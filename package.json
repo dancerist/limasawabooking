@@ -14,8 +14,11 @@
   "dependencies": {
     "@astrojs/sitemap": "^3.7.2",
     "@tailwindcss/typography": "^0.5.19",
-    "@tailwindcss/vite": "^4.2.2",
-    "astro": "^6.1.8",
-    "tailwindcss": "^4.2.2"
+    "@tailwindcss/vite": "4.2.2",
+    "astro": "6.1.8",
+    "tailwindcss": "4.2.2"
+  },
+  "overrides": {
+    "vite": "7.3.2"
   }
 }
