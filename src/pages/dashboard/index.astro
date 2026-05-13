@@ -1,0 +1,81 @@
+---
+import Layout from '../../layouts/Layout.astro'
+---
+
+<Layout title="Dashboard — Limasawa Booking" noindex={true}>
+  <div class="dash-wrap">
+    <div class="dash-header">
+      <h1>Host Dashboard</h1>
+      <a href="/list-your-property" class="btn-primary">+ Add listing</a>
+    </div>
+
+    <div id="dash-content">
+      <p class="loading-msg">Loading…</p>
+    </div>
+  </div>
+</Layout>
+
+<style>
+.dash-wrap { max-width:1100px;margin:0 auto;padding:2rem 1.5rem; }
+.dash-header { display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;flex-wrap:wrap;gap:1rem; }
+.dash-header h1 { font-size:1.75rem; }
+.loading-msg { color:var(--sb-text-muted); }
+</style>
+
+<script>
+  const REST = 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+
+  function parseJWT(t: string) {
+    try { return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))) } catch { return null }
+  }
+  function validToken() {
+    const t = localStorage.getItem('sb_token')
+    const p = t ? parseJWT(t) : null
+    return p && p.exp > Date.now() / 1000 ? t : null
+  }
+
+  const token = validToken()
+  if (!token) location.href = '/auth?redirect=/dashboard'
+
+  const content = document.getElementById('dash-content')!
+
+  async function load() {
+    try {
+      const res = await fetch(`${REST}/my-listings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error(res.statusText)
+      const data = await res.json()
+      const listings = Array.isArray(data.listings) ? data.listings : []
+      if (!listings.length) {
+        content.innerHTML = `<div class="sb-card" style="text-align:center;padding:3rem">
+          <p style="color:var(--sb-text-muted);margin-bottom:1.5rem">You have no listings yet.</p>
+          <a href="/list-your-property" class="btn-primary">Add your first listing</a>
+        </div>`
+        return
+      }
+      content.innerHTML = `<div class="dash-grid">${listings.map((l: any) => `
+        <div class="sb-card dash-listing">
+          ${l.thumb ? `<img src="${l.thumb}" alt="${l.title}" />` : '<div class="dash-listing-thumb"></div>'}
+          <div class="dash-listing-body">
+            <h3>${l.title}</h3>
+            <span class="badge badge-${l.status}">${l.status}</span>
+            ${l.price ? `<p>₱${Number(l.price).toLocaleString()} / night</p>` : ''}
+          </div>
+        </div>
+      `).join('')}</div>`
+    } catch {
+      content.innerHTML = '<p style="color:var(--sb-text-muted)">Could not load dashboard.</p>'
+    }
+  }
+
+  if (token) load()
+</script>
+
+<style is:global>
+.dash-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1.25rem; }
+.dash-listing img { width:100%;height:160px;object-fit:cover;border-radius:var(--sb-radius);margin-bottom:.75rem; }
+.dash-listing-thumb { width:100%;height:160px;background:var(--sb-secondary-pale);border-radius:var(--sb-radius);margin-bottom:.75rem; }
+.dash-listing-body h3 { font-size:1rem;margin:0 0 .5rem; }
+.dash-listing-body p { font-size:.875rem;color:var(--sb-text-muted);margin:.5rem 0 0; }
+</style>

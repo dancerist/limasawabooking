@@ -1,0 +1,184 @@
+---
+import '../styles/global.css'
+import SiteNav from '../components/SiteNav.astro'
+import SiteFooter from '../components/SiteFooter.astro'
+
+interface Props {
+  title?: string
+  description?: string
+  image?: string
+  type?: 'website' | 'article' | 'product'
+  noindex?: boolean
+  showNav?: boolean
+  showFooter?: boolean
+  jsonLd?: Record<string, any> | Record<string, any>[]
+}
+
+const SITE_NAME = 'Limasawa Booking'
+const DEFAULT_OG = 'https://admin.limasawabooking.com/wp-content/uploads/og-image.png'
+
+const {
+  title = SITE_NAME,
+  description = 'Find and book accommodation in Limasawa, Philippines — resorts, homestays, and island getaways.',
+  image = DEFAULT_OG,
+  type = 'website',
+  noindex = false,
+  showNav = true,
+  showFooter = true,
+  jsonLd,
+} = Astro.props
+
+const extraJsonLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : []
+const canonicalUrl = new URL(Astro.url.pathname, Astro.site ?? 'https://limasawabooking.com').toString()
+const ogImage = image.startsWith('http') ? image : new URL(image, Astro.site ?? 'https://limasawabooking.com').toString()
+const fullTitle = title === SITE_NAME ? title : `${title} — ${SITE_NAME}`
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <title>{fullTitle}</title>
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <link rel="canonical" href={canonicalUrl} />
+
+    <meta property="og:site_name" content={SITE_NAME} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:type" content={type} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_PH" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Nunito+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+    <script type="application/ld+json" set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: SITE_NAME,
+      url: 'https://limasawabooking.com',
+    })} />
+    {extraJsonLd.map(obj => (
+      <script type="application/ld+json" set:html={JSON.stringify(obj)} />
+    ))}
+  </head>
+  <body>
+    <script is:inline>
+      window.__sb = (function () {
+        var REST = 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+        function parseJWT(t) {
+          try { return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))) } catch { return null }
+        }
+        function validToken() {
+          var t = localStorage.getItem('sb_token')
+          var p = t ? parseJWT(t) : null
+          return (p && p.exp > Date.now() / 1000) ? t : null
+        }
+        function authedFetch(url, token, opts) {
+          opts = opts || {}
+          opts.headers = Object.assign({ 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }, opts.headers || {})
+          return fetch(url, opts)
+        }
+        var saved = new Set()
+        try { saved = new Set(JSON.parse(localStorage.getItem('sb_saved') || '[]')) } catch {}
+        function persist() { try { localStorage.setItem('sb_saved', JSON.stringify(Array.from(saved))) } catch {} }
+        return {
+          isSaved: function(slug) { return saved.has(slug) },
+          toggle: async function(slug) {
+            var token = validToken()
+            if (!token) { window.dispatchEvent(new CustomEvent('sb:need-auth', { detail: { slug } })); return }
+            var willSave = !saved.has(slug)
+            if (willSave) saved.add(slug); else saved.delete(slug)
+            persist()
+            window.dispatchEvent(new CustomEvent('sb:saved-changed', { detail: { slug, saved: willSave } }))
+            try {
+              var res = await authedFetch(REST + '/save-listing', token, { method: willSave ? 'POST' : 'DELETE', body: JSON.stringify({ slug }) })
+              if (!res.ok) throw new Error()
+            } catch {
+              if (willSave) saved.delete(slug); else saved.add(slug)
+              persist()
+              window.dispatchEvent(new CustomEvent('sb:saved-changed', { detail: { slug, saved: !willSave } }))
+            }
+          },
+          clearAll: function() { saved = new Set(); try { localStorage.removeItem('sb_saved') } catch {} window.dispatchEvent(new CustomEvent('sb:saved-cleared')) },
+          syncFromServer: async function() {
+            var token = validToken(); if (!token) return
+            try {
+              var local = Array.from(saved)
+              if (local.length) await authedFetch(REST + '/save-listing', token, { method: 'POST', body: JSON.stringify({ slugs: local }) })
+              var res = await authedFetch(REST + '/my-saved', token, { method: 'GET' }); if (!res.ok) return
+              var data = await res.json()
+              if (Array.isArray(data.slugs)) { saved = new Set(data.slugs); persist(); window.dispatchEvent(new CustomEvent('sb:saved-synced')) }
+            } catch {}
+          }
+        }
+      })()
+      document.addEventListener('DOMContentLoaded', function() { window.__sb.syncFromServer() })
+    </script>
+
+    {showNav && <SiteNav />}
+    <slot />
+    {showFooter && <SiteFooter />}
+
+    <!-- Login-required modal -->
+    <div id="sb-auth-modal" class="sam-backdrop" hidden aria-modal="true" role="dialog">
+      <div class="sam-card">
+        <button class="sam-close" id="sam-close-btn" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <div class="sam-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="#e53e3e" stroke="#e53e3e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+        </div>
+        <h2 class="sam-title">Save places you love</h2>
+        <p class="sam-sub">Create a free account to save listings and access them anytime.</p>
+        <a href="/auth?tab=register" class="sam-btn sam-primary" id="sam-register-btn">Create account</a>
+        <a href="/auth" class="sam-btn sam-ghost" id="sam-signin-btn">Sign in</a>
+      </div>
+    </div>
+
+    <style is:global>
+      .sam-backdrop { position:fixed;inset:0;z-index:900;background:rgba(13,30,43,.55);display:flex;align-items:center;justify-content:center;padding:20px;animation:sam-fade-in 160ms ease; }
+      .sam-backdrop[hidden]{display:none;}
+      @keyframes sam-fade-in{from{opacity:0}to{opacity:1}}
+      .sam-card{background:#fff;border-radius:20px;box-shadow:0 24px 80px rgba(13,30,43,.22),0 4px 16px rgba(13,30,43,.1);width:100%;max-width:380px;padding:36px 32px 28px;display:flex;flex-direction:column;align-items:center;text-align:center;position:relative;animation:sam-slide-up 200ms ease;}
+      @keyframes sam-slide-up{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+      .sam-close{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:none;background:#f1f5f9;color:#64748b;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 140ms}
+      .sam-close:hover{background:#e2e8f0;color:#1a2533}
+      .sam-icon{width:60px;height:60px;border-radius:50%;background:#fff0f0;display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+      .sam-title{font-family:'DM Sans',sans-serif;font-weight:700;font-size:20px;color:#1a2533;margin-bottom:10px}
+      .sam-sub{font-size:14px;color:#64748b;line-height:1.6;margin-bottom:24px;max-width:280px}
+      .sam-btn{display:block;width:100%;padding:13px 20px;border-radius:10px;font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px;text-decoration:none;text-align:center;cursor:pointer;transition:all 140ms;border:none}
+      .sam-primary{background:#25cece;color:#fff;margin-bottom:10px;box-shadow:0 4px 16px rgba(37,206,206,.35)}
+      .sam-primary:hover{background:#1eb8b8}
+      .sam-ghost{background:#f1f5f9;color:#4c5b6c}
+      .sam-ghost:hover{background:#e2e8f0}
+    </style>
+
+    <script>
+      ;(function(){
+        var modal=document.getElementById('sb-auth-modal')!
+        var closeBtn=document.getElementById('sam-close-btn')!
+        var registerBtn=document.getElementById('sam-register-btn') as HTMLAnchorElement
+        var signinBtn=document.getElementById('sam-signin-btn') as HTMLAnchorElement
+        function open(){var r=encodeURIComponent(location.pathname+location.search);registerBtn.href='/auth?tab=register&redirect='+r;signinBtn.href='/auth?redirect='+r;modal.hidden=false;document.body.style.overflow='hidden'}
+        function close(){modal.hidden=true;document.body.style.overflow=''}
+        window.addEventListener('sb:need-auth',open)
+        closeBtn.addEventListener('click',close)
+        modal.addEventListener('click',function(e){if(e.target===modal)close()})
+        document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!modal.hidden)close()})
+      })()
+    </script>
+  </body>
+</html>

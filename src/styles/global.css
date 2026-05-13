@@ -1,0 +1,103 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+:root {
+  --cyan:       #25cece;
+  --cyan-hover: #1ab4b4;
+  --cyan-light: #edfcfc;
+  --cyan-mid:   #93eceb;
+  --navy:       #253f55;
+  --navy-dark:  #182d3c;
+  --ink:        #0d1e2b;
+  --ink-2:      #274455;
+  --ink-3:      #5a7d96;
+  --sl-200:     #dce6ef;
+  --sl-300:     #c2d3e0;
+  --sl-400:     #8aaabf;
+  --star:       #f4a925;
+  --teal-bg:    #e8f7f7;
+
+  --sb-primary:         #3EC7CF;
+  --sb-primary-dark:    #32B5BC;
+  --sb-primary-deeper:  #279DA3;
+  --sb-primary-light:   #E6F9FA;
+  --sb-primary-mid:     #BEF0F3;
+  --sb-primary-trans-10: rgba(62,199,207,0.10);
+  --sb-primary-trans-50: rgba(62,199,207,0.50);
+  --sb-primary-trans-90: rgba(62,199,207,0.90);
+
+  --sb-secondary:            #4C5B6C;
+  --sb-secondary-mid:        #5E6E80;
+  --sb-secondary-light:      #EEF2F5;
+  --sb-secondary-pale:       #F5F7FA;
+  --sb-secondary-ultra-dark: #151A1E;
+
+  --sb-text:        #1A2533;
+  --sb-text-muted:  #64748B;
+  --sb-border:      #E2EBF3;
+  --sb-white:       #FFFFFF;
+  --sb-bg:          #F5F8FB;
+  --sb-radius:      12px;
+  --sb-radius-lg:   18px;
+  --sb-shadow:      0 2px 12px rgba(62,199,207,0.08), 0 1px 3px rgba(76,91,108,0.06);
+  --sb-shadow-lg:   0 8px 32px rgba(62,199,207,0.12), 0 2px 8px rgba(76,91,108,0.08);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Nunito Sans', system-ui, -apple-system, sans-serif; color: var(--sb-text); background: var(--sb-bg); }
+h1, h2, h3, h4, h5, h6 { font-family: 'DM Sans', system-ui, -apple-system, sans-serif; }
+
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  background: var(--sb-primary); color: #fff; font-weight: 600;
+  padding: 0.75rem 1.5rem; border-radius: var(--sb-radius);
+  border: none; cursor: pointer; transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  font-size: 0.95rem; text-decoration: none;
+}
+.btn-primary:hover { background: var(--sb-primary-dark); box-shadow: 0 4px 16px rgba(62,199,207,0.35); transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+
+.btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  background: var(--sb-secondary-light); color: var(--sb-secondary); font-weight: 600;
+  padding: 0.75rem 1.5rem; border-radius: var(--sb-radius);
+  border: none; cursor: pointer; transition: background 0.2s;
+  font-size: 0.95rem; text-decoration: none;
+}
+.btn-secondary:hover { background: #DDE6F0; }
+
+.btn-outline {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  background: transparent; color: var(--sb-primary); font-weight: 600;
+  padding: 0.7rem 1.4rem; border-radius: var(--sb-radius);
+  border: 2px solid var(--sb-primary); cursor: pointer; transition: all 0.2s;
+  font-size: 0.95rem; text-decoration: none;
+}
+.btn-outline:hover { background: var(--sb-primary-light); }
+
+.sb-input {
+  width: 100%; padding: 0.75rem 1rem;
+  border: 1.5px solid var(--sb-border); border-radius: var(--sb-radius);
+  font-size: 0.95rem; color: var(--sb-text); background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+}
+.sb-input:focus { border-color: var(--sb-primary); box-shadow: 0 0 0 3px var(--sb-primary-trans-10); }
+.sb-input::placeholder { color: #A0AEC0; }
+
+.sb-card {
+  background: #fff; border: 1px solid var(--sb-border);
+  border-radius: var(--sb-radius-lg); padding: 1.5rem;
+  box-shadow: var(--sb-shadow);
+}
+
+.badge-pending  { background:#FFF7ED; color:#C2410C; border:1px solid #FED7AA; }
+.badge-publish  { background:#F0FDF4; color:#15803D; border:1px solid #BBF7D0; }
+.badge-draft    { background:#F8FAFC; color:#64748B; border:1px solid #CBD5E1; }
+.badge { display:inline-flex; align-items:center; gap:0.3rem; font-size:0.7rem; font-weight:700;
+         text-transform:uppercase; letter-spacing:.06em; padding:0.2rem 0.6rem; border-radius:999px; }
+
+.tier-free     { background:#EFF6FF; color:#1D4ED8; }
+.tier-local    { background:#F0FDF4; color:#15803D; }
+.tier-prime    { background:#FFF7ED; color:#C2410C; }
+.tier-featured { background:linear-gradient(135deg,#FFF7ED,#FEF3C7); color:#92400E; }

@@ -1,0 +1,63 @@
+---
+const year = new Date().getFullYear()
+---
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a href="/" class="footer-logo">Limasawa<strong>Booking</strong></a>
+      <p>Find and book accommodation in Limasawa, Philippines.</p>
+    </div>
+    <div class="footer-cols">
+      <div>
+        <h4>Explore</h4>
+        <a href="/stays">Browse Stays</a>
+        <a href="/blog">Blog</a>
+      </div>
+      <div>
+        <h4>Account</h4>
+        <a href="/auth">Sign in</a>
+        <a href="/auth?tab=register">Register</a>
+        <a href="/dashboard">Dashboard</a>
+      </div>
+      <div>
+        <h4>Hosts</h4>
+        <a href="/list-your-property">List your property</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© {year} LimasawaBooking.com</span>
+    <span>
+      <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
+    </span>
+  </div>
+</footer>
+
+<style is:global>
+.site-footer {
+  background: var(--navy-dark); color: #b0c4d4;
+  margin-top: 4rem; padding: 3rem 1.5rem 1.5rem;
+}
+.footer-inner {
+  max-width: 1280px; margin: 0 auto;
+  display: flex; gap: 3rem; flex-wrap: wrap; margin-bottom: 2.5rem;
+}
+.footer-brand { flex: 1; min-width: 200px; }
+.footer-logo { font-size: 1.1rem; color: #fff; text-decoration: none; display: block; margin-bottom: 0.5rem; }
+.footer-logo strong { color: var(--sb-primary); }
+.footer-brand p { font-size: 0.875rem; line-height: 1.6; margin: 0; }
+.footer-cols { display: flex; gap: 2.5rem; flex-wrap: wrap; }
+.footer-cols div { display: flex; flex-direction: column; gap: 0.4rem; }
+.footer-cols h4 { color: #fff; font-size: 0.8rem; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 0.5rem; }
+.footer-cols a { color: #b0c4d4; text-decoration: none; font-size: 0.875rem; }
+.footer-cols a:hover { color: var(--sb-primary); }
+.footer-bottom {
+  max-width: 1280px; margin: 0 auto;
+  border-top: 1px solid rgba(255,255,255,.08);
+  padding-top: 1.25rem;
+  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
+  font-size: 0.8rem;
+}
+.footer-bottom a { color: #b0c4d4; text-decoration: none; }
+.footer-bottom a:hover { color: var(--sb-primary); }
+</style>

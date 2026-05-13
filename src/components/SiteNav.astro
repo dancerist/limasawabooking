@@ -1,0 +1,127 @@
+---
+const REST = 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+---
+<header class="site-nav">
+  <div class="nav-inner">
+    <a href="/" class="nav-logo">
+      <span class="logo-text">Limasawa<strong>Booking</strong></span>
+    </a>
+    <nav class="nav-links">
+      <a href="/stays">Browse Stays</a>
+      <a href="/list-your-property" class="btn-primary" style="padding:0.5rem 1rem;font-size:0.875rem;">List your property</a>
+      <div class="nav-account" id="nav-account">
+        <button class="nav-avatar-btn" id="nav-avatar-btn" aria-label="Account menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        </button>
+        <div class="nav-dropdown" id="nav-dropdown" hidden>
+          <a href="/dashboard" id="dd-dashboard" hidden>Dashboard</a>
+          <a href="/auth" id="dd-signin">Sign in</a>
+          <button id="dd-signout" hidden>Sign out</button>
+        </div>
+      </div>
+    </nav>
+    <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+  <div class="nav-mobile" id="nav-mobile" hidden>
+    <a href="/stays">Browse Stays</a>
+    <a href="/list-your-property">List your property</a>
+    <a href="/dashboard" id="mob-dashboard" hidden>Dashboard</a>
+    <a href="/auth" id="mob-signin">Sign in</a>
+    <button id="mob-signout" hidden>Sign out</button>
+  </div>
+</header>
+
+<style is:global>
+.site-nav {
+  position: sticky; top: 0; z-index: 100;
+  background: #fff; border-bottom: 1px solid var(--sb-border);
+  box-shadow: 0 1px 6px rgba(62,199,207,0.06);
+}
+.nav-inner {
+  max-width: 1280px; margin: 0 auto;
+  padding: 0 1.5rem; height: 64px;
+  display: flex; align-items: center; gap: 1.5rem;
+}
+.nav-logo { text-decoration: none; color: var(--sb-text); font-size: 1.15rem; }
+.logo-text strong { color: var(--sb-primary); }
+.nav-links { margin-left: auto; display: flex; align-items: center; gap: 1.25rem; }
+.nav-links a { color: var(--sb-text); text-decoration: none; font-size: 0.9rem; font-weight: 500; }
+.nav-links a:hover { color: var(--sb-primary); }
+.nav-account { position: relative; }
+.nav-avatar-btn {
+  width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid var(--sb-border);
+  background: var(--sb-secondary-pale); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--sb-secondary); transition: border-color 0.2s;
+}
+.nav-avatar-btn:hover { border-color: var(--sb-primary); }
+.nav-dropdown {
+  position: absolute; right: 0; top: calc(100% + 8px);
+  background: #fff; border: 1px solid var(--sb-border); border-radius: var(--sb-radius);
+  box-shadow: var(--sb-shadow-lg); min-width: 160px; padding: 0.5rem 0;
+  display: flex; flex-direction: column;
+}
+.nav-dropdown[hidden] { display: none; }
+.nav-dropdown a, .nav-dropdown button {
+  display: block; width: 100%; padding: 0.6rem 1rem; text-align: left;
+  color: var(--sb-text); font-size: 0.9rem; text-decoration: none;
+  background: none; border: none; cursor: pointer;
+}
+.nav-dropdown a:hover, .nav-dropdown button:hover { background: var(--sb-secondary-pale); }
+.nav-hamburger {
+  display: none; flex-direction: column; gap: 5px;
+  background: none; border: none; cursor: pointer; margin-left: auto; padding: 4px;
+}
+.nav-hamburger span { display: block; width: 22px; height: 2px; background: var(--sb-text); border-radius: 2px; }
+.nav-mobile { display: flex; flex-direction: column; border-top: 1px solid var(--sb-border); padding: 0.75rem 1.5rem; gap: 0.25rem; }
+.nav-mobile[hidden] { display: none; }
+.nav-mobile a, .nav-mobile button {
+  padding: 0.6rem 0; color: var(--sb-text); text-decoration: none; font-size: 0.95rem;
+  background: none; border: none; cursor: pointer; text-align: left;
+}
+@media (max-width: 640px) {
+  .nav-links { display: none; }
+  .nav-hamburger { display: flex; }
+}
+</style>
+
+<script define:vars={{ REST }}>
+  (function () {
+    function parseJWT(t) {
+      try { return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))) } catch { return null }
+    }
+    function validToken() {
+      var t = localStorage.getItem('sb_token')
+      var p = t ? parseJWT(t) : null
+      return (p && p.exp > Date.now() / 1000) ? t : null
+    }
+    function setLoggedIn(yes) {
+      document.getElementById('dd-dashboard').hidden = !yes
+      document.getElementById('dd-signin').hidden = yes
+      document.getElementById('dd-signout').hidden = !yes
+      document.getElementById('mob-dashboard').hidden = !yes
+      document.getElementById('mob-signin').hidden = yes
+      document.getElementById('mob-signout').hidden = !yes
+    }
+    setLoggedIn(!!validToken())
+
+    var btn = document.getElementById('nav-avatar-btn')
+    var dd  = document.getElementById('nav-dropdown')
+    btn.addEventListener('click', function(e) { e.stopPropagation(); dd.hidden = !dd.hidden })
+    document.addEventListener('click', function() { dd.hidden = true })
+
+    document.getElementById('dd-signout').addEventListener('click', logout)
+    document.getElementById('mob-signout').addEventListener('click', logout)
+    function logout() {
+      localStorage.removeItem('sb_token')
+      localStorage.removeItem('sb_saved')
+      location.href = '/'
+    }
+
+    var ham = document.getElementById('nav-hamburger')
+    var mob = document.getElementById('nav-mobile')
+    ham.addEventListener('click', function() { mob.hidden = !mob.hidden })
+  })()
+</script>

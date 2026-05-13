@@ -1,0 +1,48 @@
+---
+import Layout from '../layouts/Layout.astro'
+---
+
+<Layout title="List Your Property — Limasawa Booking" noindex={true}>
+  <div class="lp-wrap">
+    <div class="lp-inner">
+      <h1>List your property</h1>
+      <p>Reach travellers coming to Limasawa Island. Listing is free.</p>
+      <div id="lp-step-container">
+        <p class="loading-msg">Loading form…</p>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<style>
+.lp-wrap { min-height:calc(100vh - 64px);background:var(--sb-bg);padding:3rem 1.5rem; }
+.lp-inner { max-width:600px;margin:0 auto; }
+.lp-inner h1 { font-size:2rem;margin-bottom:.5rem; }
+.lp-inner > p { color:var(--sb-text-muted);margin-bottom:2rem; }
+.loading-msg { color:var(--sb-text-muted); }
+</style>
+
+<script>
+  /* Multi-step listing form — to be built out matching siargaobooking flow */
+  const token = (() => {
+    try {
+      const t = localStorage.getItem('sb_token')
+      if (!t) return null
+      const p = JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
+      return p && p.exp > Date.now() / 1000 ? t : null
+    } catch { return null }
+  })()
+
+  const container = document.getElementById('lp-step-container')!
+
+  if (!token) {
+    container.innerHTML = `<div class="sb-card" style="text-align:center;padding:2.5rem">
+      <p style="color:var(--sb-text-muted);margin-bottom:1.5rem">You need to be signed in to list a property.</p>
+      <a href="/auth?redirect=/list-your-property" class="btn-primary">Sign in or Register</a>
+    </div>`
+  } else {
+    container.innerHTML = `<div class="sb-card" style="text-align:center;padding:2.5rem">
+      <p style="color:var(--sb-text-muted)">Listing form coming soon.</p>
+    </div>`
+  }
+</script>

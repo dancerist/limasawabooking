@@ -1,0 +1,124 @@
+---
+import Layout from '../layouts/Layout.astro'
+---
+
+<Layout title="Sign In — Limasawa Booking" noindex={true} showFooter={false}>
+  <div class="auth-wrap">
+    <div class="auth-card sb-card">
+      <a href="/" class="auth-logo">Limasawa<strong>Booking</strong></a>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login" id="tab-login">Sign in</button>
+        <button class="auth-tab" data-tab="register" id="tab-register">Register</button>
+      </div>
+
+      <!-- Login -->
+      <form id="form-login" class="auth-form">
+        <label>Email<input class="sb-input" type="email" id="login-email" required autocomplete="email" /></label>
+        <label>Password<input class="sb-input" type="password" id="login-password" required autocomplete="current-password" /></label>
+        <div id="login-error" class="auth-error" hidden></div>
+        <button type="submit" class="btn-primary" style="width:100%">Sign in</button>
+      </form>
+
+      <!-- Register -->
+      <form id="form-register" class="auth-form" hidden>
+        <label>Name<input class="sb-input" type="text" id="reg-name" required /></label>
+        <label>Email<input class="sb-input" type="email" id="reg-email" required autocomplete="email" /></label>
+        <label>Password<input class="sb-input" type="password" id="reg-password" required minlength="8" /></label>
+        <div id="reg-error" class="auth-error" hidden></div>
+        <button type="submit" class="btn-primary" style="width:100%">Create account</button>
+      </form>
+    </div>
+  </div>
+</Layout>
+
+<style>
+.auth-wrap { min-height:calc(100vh - 64px);display:flex;align-items:center;justify-content:center;padding:2rem 1rem;background:var(--sb-bg); }
+.auth-card { width:100%;max-width:400px; }
+.auth-logo { display:block;font-size:1.2rem;color:var(--sb-text);text-decoration:none;margin-bottom:1.5rem;text-align:center; }
+.auth-logo strong { color:var(--sb-primary); }
+.auth-tabs { display:flex;gap:.5rem;margin-bottom:1.5rem;background:var(--sb-secondary-pale);border-radius:var(--sb-radius);padding:4px; }
+.auth-tab { flex:1;padding:.5rem;border:none;background:transparent;border-radius:calc(var(--sb-radius) - 2px);cursor:pointer;font-weight:600;font-size:.9rem;color:var(--sb-text-muted);transition:all .2s; }
+.auth-tab.active { background:#fff;color:var(--sb-primary);box-shadow:0 1px 4px rgba(0,0,0,.08); }
+.auth-form { display:flex;flex-direction:column;gap:1rem; }
+.auth-form label { display:flex;flex-direction:column;gap:.35rem;font-size:.875rem;font-weight:600;color:var(--sb-text); }
+.auth-error { background:#fff5f5;border:1px solid #feb2b2;color:#c53030;padding:.75rem;border-radius:var(--sb-radius);font-size:.875rem; }
+</style>
+
+<script>
+  const REST = 'https://admin.limasawabooking.com/wp-json'
+  const params = new URLSearchParams(location.search)
+  const redirect = params.get('redirect') || '/dashboard'
+
+  function parseJWT(t: string) {
+    try { return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))) } catch { return null }
+  }
+  function validToken() {
+    const t = localStorage.getItem('sb_token')
+    const p = t ? parseJWT(t) : null
+    return p && p.exp > Date.now() / 1000 ? t : null
+  }
+  if (validToken()) location.href = redirect
+
+  const tabLogin    = document.getElementById('tab-login')!
+  const tabRegister = document.getElementById('tab-register')!
+  const formLogin   = document.getElementById('form-login')!
+  const formRegister = document.getElementById('form-register')!
+
+  function showTab(tab: string) {
+    const isLogin = tab === 'login'
+    tabLogin.classList.toggle('active', isLogin)
+    tabRegister.classList.toggle('active', !isLogin)
+    formLogin.hidden = !isLogin
+    formRegister.hidden = isLogin
+  }
+
+  if (params.get('tab') === 'register') showTab('register')
+  tabLogin.addEventListener('click', () => showTab('login'))
+  tabRegister.addEventListener('click', () => showTab('register'))
+
+  formLogin.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const errEl = document.getElementById('login-error')!
+    errEl.hidden = true
+    const email    = (document.getElementById('login-email') as HTMLInputElement).value
+    const password = (document.getElementById('login-password') as HTMLInputElement).value
+    try {
+      const res = await fetch(`${REST}/jwt-auth/v1/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: email, password }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.token) throw new Error(data.message || 'Login failed')
+      localStorage.setItem('sb_token', data.token)
+      location.href = redirect
+    } catch (err: any) {
+      errEl.textContent = err.message || 'Login failed'
+      errEl.hidden = false
+    }
+  })
+
+  formRegister.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const errEl = document.getElementById('reg-error')!
+    errEl.hidden = true
+    const name     = (document.getElementById('reg-name') as HTMLInputElement).value
+    const email    = (document.getElementById('reg-email') as HTMLInputElement).value
+    const password = (document.getElementById('reg-password') as HTMLInputElement).value
+    try {
+      const res = await fetch(`${REST}/limasawa/v1/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || 'Registration failed')
+      if (data.token) { localStorage.setItem('sb_token', data.token); location.href = redirect }
+      else showTab('login')
+    } catch (err: any) {
+      errEl.textContent = err.message || 'Registration failed'
+      errEl.hidden = false
+    }
+  })
+</script>

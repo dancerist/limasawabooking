@@ -1,0 +1,42 @@
+---
+import Layout from '../layouts/Layout.astro'
+---
+
+<Layout title="Limasawa Booking — Find Stays in Limasawa, Philippines">
+  <main>
+    <section class="hero">
+      <div class="hero-inner">
+        <h1>Find your place in <span>Limasawa</span></h1>
+        <p>Discover resorts, homestays, and island getaways in one of the Philippines' most historic islands.</p>
+        <div class="hero-cta">
+          <a href="/stays" class="btn-primary">Browse all stays</a>
+          <a href="/list-your-property" class="btn-outline">List your property</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-listings">
+      <div class="section-inner">
+        <h2>Featured Stays</h2>
+        <p class="section-sub">Coming soon — listings are being added.</p>
+      </div>
+    </section>
+  </main>
+</Layout>
+
+<style>
+.hero {
+  background: linear-gradient(135deg, var(--sb-primary-light) 0%, #fff 60%);
+  padding: 5rem 1.5rem 4rem;
+  text-align: center;
+}
+.hero-inner { max-width: 640px; margin: 0 auto; }
+.hero h1 { font-size: clamp(2rem, 5vw, 3rem); color: var(--sb-text); margin-bottom: 1rem; }
+.hero h1 span { color: var(--sb-primary); }
+.hero p { font-size: 1.1rem; color: var(--sb-text-muted); margin-bottom: 2rem; line-height: 1.7; }
+.hero-cta { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+.section-listings { padding: 4rem 1.5rem; }
+.section-inner { max-width: 1280px; margin: 0 auto; }
+.section-inner h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+.section-sub { color: var(--sb-text-muted); }
+</style>
