@@ -2,41 +2,72 @@
 import Layout from '../layouts/Layout.astro'
 ---
 
-<Layout title="Limasawa Booking — Find Stays in Limasawa, Philippines">
-  <main>
-    <section class="hero">
-      <div class="hero-inner">
-        <h1>Find your place in <span>Limasawa</span></h1>
-        <p>Discover resorts, homestays, and island getaways in one of the Philippines' most historic islands.</p>
-        <div class="hero-cta">
-          <a href="/stays" class="btn-primary">Browse all stays</a>
-          <a href="/list-your-property" class="btn-outline">List your property</a>
-        </div>
-      </div>
-    </section>
-
-    <section class="section-listings">
-      <div class="section-inner">
-        <h2>Featured Stays</h2>
-        <p class="section-sub">Coming soon — listings are being added.</p>
-      </div>
-    </section>
-  </main>
+<Layout
+  title="Limasawa Booking — Coming Soon"
+  description="Find and book accommodation in Limasawa, Philippines. Launching soon."
+  showNav={false}
+  showFooter={false}
+>
+  <div class="holding">
+    <div class="holding-card">
+      <div class="holding-logo">Limasawa<strong>Booking</strong></div>
+      <h1>Coming Soon</h1>
+      <p>We're building something for Limasawa Island. Check back soon.</p>
+      <div class="holding-divider"></div>
+      <span class="holding-tag">🇵🇭 Limasawa, Southern Leyte</span>
+    </div>
+  </div>
 </Layout>
 
 <style>
-.hero {
-  background: linear-gradient(135deg, var(--sb-primary-light) 0%, #fff 60%);
-  padding: 5rem 1.5rem 4rem;
-  text-align: center;
+.holding {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: linear-gradient(135deg, #0d1e2b 0%, #1a3a4a 50%, #0d3040 100%);
 }
-.hero-inner { max-width: 640px; margin: 0 auto; }
-.hero h1 { font-size: clamp(2rem, 5vw, 3rem); color: var(--sb-text); margin-bottom: 1rem; }
-.hero h1 span { color: var(--sb-primary); }
-.hero p { font-size: 1.1rem; color: var(--sb-text-muted); margin-bottom: 2rem; line-height: 1.7; }
-.hero-cta { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
-.section-listings { padding: 4rem 1.5rem; }
-.section-inner { max-width: 1280px; margin: 0 auto; }
-.section-inner h2 { font-size: 1.75rem; margin-bottom: 0.5rem; }
-.section-sub { color: var(--sb-text-muted); }
+.holding-card {
+  text-align: center;
+  max-width: 480px;
+}
+.holding-logo {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 2.5rem;
+  letter-spacing: -0.02em;
+}
+.holding-logo strong {
+  color: var(--sb-primary);
+}
+h1 {
+  font-family: 'DM Sans', sans-serif;
+  font-size: clamp(2.5rem, 8vw, 4rem);
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 1rem;
+  letter-spacing: -0.03em;
+}
+p {
+  font-size: 1.1rem;
+  color: #8aaabf;
+  line-height: 1.7;
+  margin: 0;
+}
+.holding-divider {
+  width: 48px;
+  height: 3px;
+  background: var(--sb-primary);
+  border-radius: 2px;
+  margin: 2rem auto;
+  opacity: 0.6;
+}
+.holding-tag {
+  font-size: 0.875rem;
+  color: #5a7d96;
+  letter-spacing: 0.04em;
+}
 </style>
