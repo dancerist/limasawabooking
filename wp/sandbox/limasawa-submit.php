@@ -291,4 +291,87 @@ if (defined('ABSPATH')) {
             ], 201);
         }
     }
+
+    /* =========================================================================
+     * Subscription renewal / upgrade (Phase 4) — manual e-wallet model.
+     * Paid upgrades are recorded as pending_review; the listing's tier only
+     * changes once an admin approves the payment (Phase 6). Free is immediate.
+     * ====================================================================== */
+    add_action('rest_api_init', function () {
+        register_rest_route('limasawa/v1', '/renew-subscription', [
+            'methods' => 'POST', 'permission_callback' => '__return_true', 'callback' => 'sb_renew_subscription',
+        ]);
+    });
+
+    if (!function_exists('sb_coupon_discount')) {
+        function sb_coupon_discount($code, $amount) {
+            $code = strtoupper(trim((string) $code));
+            if ($code === '' || $amount <= 0) return ['code' => '', 'discount' => 0.0];
+            $coupons = get_option('sb_coupons', []);
+            if (!is_array($coupons)) return ['code' => '', 'discount' => 0.0];
+            $upper = [];
+            foreach ($coupons as $k => $v) $upper[strtoupper((string) $k)] = $v;
+            if (!isset($upper[$code])) return ['code' => '', 'discount' => 0.0];
+            $c    = $upper[$code];
+            $type = ($c['type'] ?? 'percentage') === 'fixed' ? 'fixed' : 'percentage';
+            $val  = (float) ($c['value'] ?? 0);
+            $disc = $type === 'percentage' ? floor($amount * $val / 100) : min($val, $amount);
+            return ['code' => $code, 'discount' => (float) $disc];
+        }
+    }
+
+    if (!function_exists('sb_renew_subscription')) {
+        function sb_renew_subscription(WP_REST_Request $req) {
+            $user = function_exists('sb_jwt_current_user') ? sb_jwt_current_user($req) : null;
+            if (!$user) return new WP_REST_Response(['success' => false, 'message' => 'Please sign in.'], 401);
+
+            $id   = (int) $req->get_param('listing_id');
+            $post = $id ? get_post($id) : null;
+            if (!$post || $post->post_type !== 'accommodation') {
+                return new WP_REST_Response(['success' => false, 'message' => 'Listing not found.'], 404);
+            }
+            if ((int) $post->post_author !== (int) $user->ID) {
+                return new WP_REST_Response(['success' => false, 'message' => 'Not your listing.'], 403);
+            }
+
+            $tiers = sb_tiers();
+            $tier  = (string) $req->get_param('tier');
+            if (!isset($tiers[$tier])) {
+                return new WP_REST_Response(['success' => false, 'message' => 'Invalid plan.'], 400);
+            }
+            $billing = $req->get_param('billing_period') === 'yearly' ? 'yearly' : 'monthly';
+
+            if ($tier === 'free') {
+                update_post_meta($id, 'listing_tier', 'free');
+                update_post_meta($id, 'sb_payment', [
+                    'tier' => 'free', 'billingPeriod' => $billing, 'amount' => 0, 'method' => '',
+                    'reference' => '', 'receiptId' => 0, 'couponCode' => '', 'status' => 'not_required',
+                    'paidAt' => '', 'expiresAt' => '', 'submittedAt' => current_time('mysql'),
+                ]);
+                return new WP_REST_Response(['success' => true, 'message' => 'Switched to the free plan.'], 200);
+            }
+
+            // Paid: server computes the base price from tier config (anti-tamper),
+            // re-validates the coupon, and records the payment for admin review.
+            $base   = (float) ($tiers[$tier][$billing] ?? 0);
+            $coupon = sb_coupon_discount($req->get_param('coupon_code'), $base);
+            $final  = max(0, $base - $coupon['discount']);
+
+            update_post_meta($id, 'sb_payment', [
+                'tier'          => $tier,
+                'billingPeriod' => $billing,
+                'amount'        => $final,
+                'method'        => sanitize_text_field($req->get_param('payment_method')),
+                'reference'     => sanitize_text_field($req->get_param('payment_reference')),
+                'receiptId'     => (int) $req->get_param('payment_receipt_id'),
+                'couponCode'    => $coupon['code'],
+                'status'        => 'pending_review',
+                'paidAt'        => '',
+                'expiresAt'     => '',
+                'submittedAt'   => current_time('mysql'),
+            ]);
+            // listing_tier is NOT upgraded until an admin approves the payment (Phase 6).
+            return new WP_REST_Response(['success' => true, 'message' => 'Payment submitted — your upgrade goes live once we confirm it.'], 200);
+        }
+    }
 }
