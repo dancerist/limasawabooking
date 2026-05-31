@@ -5,6 +5,7 @@ interface Props {
 }
 const { location = '', locationName = '' } = Astro.props;
 const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking.com/wp-json/limasawa/v1';
+const GMAPS_KEY = import.meta.env.PUBLIC_GOOGLE_MAPS_KEY ?? '';
 ---
 
 {location && (
@@ -251,11 +252,18 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
   </div>
 </div>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" is:inline></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" is:inline></script>
+<!-- Google Maps JS API (loaded async) + MarkerClusterer. window.__gmapsReady
+     resolves once the API is ready; boot() awaits it before initMap(). -->
+<script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js" is:inline></script>
+<script is:inline define:vars={{ GMAPS_KEY }}>
+  if (GMAPS_KEY) {
+    window.__gmapsReady = new Promise(function (resolve) { window.__initGmaps = resolve })
+    var gms = document.createElement('script')
+    gms.src = 'https://maps.googleapis.com/maps/api/js?key=' + GMAPS_KEY + '&loading=async&callback=__initGmaps'
+    gms.async = true
+    document.head.appendChild(gms)
+  }
+</script>
 
 <style is:global>
   /* ── Reset & tokens ───────────────────────────────── */
@@ -1089,7 +1097,9 @@ const HIST_BUCKETS = 24
 const PER_PAGE = 24
 const PIN_CACHE_KEY = 'sb_pins_v1'
 let mapInstance = null
-let markerLayer = null
+let clusterer = null         // markerClusterer.MarkerClusterer
+let mapProjOverlay = null    // OverlayView used only for pixel projection
+let mapReady = false         // gate idle-refetch until initial load is done
 let mapMoveTimer = null
 let fetchController = null
 let allPins = []
@@ -1115,7 +1125,7 @@ function setMobileView(view) {
     mobileView === 'map' ? 'Tap a price to preview' : 'Limasawa Island'
   if (mobileView === 'map') {
     window.setTimeout(() => {
-      mapInstance?.invalidateSize()
+      if (mapInstance && window.google) google.maps.event.trigger(mapInstance, 'resize')
       if (activePopupListing) positionPopup()
     }, 80)
   }
@@ -1398,10 +1408,10 @@ function paramsForCards(page = 1, opts = {}) {
   const bounds = shouldUseBounds ? (opts.bounds ?? mapInstance?.getBounds()) : null
   if (bounds) {
     params.set('bounds', [
-      bounds.getSouthWest().lat,
-      bounds.getSouthWest().lng,
-      bounds.getNorthEast().lat,
-      bounds.getNorthEast().lng,
+      bounds.getSouthWest().lat(),
+      bounds.getSouthWest().lng(),
+      bounds.getNorthEast().lat(),
+      bounds.getNorthEast().lng(),
     ].join(','))
   }
 
@@ -1625,33 +1635,34 @@ function renderCards(items) {
 // Map
 // ─────────────────────────────────────────────────────────────────────────────
 function initMap() {
-  mapInstance = L.map('map', {
-    center: [9.9333, 125.0667],
+  mapInstance = new google.maps.Map(document.getElementById('map'), {
+    center: { lat: 9.9333, lng: 125.0667 },
     zoom: 13,
-    zoomControl: true,
+    mapTypeControl: false,
+    streetViewControl: false,
+    fullscreenControl: false,
+    clickableIcons: false,
+    gestureHandling: 'greedy',
   })
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap © CARTO',
-    subdomains: 'abcd', maxZoom: 19,
-  }).addTo(mapInstance)
-
   window.__stMap = mapInstance
-  markerLayer = window.L.markerClusterGroup
-    ? L.markerClusterGroup({
-        showCoverageOnHover: false,
-        maxClusterRadius: 44,
-        disableClusteringAtZoom: 14,
-      }).addTo(mapInstance)
-    : L.layerGroup().addTo(mapInstance)
 
-  // Click empty map area → close popup (Leaflet map click doesn't fire when clicking a marker)
-  mapInstance.on('click', closeMapPopup)
+  // Hidden overlay used purely to access the pixel projection (positionPopup).
+  mapProjOverlay = new google.maps.OverlayView()
+  mapProjOverlay.onAdd = function () {}
+  mapProjOverlay.draw = function () {}
+  mapProjOverlay.onRemove = function () {}
+  mapProjOverlay.setMap(mapInstance)
 
-  // Keep popup anchored to its pin while panning/zooming
-  mapInstance.on('move zoom', positionPopup)
+  // Click empty map → close popup
+  mapInstance.addListener('click', closeMapPopup)
 
-  // Viewport filter — re-run when user pans or zooms (debounced)
-  mapInstance.on('moveend zoomend', function () {
+  // Keep popup anchored to its pin while panning/zooming (fires continuously)
+  mapInstance.addListener('bounds_changed', positionPopup)
+
+  // Viewport filter — refetch when the user pans/zooms (debounced). Guarded by
+  // mapReady so the initial programmatic fitBounds doesn't trigger a refetch.
+  mapInstance.addListener('idle', function () {
+    if (!mapReady) return
     if (isMobileStays() && mobileView !== 'map') return
     clearTimeout(mapMoveTimer)
     mapMoveTimer = setTimeout(function () {
@@ -1694,7 +1705,9 @@ function positionPopup() {
     return
   }
 
-  const point  = mapInstance.latLngToContainerPoint(L.latLng(coords[0], coords[1]))
+  const proj = mapProjOverlay && mapProjOverlay.getProjection ? mapProjOverlay.getProjection() : null
+  if (!proj) return
+  const point = proj.fromLatLngToContainerPixel(new google.maps.LatLng(coords[0], coords[1]))
   const PIN_H  = 34   // approx height of .mp-pin pill
   const GAP    = 6    // gap between pin bottom and popup top
   const popupW = 260
@@ -1878,30 +1891,48 @@ window.addEventListener('sb:saved-changed', e => {
   }
 })
 
-function renderAllPins(pins) {
-  if (!mapInstance || !markerLayer) return
-  markerLayer.clearLayers()
+// Build an SVG price-pill icon for a classic google.maps.Marker (keeps the
+// Leaflet "price pin" look without needing a cloud Map ID / AdvancedMarker).
+function pricePinIcon(l) {
+  const label = l.price > 0 ? '₱' + Number(l.price).toLocaleString() : (l.muniName || 'View')
+  const w = Math.max(46, 16 + label.length * 8)
+  const h = 28
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + (h + 8) + '" viewBox="0 0 ' + w + ' ' + (h + 8) + '">' +
+    '<rect x="1" y="1" width="' + (w - 2) + '" height="' + (h - 2) + '" rx="' + ((h - 2) / 2) + '" fill="#ffffff" stroke="#0d1e2b" stroke-width="1.5"/>' +
+    '<path d="M' + (w / 2 - 6) + ' ' + (h - 1) + ' L' + (w / 2) + ' ' + (h + 6) + ' L' + (w / 2 + 6) + ' ' + (h - 1) + ' Z" fill="#ffffff" stroke="#0d1e2b" stroke-width="1.5"/>' +
+    '<text x="' + (w / 2) + '" y="' + (h / 2 + 4) + '" text-anchor="middle" font-family="DM Sans, Arial, sans-serif" font-size="12.5" font-weight="700" fill="#0d1e2b">' + label + '</text>' +
+    '</svg>'
+  return {
+    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+    scaledSize: new google.maps.Size(w, h + 8),
+    anchor: new google.maps.Point(w / 2, h + 6),
+  }
+}
 
+function renderAllPins(pins) {
+  if (!mapInstance || !window.google) return
+  if (clusterer) clusterer.clearMarkers()
+
+  const markers = []
   pins.forEach(pin => {
     const l = normalizePin(pin)
     const coords = listingCoords(l)
     if (!coords) return
-    const label = l.price > 0 ? '₱' + l.price.toLocaleString() : (l.muniName || '')
-    if (!label) return
-
-    const icon = L.divIcon({
-      html: `<div class="mp-pin" data-slug="${l.slug}">${label}</div>`,
-      className: '',
-      iconSize: null,
-      iconAnchor: [0, 0],
+    const marker = new google.maps.Marker({
+      position: { lat: coords[0], lng: coords[1] },
+      icon: pricePinIcon(l),
+      title: l.title || '',
     })
-    const marker = L.marker(coords, { icon })
-    marker.on('click', async (event) => {
-      if (event?.originalEvent) L.DomEvent.stopPropagation(event.originalEvent)
-      await showMapPopup(pin)
-    })
-    markerLayer.addLayer(marker)
+    marker.addListener('click', async () => { await showMapPopup(pin) })
+    markers.push(marker)
   })
+
+  if (window.markerClusterer && window.markerClusterer.MarkerClusterer) {
+    clusterer = new markerClusterer.MarkerClusterer({ map: mapInstance, markers })
+  } else {
+    markers.forEach(m => m.setMap(mapInstance))
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2149,7 +2180,13 @@ function initSteppers() {
 // Boot
 // ─────────────────────────────────────────────────────────────────────────────
 async function boot() {
-  initMap()
+  if (window.__gmapsReady) {
+    try { await window.__gmapsReady } catch (_) {}
+    initMap()
+  } else {
+    const mapEl = document.getElementById('map')
+    if (mapEl) mapEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;padding:2rem;text-align:center;color:#64748B">Map unavailable — set PUBLIC_GOOGLE_MAPS_KEY.</div>'
+  }
   setLoading(true)
 
   // Fetch pins + taxonomies in parallel — both come from cached transients server-side
@@ -2167,12 +2204,14 @@ async function boot() {
     // (the small island means the default center+zoom may not catch every pin).
     if (allPins.length && mapInstance) {
       try {
-        const latlngs = allPins.map(p => [Number(p.lat), Number(p.lng)]).filter(([la, ln]) => Number.isFinite(la) && Number.isFinite(ln))
-        if (latlngs.length === 1) {
-          mapInstance.setView(latlngs[0], 14)
-        } else if (latlngs.length > 1) {
-          mapInstance.fitBounds(latlngs, { padding: [40, 40], maxZoom: 15 })
-        }
+        const b = new google.maps.LatLngBounds()
+        let n = 0
+        allPins.forEach(p => {
+          const la = Number(p.lat), ln = Number(p.lng)
+          if (Number.isFinite(la) && Number.isFinite(ln)) { b.extend({ lat: la, lng: ln }); n++ }
+        })
+        if (n === 1) { mapInstance.setCenter(b.getCenter()); mapInstance.setZoom(15) }
+        else if (n > 1) { mapInstance.fitBounds(b, 40) }
       } catch (e) { console.warn('fitBounds failed', e) }
     }
   } else {
@@ -2191,6 +2230,8 @@ async function boot() {
   initPriceSlider()
   initSteppers()
   await fetchCards(1, { skipBounds: isMobileStays() })
+  // Now that the initial load is done, let map pans/zooms drive refetches.
+  mapReady = true
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2244,7 +2285,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('resize', () => {
     if (!isMobileStays()) {
       document.body.classList.remove('st-map-mode')
-      window.setTimeout(() => mapInstance?.invalidateSize(), 80)
+      window.setTimeout(() => { if (mapInstance && window.google) google.maps.event.trigger(mapInstance, 'resize') }, 80)
     } else {
       setMobileView(mobileView)
     }
