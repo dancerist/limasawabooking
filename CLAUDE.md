@@ -67,4 +67,4 @@
 - Frontend `auth.astro` not yet wired to the new endpoints
 - `window.__sb` (Layout.astro) calls `/save-listing` + `/my-saved` — those backend endpoints do NOT exist yet (saved-listings feature unbuilt)
 - list-your-property form: skeleton only
-- Deployed to Vercel, domain pending Cloudflare DNS update
+- **SITE IS LIVE** at https://limasawabooking.com (Cloudflare proxies the apex → Vercel; serving the real homepage + listings as of 2026-05-31). Deploy via `vercel --prod --yes` (project not git-auto-deploying). Note: Vercel reports a nameserver mismatch (wants ns*.vercel-dns.com, domain stays on Cloudflare NS) but Cloudflare proxy A/CNAME records make it resolve fine — leave as-is.
