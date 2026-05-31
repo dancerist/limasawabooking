@@ -1,0 +1,2336 @@
+---
+interface Props {
+  location?: string;       // location taxonomy slug to pre-apply (e.g. "general-luna")
+  locationName?: string;   // display name for the location (e.g. "General Luna")
+}
+const { location = '', locationName = '' } = Astro.props;
+const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking.com/wp-json/limasawa/v1';
+---
+
+{location && (
+  <script is:inline set:html={`window.__sbInitialLocation = ${JSON.stringify({ slug: location, name: locationName })};`} />
+)}
+
+
+<!-- ═══ TOPBAR ═══════════════════════════════════════════════════════════ -->
+<nav class="st-nav" id="st-nav">
+  <div class="st-nav-inner">
+    <button class="st-mobile-back" id="st-mobile-back" aria-label="Back">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/>
+      </svg>
+    </button>
+
+    <a href="/" class="st-logo">
+      <div class="st-brand">
+        <span class="st-wordmark">Limasawa Booking</span>
+        <span class="st-beta" aria-label="Beta version">BETA</span>
+      </div>
+    </a>
+
+    <!-- Category pill strip — "All" is static; the rest are injected from /taxonomies -->
+    <div class="st-cats" id="st-cats">
+      <button class="st-cat active" data-cat="">All</button>
+    </div>
+
+    <button class="st-mobile-summary" id="st-mobile-summary" type="button">
+      <span id="st-mobile-title">Homes in map area</span>
+      <small id="st-mobile-subtitle">Limasawa Island</small>
+    </button>
+
+    <button class="st-filter-btn" id="st-filter-btn">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/>
+      </svg>
+      Filters
+      <span class="st-filter-count" id="st-filter-count" hidden>0</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ═══ MAIN SPLIT ═══════════════════════════════════════════════════════ -->
+<div class="st-shell">
+
+  <!-- Left: scrollable listings -->
+  <div class="st-list-panel" id="st-list-panel">
+    <div class="st-result-bar">
+      <span id="st-count">Loading…</span>
+    </div>
+    <div class="st-grid" id="st-grid"></div>
+    <div class="st-page-actions" id="st-page-actions" hidden>
+      <button class="st-load-more" id="st-load-more">Load more</button>
+    </div>
+    <div class="st-empty" id="st-empty" hidden>
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <h3>No places match your filters</h3>
+      <p>Try adjusting or clearing your filters.</p>
+      <button onclick="clearAllFilters()">Clear filters</button>
+    </div>
+  </div>
+
+  <!-- Right: sticky map -->
+  <div class="st-map-panel">
+    <div id="map"></div>
+
+    <!-- Map listing popup -->
+    <div id="map-popup" class="mp-card" hidden>
+      <a id="mp-card-link" href="#" class="mp-card-inner">
+        <div class="mp-card-img-wrap">
+          <!-- Gallery slider (slides injected by showMapPopup) -->
+          <div class="sb-track" id="mp-track"></div>
+
+          <!-- Arrows -->
+          <button class="sb-arrow sb-prev" id="mp-prev" data-hidden aria-label="Previous photo">
+            <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M7 1L1 7l6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="sb-arrow sb-next" id="mp-next" data-hidden aria-label="Next photo">
+            <svg width="8" height="14" viewBox="0 0 8 14" fill="none"><path d="M1 1l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+
+          <!-- Dots -->
+          <div class="sb-dots" id="mp-dots-wrap" hidden>
+            <div class="sb-dots-clip"><div class="sb-dots-track" id="mp-dots"></div></div>
+          </div>
+
+          <div class="ac-badges" id="mp-card-badges"></div>
+
+          <!-- Heart + close sit together top-right, same as listing card -->
+          <div class="mp-card-actions">
+            <button class="mp-card-heart" id="mp-card-heart" aria-label="Save"
+              onclick="event.preventDefault();event.stopPropagation();mpToggleHeart()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+            </button>
+            <button class="mp-card-close" id="mp-card-close" aria-label="Close"
+              onclick="event.preventDefault();event.stopPropagation();closeMapPopup()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+
+        </div>
+        <div class="mp-card-body">
+          <!-- Host avatar (straddles image/body boundary, mirrors AccommodationCard).
+               Lives in .mp-card-body — not .mp-card-img-wrap — because the image
+               wrap has overflow:hidden which clips the bottom half of the avatar. -->
+          <div class="mp-card-avatar" id="mp-card-avatar"></div>
+          <div class="mp-card-sub" id="mp-card-sub"></div>
+          <div class="mp-card-title" id="mp-card-title"></div>
+          <div class="mp-card-stats" id="mp-card-stats"></div>
+          <div class="mp-card-price" id="mp-card-price"></div>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+
+<button class="st-map-fab" id="st-map-toggle" type="button">
+  Map
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 18l-6 3V6l6-3 6 3 6-3v15l-6 3-6-3Z"/><path d="M9 3v15"/><path d="M15 6v15"/>
+  </svg>
+</button>
+
+<button class="st-list-fab" id="st-list-toggle" type="button">
+  Show list
+</button>
+
+<!-- ═══ FILTER OVERLAY ════════════════════════════════════════════════════ -->
+<div class="fd-backdrop" id="fd-backdrop" hidden></div>
+<div class="fd" id="fd" hidden role="dialog" aria-label="Filters">
+  <div class="fd-head">
+    <button class="fd-close" id="fd-close">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <span class="fd-title">Filters</span>
+    <div></div>
+  </div>
+  <div class="fd-body">
+
+    <!-- Type of place -->
+    <section class="fd-section">
+      <h3 class="fd-sh">Type of place</h3>
+      <div class="fd-type-row">
+        <button class="fd-type active" data-type="">Any type</button>
+        <button class="fd-type" data-type="room">Room</button>
+        <button class="fd-type" data-type="entire">Entire home</button>
+      </div>
+    </section>
+
+    <!-- Stay preferences -->
+    <section class="fd-section fd-section-compact">
+      <h3 class="fd-sh">Stay preferences</h3>
+      <button class="fd-nomad" id="fd-nomad" type="button" data-badge="digital-nomad">
+        <span>Digital nomad friendly</span>
+        <small>Wifi, workspace, long-stay friendly</small>
+      </button>
+    </section>
+
+    <!-- Rate mode -->
+    <section class="fd-section fd-section-compact">
+      <h3 class="fd-sh">Rate type</h3>
+      <div class="fd-rate-row" aria-label="Rate type">
+        <button class="fd-rate active" type="button" data-rate-mode="daily">Daily rate</button>
+        <button class="fd-rate" type="button" data-rate-mode="monthly">Monthly rate</button>
+      </div>
+    </section>
+
+    <!-- Rating -->
+    <section class="fd-section fd-section-compact">
+      <h3 class="fd-sh">Guest rating</h3>
+      <div class="fd-rating-row">
+        <button class="fd-rating-pill active" data-rating="0">Any</button>
+        <button class="fd-rating-pill" data-rating="3">3★+</button>
+        <button class="fd-rating-pill" data-rating="4">4★+</button>
+        <button class="fd-rating-pill" data-rating="4.5">4.5★+</button>
+      </div>
+    </section>
+
+    <!-- Price range -->
+    <section class="fd-section">
+      <h3 class="fd-sh">Price range</h3>
+      <p class="fd-sh-sub" id="fd-price-sub">Nightly price in Philippine Peso</p>
+      <div class="fd-quick-rates" aria-label="Quick rate filters">
+        <button class="fd-quick-rate active" type="button" data-rate-band="any">Any rate</button>
+        <button class="fd-quick-rate" type="button" data-rate-band="under-1500">Below ₱1,500</button>
+        <button class="fd-quick-rate" type="button" data-rate-band="1500-5000">₱1,500 - ₱5,000</button>
+        <button class="fd-quick-rate" type="button" data-rate-band="over-5000">Over ₱5,000</button>
+      </div>
+      <div class="fd-histogram" id="fd-histogram">
+        <svg id="fd-hist-svg" width="100%" height="72" preserveAspectRatio="none"></svg>
+      </div>
+      <div class="fd-slider-wrap">
+        <div class="fd-slider-track" id="fd-slider-track"></div>
+        <input type="range" class="fd-range" id="fd-range-min" min="0" max="100" value="0" />
+        <input type="range" class="fd-range" id="fd-range-max" min="0" max="100" value="100" />
+      </div>
+      <div class="fd-price-labels">
+        <div class="fd-price-box">
+          <span class="fd-price-lbl">Min</span>
+          <span class="fd-price-val" id="fd-price-min-lbl">₱0</span>
+        </div>
+        <div class="fd-price-box fd-price-box-r">
+          <span class="fd-price-lbl">Max</span>
+          <span class="fd-price-val" id="fd-price-max-lbl">₱0+</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Accommodation type — pills injected from /taxonomies -->
+    <section class="fd-section">
+      <h3 class="fd-sh">Accommodation type</h3>
+      <div class="fd-accom-pills" id="fd-accom-pills"></div>
+    </section>
+
+    <!-- Rooms and beds -->
+    <section class="fd-section">
+      <h3 class="fd-sh">Rooms and beds</h3>
+      {[['Bedrooms','beds'],['Beds','bed-count'],['Bathrooms','baths']].map(([label, key]) => (
+        <div class="fd-stepper-row">
+          <span class="fd-stepper-label">{label}</span>
+          <div class="fd-stepper">
+            <button class="fd-step-btn" data-step-key={key} data-step-dir="-1">−</button>
+            <span class="fd-step-val" id={`step-${key}`}>Any</span>
+            <button class="fd-step-btn" data-step-key={key} data-step-dir="1">+</button>
+          </div>
+        </div>
+      ))}
+    </section>
+
+    <!-- Amenities — pills + checkboxes injected from /taxonomies, kept in sync -->
+    <section class="fd-section">
+      <h3 class="fd-sh">Amenities</h3>
+      <div class="fd-faq-pills" id="fd-amen-pills"></div>
+      <div class="fd-amen-group">
+        <div class="fd-amen-checks" id="fd-amen-checks"></div>
+      </div>
+    </section>
+
+  </div>
+  <div class="fd-foot">
+    <button class="fd-clear" onclick="clearAllFilters()">Clear all</button>
+    <button class="fd-apply" id="fd-apply">Show places</button>
+  </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" is:inline></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" is:inline></script>
+
+<style is:global>
+  /* ── Reset & tokens ───────────────────────────────── */
+  :root {
+    --ink: #1a2533; --ink-2: #4c5b6c; --ink-3: #64748b;
+    --cyan: #25cece; --cyan-hover: #1eb8b8; --cyan-light: #e6f9fa;
+    --sl-200: #e2ebf3; --sl-100: #f5f8fb;
+    --nav-h: 64px;
+  }
+
+  /* ── Topbar ───────────────────────────────────────── */
+  .st-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 300;
+    height: var(--nav-h); background: #fff;
+    border-bottom: 1px solid var(--sl-200);
+  }
+  .st-nav-inner {
+    max-width: 100%; height: 100%;
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 20px;
+  }
+  .st-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
+  .st-logo-img { height: 30px; width: auto; }
+  .st-brand    { display: flex; align-items: center; gap: 8px; line-height: 1; }
+  .st-wordmark { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; color: var(--ink); letter-spacing: -.01em; }
+  .st-beta {
+    font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 9px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--cyan);
+    background: rgba(37, 206, 206, .14);
+    padding: 3px 6px; border-radius: 4px; line-height: 1;
+  }
+  .st-mobile-back,
+  .st-mobile-summary,
+  .st-map-fab,
+  .st-list-fab { display: none; }
+
+  .st-cats {
+    flex: 1; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none;
+    padding: 0 4px;
+  }
+  .st-cats::-webkit-scrollbar { display: none; }
+  .st-cat {
+    flex-shrink: 0; padding: 7px 16px; border-radius: 9999px;
+    border: 1.5px solid var(--sl-200); background: #fff;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+    color: var(--ink-2); cursor: pointer; transition: all 140ms; white-space: nowrap;
+  }
+  .st-cat:hover { border-color: var(--ink-2); color: var(--ink); }
+  .st-cat.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+  .st-filter-btn {
+    flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+    padding: 8px 16px; border-radius: 9999px;
+    border: 1.5px solid var(--sl-200); background: #fff;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    color: var(--ink); cursor: pointer; transition: all 140ms;
+    position: relative;
+  }
+  .st-filter-btn:hover { border-color: var(--ink); }
+  .st-filter-count {
+    position: absolute; top: -6px; right: -6px;
+    background: var(--ink); color: #fff;
+    width: 18px; height: 18px; border-radius: 50%;
+    font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .st-filter-count[hidden] { display: none; }
+
+  .st-filter-btn svg {
+    flex-shrink: 0;
+  }
+
+  /* ── Shell ────────────────────────────────────────── */
+  .st-shell {
+    display: flex; height: calc(100vh - var(--nav-h));
+    margin-top: var(--nav-h); overflow: hidden;
+  }
+
+  /* ── List panel ───────────────────────────────────── */
+  .st-list-panel {
+    width: 55%; flex-shrink: 0;
+    overflow-y: auto; padding: 20px 24px 40px;
+  }
+  .st-result-bar {
+    font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700;
+    color: var(--ink); margin-bottom: 18px; padding-bottom: 14px;
+    border-bottom: 1px solid var(--sl-200);
+  }
+  .st-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+  }
+  .st-page-actions {
+    display: flex; justify-content: center; padding: 28px 0 4px;
+  }
+  .st-page-actions[hidden] { display: none; }
+  .st-load-more {
+    border: 1.5px solid var(--ink); background: var(--ink); color: #fff;
+    border-radius: 9999px; padding: 11px 24px;
+    font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: background 140ms, transform 140ms;
+  }
+  .st-load-more:hover { background: #0d1e2b; transform: translateY(-1px); }
+  .st-load-more:disabled { opacity: .55; cursor: wait; transform: none; }
+  .st-empty {
+    text-align: center; padding: 4rem 2rem;
+    color: var(--ink-3);
+  }
+  .st-empty[hidden] { display: none; }
+  .st-empty svg { margin: 0 auto 1rem; display: block; color: var(--sl-200); }
+  .st-empty h3 { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 1.1rem; color: var(--ink); margin-bottom: .4rem; }
+  .st-empty p  { font-size: .875rem; margin-bottom: 1.25rem; }
+  .st-empty button {
+    padding: .55rem 1.4rem; background: var(--ink); color: #fff; border: none;
+    border-radius: 9999px; font-family: 'DM Sans', sans-serif; font-weight: 600;
+    font-size: .875rem; cursor: pointer;
+  }
+
+  /* ── Listing card ─────────────────────────────────── */
+  /* All .ac-* / .sb-* card styles live in src/styles/card.css (imported via global.css). */
+
+  /* ── Map panel ────────────────────────────────────── */
+  .st-map-panel { flex: 1; position: relative; }
+  #map { width: 100%; height: 100%; }
+
+  /* Leaflet price marker */
+  .mp-pin {
+    background: #fff; border: 1.5px solid rgba(0,0,0,.15);
+    border-radius: 20px; padding: 5px 11px;
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 700;
+    color: var(--ink); box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    white-space: nowrap; cursor: pointer; transition: all 120ms;
+    transform: translateZ(0);
+  }
+  .mp-pin:hover, .mp-pin.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .marker-cluster-small,
+  .marker-cluster-medium,
+  .marker-cluster-large { background: rgba(37,206,206,.18); }
+  .marker-cluster-small div,
+  .marker-cluster-medium div,
+  .marker-cluster-large div {
+    background: var(--ink); color: #fff;
+    font-family: 'DM Sans', sans-serif; font-weight: 800;
+  }
+
+  /* ── Map popup card ───────────────────────────────── */
+  .mp-card {
+    position: absolute;
+    width: 260px; z-index: 1200;
+    background: #fff; border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(13,30,43,.22), 0 2px 8px rgba(13,30,43,.1);
+    overflow: hidden;
+    animation: mp-pop 180ms cubic-bezier(.22,.68,0,1.2);
+  }
+  .mp-card[hidden] { display: none; }
+  @keyframes mp-pop {
+    from { opacity: 0; transform: scale(.94) translateY(6px); }
+    to   { opacity: 1; transform: scale(1)   translateY(0); }
+  }
+
+  .mp-card-inner { display: block; text-decoration: none; color: inherit; cursor: pointer; }
+
+  .mp-card-img-wrap {
+    position: relative; aspect-ratio: 4/3; overflow: hidden;
+    background: #f3f4f6; border-radius: 16px 16px 0 0;
+  }
+  .mp-card-img-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform 280ms; }
+  .mp-card-inner:hover .mp-card-img-wrap img { transform: scale(1.04); }
+  /* Popup slider — show arrows on hover, scale images */
+  .mp-card-img-wrap:hover .sb-arrow { opacity: 1; pointer-events: auto; }
+  .mp-card-inner:hover .sb-slide img { transform: scale(1.04); }
+
+  /* Heart + close grouped top-right, matching listing card style */
+  .mp-card-actions {
+    position: absolute; top: 10px; right: 10px; z-index: 10;
+    display: flex; gap: 6px;
+  }
+  .mp-card-heart,
+  .mp-card-close {
+    width: 32px; height: 32px; border-radius: 50%; border: none;
+    background: rgba(255,255,255,.92); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #6b7280; box-shadow: 0 1px 4px rgba(0,0,0,.18); transition: all 160ms;
+  }
+  .mp-card-heart:hover { color: #e53e3e; transform: scale(1.1); }
+  .mp-card-close:hover { background: #fff; color: #111827; }
+  .mp-card-heart.saved { color: #e53e3e; }
+  .mp-card-heart.saved svg { fill: #e53e3e; stroke: #e53e3e; }
+
+  /* Host avatar — straddles image/body boundary on the left.
+     Anchored to the top of .mp-card-body (which is position:relative and has
+     no overflow:hidden) so the avatar isn't clipped like it was when it lived
+     inside .mp-card-img-wrap. */
+  .mp-card-avatar {
+    position: absolute; top: 0; left: 14px;
+    transform: translateY(-50%);
+    z-index: 8;
+  }
+  .mp-card-avatar .mp-av-rel { position: relative; width: 44px; height: 44px; }
+  .mp-card-avatar .mp-av {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 2.5px solid #fff; background: #e5e7eb; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    color: #6b7280; font-size: 12px; font-weight: 700;
+    box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  }
+  .mp-card-avatar .mp-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .mp-card-avatar .mp-av-verified {
+    position: absolute; bottom: -2px; right: -2px;
+    width: 16px; height: 16px; border-radius: 50%; background: #3b82f6;
+    border: 2px solid #fff; display: flex; align-items: center; justify-content: center;
+  }
+
+  .mp-card-body { position: relative; padding: 32px 14px 14px; }
+  .mp-card-sub  { font-size: 12px; color: #6b7280; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mp-card-title {
+    font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 14px;
+    color: #111827; line-height: 1.35;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .mp-card-stats { font-size: 12px; color: #6b7280; display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+  .mp-card-price { display: flex; justify-content: flex-end; }
+  .mp-card-price-night { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 14px; color: #111827; }
+  .mp-card-price-sub   { font-weight: 400; color: #9ca3af; font-size: 12px; }
+  .mp-card-price-month { font-size: 11px; color: #6b7280; margin-top: 2px; text-align: right; }
+
+  /* ── Filter drawer (must sit ABOVE the map popup card, z=1200) ────── */
+  .fd-backdrop {
+    position: fixed; inset: 0; z-index: 1990;
+    background: rgba(13,30,43,.45);
+    animation: fd-fade 160ms ease;
+  }
+  .fd-backdrop[hidden] { display: none; }
+  @keyframes fd-fade { from { opacity: 0; } to { opacity: 1; } }
+
+  .fd {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 460px; max-width: 95vw;
+    background: #fff; z-index: 2000;
+    display: flex; flex-direction: column;
+    box-shadow: -8px 0 40px rgba(13,30,43,.12);
+    animation: fd-slide 240ms ease;
+  }
+  .fd[hidden] { display: none; }
+  @keyframes fd-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+  .fd-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px; border-bottom: 1px solid var(--sl-200);
+    flex-shrink: 0;
+  }
+  .fd-title { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; color: var(--ink); }
+  .fd-close {
+    width: 32px; height: 32px; border-radius: 50%; border: none;
+    background: var(--sl-100); color: var(--ink-3); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 120ms;
+  }
+  .fd-close:hover { background: var(--sl-200); }
+
+  .fd-body { flex: 1; overflow-y: auto; padding-bottom: 8px; }
+  .fd-section {
+    padding: 24px 24px 20px;
+    border-bottom: 1px solid var(--sl-200);
+  }
+  .fd-section-compact { padding-bottom: 18px; }
+  .fd-section:last-child { border-bottom: none; }
+  .fd-sh { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; color: var(--ink); margin-bottom: 14px; }
+  .fd-sh-sub { font-size: 13px; color: var(--ink-3); margin-top: -8px; margin-bottom: 16px; }
+
+  /* Type-of-place buttons */
+  .fd-type-row,
+  .fd-rate-row { display: flex; gap: 10px; }
+  .fd-type,
+  .fd-rate {
+    flex: 1; padding: 11px 8px; border-radius: 10px;
+    border: 1.5px solid var(--sl-200); background: #fff;
+    font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500;
+    color: var(--ink-2); cursor: pointer; text-align: center; transition: all 140ms;
+  }
+  .fd-type:hover,
+  .fd-rate:hover  { border-color: var(--ink-2); color: var(--ink); }
+  .fd-type.active,
+  .fd-rate.active { border-color: var(--ink); background: var(--ink); color: #fff; font-weight: 600; }
+
+  .fd-nomad {
+    width: 100%;
+    min-height: 68px;
+    padding: 13px 15px;
+    border-radius: 14px;
+    border: 1.5px solid var(--sl-200);
+    background: #fff;
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 140ms, background 140ms, box-shadow 140ms;
+  }
+  .fd-nomad span { font-size: 14px; font-weight: 800; }
+  .fd-nomad small { color: var(--ink-3); font-size: 12px; }
+  .fd-nomad.active {
+    border-color: var(--cyan);
+    background: var(--cyan-light);
+    box-shadow: inset 0 0 0 1px rgba(37,206,206,.18);
+  }
+
+  /* Rating pills in filter drawer */
+  .fd-rating-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .fd-rating-pill {
+    padding: 8px 14px; border-radius: 9999px;
+    border: 1.5px solid var(--sl-200); background: #fff;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    color: var(--ink-2); cursor: pointer; transition: all 140ms;
+  }
+  .fd-rating-pill:hover  { border-color: var(--ink-2); color: var(--ink); }
+  .fd-rating-pill.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+  /* Card rating pill (injected by renderCards) */
+  .card-rating-pill {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: #fffbeb; color: #92400e;
+    border: 1px solid #fde68a; border-radius: 6px;
+    font-family: 'DM Sans', sans-serif; font-size: 11.5px; font-weight: 700;
+    padding: 2px 7px; line-height: 1.4;
+  }
+
+  .fd-quick-rates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .fd-quick-rate {
+    padding: 8px 13px;
+    border-radius: 999px;
+    border: 1.5px solid var(--sl-200);
+    background: #fff;
+    color: var(--ink-2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .fd-quick-rate.active {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: #fff;
+  }
+
+  /* Price histogram + slider */
+  .fd-histogram {
+    background: var(--sl-100); border-radius: 8px 8px 0 0;
+    overflow: hidden; margin-bottom: 0;
+  }
+  .fd-hist-bar { transition: fill 80ms; }
+
+  .fd-slider-wrap {
+    position: relative; height: 30px; margin: 0;
+    background: var(--sl-100); border-radius: 0 0 8px 8px;
+    padding: 0 8px;
+  }
+  .fd-slider-track {
+    position: absolute; top: 50%; left: 8px; right: 8px;
+    height: 3px; margin-top: -1.5px;
+    background: var(--sl-200); border-radius: 3px;
+    pointer-events: none;
+  }
+  .fd-slider-fill {
+    position: absolute; top: 0; height: 100%;
+    background: var(--ink); border-radius: 3px;
+  }
+  .fd-range {
+    position: absolute; top: 0; left: 8px; right: 8px; width: calc(100% - 16px);
+    height: 100%; margin: 0; padding: 0;
+    appearance: none; background: transparent; pointer-events: none;
+  }
+  .fd-range::-webkit-slider-thumb {
+    appearance: none; width: 22px; height: 22px;
+    border-radius: 50%; background: #fff;
+    border: 2px solid var(--ink); pointer-events: all; cursor: grab;
+    box-shadow: 0 1px 6px rgba(0,0,0,.2);
+  }
+  .fd-range::-moz-range-thumb {
+    width: 22px; height: 22px; border-radius: 50%; background: #fff;
+    border: 2px solid var(--ink); pointer-events: all; cursor: grab;
+    box-shadow: 0 1px 6px rgba(0,0,0,.2);
+  }
+  .fd-price-labels {
+    display: flex; justify-content: space-between; gap: 12px;
+    margin-top: 16px;
+  }
+  .fd-price-box {
+    flex: 1; border: 1.5px solid var(--sl-200); border-radius: 10px;
+    padding: 10px 14px;
+  }
+  .fd-price-box-r { text-align: right; }
+  .fd-price-lbl { display: block; font-size: 11px; color: var(--ink-3); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 3px; }
+  .fd-price-val { font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700; color: var(--ink); }
+
+  /* Accommodation type pills */
+  .fd-accom-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .fd-pill {
+    padding: 8px 16px; border-radius: 9999px;
+    border: 1.5px solid var(--sl-200); background: #fff;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+    color: var(--ink-2); cursor: pointer; transition: all 140ms;
+  }
+  .fd-pill:hover  { border-color: var(--ink-2); color: var(--ink); }
+  .fd-pill.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+  /* Stepper rows */
+  .fd-stepper-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 0; border-bottom: 1px solid var(--sl-100);
+  }
+  .fd-stepper-row:last-child { border-bottom: none; }
+  .fd-stepper-label { font-size: 15px; color: var(--ink); }
+  .fd-stepper { display: flex; align-items: center; gap: 16px; }
+  .fd-step-btn {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 1.5px solid var(--sl-200); background: #fff;
+    font-size: 18px; color: var(--ink-2); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 120ms; line-height: 1;
+  }
+  .fd-step-btn:hover:not(:disabled) { border-color: var(--ink); color: var(--ink); }
+  .fd-step-btn:disabled { opacity: .35; cursor: not-allowed; }
+  .fd-step-val { font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; color: var(--ink); min-width: 36px; text-align: center; }
+
+  /* Amenities */
+  .fd-faq-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .fd-faq-pill {
+    padding: 9px 18px; border-radius: 9999px;
+    border: 1.5px solid var(--sl-200); background: #fff;
+    font-family: 'DM Sans', sans-serif; font-size: 13.5px; font-weight: 600;
+    color: var(--ink); cursor: pointer; transition: all 140ms;
+  }
+  .fd-faq-pill:hover  { border-color: var(--ink); }
+  .fd-faq-pill.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+  .fd-amen-group { margin-top: 20px; }
+  .fd-amen-group-title {
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+    color: var(--ink-3); text-transform: uppercase; letter-spacing: .07em;
+    margin-bottom: 10px;
+  }
+  .fd-amen-checks { display: flex; flex-direction: column; gap: 22px; }
+  .fd-amen-block {}
+  .fd-amen-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; }
+  .fd-check-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0; cursor: pointer; font-size: 14px; color: var(--ink);
+  }
+  .fd-amen-cb {
+    width: 18px; height: 18px; border-radius: 4px;
+    border: 1.5px solid var(--sl-200); cursor: pointer;
+    accent-color: var(--ink); flex-shrink: 0;
+  }
+
+  /* Drawer footer */
+  .fd-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 24px; border-top: 1px solid var(--sl-200);
+    flex-shrink: 0; background: #fff;
+  }
+  .fd-clear {
+    background: none; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+    color: var(--ink); text-decoration: underline; padding: 8px 0;
+  }
+  .fd-apply {
+    background: var(--ink); color: #fff; border: none; border-radius: 10px;
+    padding: 13px 28px; font-family: 'DM Sans', sans-serif; font-weight: 700;
+    font-size: 15px; cursor: pointer; transition: background 140ms;
+  }
+  .fd-apply:hover { background: #0d1e2b; }
+
+  /* Leaflet override */
+  .leaflet-container { font-family: 'DM Sans', sans-serif; }
+
+  @media (max-width: 1180px) {
+    :root { --nav-h: 76px; }
+
+    html, body {
+      height: 100%;
+      overflow-x: hidden;
+    }
+
+    .st-nav {
+      height: var(--nav-h);
+      box-shadow: 0 1px 12px rgba(13,30,43,.08);
+    }
+
+    .st-nav-inner {
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 18px;
+    }
+
+    .st-logo,
+    .st-cats {
+      display: none;
+    }
+
+    .st-mobile-back {
+      width: 40px;
+      height: 40px;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--ink);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .st-mobile-summary {
+      min-width: 0;
+      flex: 1;
+      max-width: 420px;
+      height: 56px;
+      border: 0;
+      border-radius: 999px;
+      background: #fff;
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 18px rgba(13,30,43,.12);
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+    }
+
+    .st-mobile-summary span {
+      display: block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+
+    .st-mobile-summary small {
+      display: block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      margin-top: 3px;
+      color: var(--ink-3);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .st-filter-btn {
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      justify-content: center;
+      background: transparent;
+      font-size: 0;
+    }
+
+    .st-filter-btn svg {
+      width: 21px;
+      height: 21px;
+    }
+
+    .st-filter-btn > :not(svg):not(.st-filter-count) {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+    }
+
+    .st-filter-count {
+      font-size: 10px;
+    }
+
+    .st-shell {
+      display: block;
+      height: auto;
+      min-height: calc(100vh - var(--nav-h));
+      margin-top: var(--nav-h);
+      overflow: visible;
+    }
+
+    .st-list-panel {
+      width: 100%;
+      min-height: auto;
+      padding: 18px 24px 96px;
+      overflow: visible;
+      background: #fff;
+    }
+
+    .st-result-bar {
+      margin-bottom: 16px;
+      padding-bottom: 0;
+      border-bottom: 0;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .st-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 26px 18px;
+    }
+
+    .ac-heart {
+      top: 12px;
+      right: 12px;
+      background: rgba(255,255,255,.95);
+    }
+
+    .st-map-panel {
+      display: none;
+      position: fixed;
+      inset: var(--nav-h) 0 0;
+      z-index: 120;
+      background: #e8f7f7;
+    }
+
+    #map {
+      height: 100%;
+    }
+
+    body.st-map-mode {
+      overflow: hidden;
+    }
+
+    body:not(.st-map-mode) {
+      overflow-y: auto;
+    }
+
+    body.st-map-mode .st-list-panel {
+      display: none;
+    }
+
+    body.st-map-mode .st-map-panel {
+      display: block;
+    }
+
+    body.st-map-mode .st-nav {
+      z-index: 320;
+    }
+
+    .st-map-fab {
+      position: fixed;
+      left: 50%;
+      bottom: calc(18px + env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      z-index: 260;
+      min-height: 48px;
+      padding: 0 20px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--ink);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 15px;
+      font-weight: 800;
+      box-shadow: 0 8px 28px rgba(13,30,43,.28);
+      cursor: pointer;
+    }
+
+    .st-list-fab {
+      position: fixed;
+      left: 50%;
+      bottom: calc(18px + env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      z-index: 260;
+      min-height: 44px;
+      padding: 0 18px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--ink);
+      color: #fff;
+      display: none;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      font-weight: 800;
+      box-shadow: 0 8px 28px rgba(13,30,43,.28);
+      cursor: pointer;
+    }
+
+    body.st-map-mode .st-map-fab {
+      display: none;
+    }
+
+    body.st-map-mode .st-list-fab {
+      display: inline-flex;
+      align-items: center;
+    }
+
+    body.st-map-mode.st-popup-open .st-list-fab {
+      display: none;
+    }
+
+    .mp-card {
+      position: fixed !important;
+      left: 16px !important;
+      right: 16px !important;
+      max-width: 620px;
+      margin: 0 auto;
+      top: auto !important;
+      bottom: calc(18px + env(safe-area-inset-bottom)) !important;
+      width: auto;
+      max-height: min(54vh, 460px);
+      border-radius: 22px;
+      z-index: 1200;
+      overflow: hidden;
+      animation: mobile-sheet 220ms ease;
+    }
+
+    @keyframes mobile-sheet {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .mp-card-img-wrap {
+      border-radius: 22px 22px 0 0;
+      aspect-ratio: 16 / 10;
+    }
+
+    .mp-card-body {
+      padding: 13px 16px 16px;
+    }
+
+    .mp-card-title {
+      font-size: 16px;
+    }
+
+    .mp-card-price {
+      justify-content: flex-start;
+    }
+
+    .fd {
+      width: min(680px, 100vw);
+      max-width: 100vw;
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
+      border-radius: 18px 18px 0 0;
+      top: auto;
+      min-height: 78vh;
+      max-height: 92vh;
+      animation: fd-mobile-slide 220ms ease;
+    }
+
+    @keyframes fd-mobile-slide {
+      from { transform: translate(-50%, 100%); }
+      to { transform: translate(-50%, 0); }
+    }
+  }
+
+  @media (max-width: 760px) {
+    .st-nav-inner {
+      padding: 10px 18px;
+    }
+
+    .st-mobile-summary {
+      max-width: 320px;
+    }
+
+    .st-list-panel {
+      padding: 16px 18px 104px;
+    }
+
+    .st-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .mp-card {
+      max-width: none;
+    }
+
+    .fd {
+      width: 100vw;
+    }
+  }
+</style>
+
+<script>
+  // Expose shared slider init + card template for cards injected after REST fetches.
+  import { initSliders } from '../scripts/card-slider.js'
+  import { cardHTML, badgeChipsHTML, escapeHtml } from '../scripts/card-template.js'
+  window.__initSliders   = initSliders
+  window.__cardHTML      = cardHTML
+  window.__badgeChipsHTML = badgeChipsHTML
+  window.__escapeHtml    = escapeHtml
+</script>
+
+<script define:vars={{ WP_REST }}>
+  window.__SB_WP_REST = WP_REST
+</script>
+
+<script is:inline>
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants & state
+// ─────────────────────────────────────────────────────────────────────────────
+const WP_REST_BASE = window.__SB_WP_REST || 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+// Limasawa barangay fallback centroids — only used if a listing lacks a real
+// ACF map pin (all current listings have one, so this is a safety net).
+const MUNI_COORDS = {
+  'san-bernardo': [9.9492, 125.0650],
+  'san-agustin':  [9.9300, 125.0700],
+  'lugsongan':    [9.9550, 125.0720],
+  'magallanes':   [9.9180, 125.0820],
+  'cabulihan':    [9.9420, 125.0600],
+  'triana':       [9.9330, 125.0620],
+}
+
+const HIST_BUCKETS = 24
+const PER_PAGE = 24
+const PIN_CACHE_KEY = 'sb_pins_v1'
+let mapInstance = null
+let markerLayer = null
+let mapMoveTimer = null
+let fetchController = null
+let allPins = []
+let cardCache = new Map()
+let currentPage = 1
+let totalPages = 1
+let totalResults = 0
+let currentListings = []
+let priceMin = 0
+let priceMax = 0
+let mobileView = 'list'
+const listingIndexCache = new Map()
+let liveFilterTimer = null
+
+function isMobileStays() {
+  return window.matchMedia('(max-width: 1180px)').matches
+}
+
+function setMobileView(view) {
+  mobileView = view === 'map' ? 'map' : 'list'
+  document.body.classList.toggle('st-map-mode', mobileView === 'map')
+  document.getElementById('st-mobile-subtitle').textContent =
+    mobileView === 'map' ? 'Tap a price to preview' : 'Limasawa Island'
+  if (mobileView === 'map') {
+    window.setTimeout(() => {
+      mapInstance?.invalidateSize()
+      if (activePopupListing) positionPopup()
+    }, 80)
+  }
+}
+
+// Use real GPS pin from WordPress ACF google_map field; fall back to municipality centroid
+function listingCoords(l) {
+  if (l.lat && l.lng) return [l.lat, l.lng]
+  if (l.muniSlug && MUNI_COORDS[l.muniSlug]) return MUNI_COORDS[l.muniSlug]
+  return null
+}
+
+// Filter state
+const F = {
+  cat:       '',   // category slug
+  type:      '',   // '' | 'room' | 'entire'
+  cats:      new Set(),  // selected accommodation-type pills
+  badge:     '',
+  rateMode:  'daily',
+  rateBand:  'any',
+  priceMin:  0,
+  priceMax:  Infinity,
+  beds:      0,
+  bedCount:  0,
+  baths:     0,
+  amenities: new Set(),
+  minRating: 0,
+  location:  (typeof window !== 'undefined' && window.__sbInitialLocation?.slug) || '',
+}
+
+function fmt(n) {
+  if (n >= 1000) return '₱' + (n/1000).toFixed(0) + 'k'
+  return '₱' + n.toLocaleString()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REST data
+// ─────────────────────────────────────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+}
+
+async function fetchJson(url, options = {}) {
+  const res = await fetch(url, options)
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`)
+  return res.json()
+}
+
+async function fetchPins() {
+  // Skip session cache when filtering by location — keeps the cache for the
+  // global /stays page only (matches backend cache behavior).
+  if (!F.location) {
+    try {
+      const cached = sessionStorage.getItem(PIN_CACHE_KEY)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed)) return parsed
+      }
+    } catch (_) {}
+  }
+
+  const url = F.location
+    ? `${WP_REST_BASE}/map-pins?location=${encodeURIComponent(F.location)}`
+    : `${WP_REST_BASE}/map-pins`
+  const pins = await fetchJson(url)
+  if (!F.location) {
+    try { sessionStorage.setItem(PIN_CACHE_KEY, JSON.stringify(pins)) } catch (_) {}
+  }
+  return Array.isArray(pins) ? pins : []
+}
+
+const TAX_CACHE_KEY = 'sb_tax_v1'
+async function fetchTaxonomies() {
+  try {
+    const cached = sessionStorage.getItem(TAX_CACHE_KEY)
+    if (cached) {
+      const parsed = JSON.parse(cached)
+      if (parsed && Array.isArray(parsed.categories) && Array.isArray(parsed.amenities)) return parsed
+    }
+  } catch (_) {}
+
+  const tax = await fetchJson(`${WP_REST_BASE}/taxonomies`)
+  const safe = {
+    categories: Array.isArray(tax?.categories) ? tax.categories : [],
+    amenities:  Array.isArray(tax?.amenities)  ? tax.amenities  : [],
+  }
+  try { sessionStorage.setItem(TAX_CACHE_KEY, JSON.stringify(safe)) } catch (_) {}
+  return safe
+}
+
+/**
+ * Render dynamic filter UI from the taxonomies endpoint.
+ *  - Topbar category strip (#st-cats): keeps the static "All" pill, appends one per category
+ *  - Filter drawer "Accommodation type" pills (#fd-accom-pills)
+ *  - Filter drawer "Amenities" pills (#fd-amen-pills) and checkboxes (#fd-amen-checks)
+ *
+ * Pills + checkboxes use the same data source so they stay in sync; click handlers
+ * for both are wired here (not in DOMContentLoaded) since the elements are dynamic.
+ */
+function renderDynamicFilters(tax) {
+  // ── Topbar pills ────────────────────────────────────────────────────────
+  const cats = document.getElementById('st-cats')
+  if (cats) {
+    // Remove any previously-injected pills (keep the static "All" at index 0)
+    cats.querySelectorAll('.st-cat[data-cat]:not([data-cat=""])').forEach(el => el.remove())
+    tax.categories.forEach(c => {
+      const btn = document.createElement('button')
+      btn.className = 'st-cat'
+      btn.dataset.cat = c.slug
+      btn.textContent = c.name
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.st-cat').forEach(b => b.classList.remove('active'))
+        btn.classList.add('active')
+        F.cat = c.slug
+        F.cats.clear()
+        document.querySelectorAll('.fd-pill').forEach(b => b.classList.toggle('active', false))
+        fetchCards(1, { skipBounds: true })
+      })
+      cats.appendChild(btn)
+    })
+  }
+
+  // ── Drawer accommodation-type pills ────────────────────────────────────
+  const accomPills = document.getElementById('fd-accom-pills')
+  if (accomPills) {
+    accomPills.innerHTML = ''
+    tax.categories.forEach(c => {
+      const btn = document.createElement('button')
+      btn.className = 'fd-pill'
+      btn.dataset.catPill = c.slug
+      btn.textContent = c.name
+      btn.addEventListener('click', () => {
+        btn.classList.toggle('active')
+        if (F.cats.has(c.slug)) F.cats.delete(c.slug)
+        else F.cats.add(c.slug)
+        scheduleFilterResults()
+      })
+      accomPills.appendChild(btn)
+    })
+  }
+
+  // ── Drawer amenity pills + checkboxes (curated, deduplicated) ──────────
+  // FAQ pills: same 10 highlights surfaced on the listing page.
+  // Grouped checkboxes: hand-picked canonical amenities, no redundant variants.
+  // Anything not in this curated list is intentionally hidden — taxonomy has 180+
+  // raw terms (6 variants of "AC", etc.) and dumping them all is unusable.
+  const FAQ_PILLS = [
+    { slug: 'wifi',                                  label: 'Wifi' },
+    { slug: 'air-conditioning',                      label: 'Air conditioning' },
+    { slug: 'kitchen',                               label: 'Kitchen' },
+    { slug: 'free-parking-on-premises',              label: 'Free parking' },
+    { slug: 'beach-access-walking-distance',         label: 'Beach access' },
+    { slug: 'dedicated-workspace',                   label: 'Workspace' },
+    { slug: 'pets-allowed',                          label: 'Pets allowed' },
+    { slug: 'with-generator',                        label: 'Generator' },
+    { slug: 'hot-shower',                            label: 'Hot shower' },
+    { slug: 'exterior-security-cameras-on-property', label: 'Security cameras' },
+  ]
+  const AMEN_GROUPS = [
+    { title: 'Essentials', items: [
+      ['bed-linens',      'Bed linens'],
+      ['hot-water',       'Hot water'],
+      ['bidet',           'Bidet'],
+      ['hangers',         'Hangers'],
+      ['iron',            'Iron'],
+      ['hair-dryer',      'Hair dryer'],
+      ['shampoo',         'Shampoo'],
+      ['body-soap',       'Body soap'],
+      ['essentials',      'Essentials kit'],
+    ]},
+    { title: 'Kitchen & dining', items: [
+      ['refrigerator',          'Refrigerator'],
+      ['coffee-maker',          'Coffee maker'],
+      ['rice-maker',            'Rice maker'],
+      ['hot-water-kettle',      'Hot water kettle'],
+      ['cooking-basics',        'Cooking basics'],
+      ['dishes-and-silverware', 'Dishes & silverware'],
+      ['dining-table',          'Dining table'],
+      ['outdoor-dining-area',   'Outdoor dining area'],
+      ['bbq-grill',             'BBQ grill'],
+    ]},
+    { title: 'Comfort & safety', items: [
+      ['tv',                'TV'],
+      ['portable-fans',     'Fan'],
+      ['fire-extinguisher', 'Fire extinguisher'],
+      ['first-aid-kit',     'First aid kit'],
+      ['self-check-in',     'Self check-in'],
+      ['private-entrance',  'Private entrance'],
+    ]},
+    { title: 'Outdoor & views', items: [
+      ['pool',                     'Pool'],
+      ['private-pool',             'Private pool'],
+      ['private-patio-or-balcony', 'Private patio or balcony'],
+      ['outdor-furniture',         'Outdoor furniture'],
+      ['garden-view',              'Garden view'],
+      ['ocean-view',               'Ocean view'],
+      ['sea-view',                 'Sea view'],
+      ['mountain-view',            'Mountain view'],
+      ['backyard',                 'Backyard'],
+    ]},
+    { title: 'Family', items: [
+      ['crib',                       'Crib'],
+      ['high-chair',                 'High chair'],
+      ['childrens-books-and-toys',   "Children's books & toys"],
+      ['babysitter-recommendations', 'Babysitter recommendations'],
+    ]},
+    { title: 'Stay & services', items: [
+      ['long-term-stays-allowed',  'Long-term stays allowed'],
+      ['luggage-dropoff-allowed',  'Luggage dropoff'],
+      ['host-greets-you',          'Host greets you'],
+      ['laundromat-nearby',        'Laundromat nearby'],
+      ['washer',                   'Washer'],
+      ['drying-rack-for-clothing', 'Drying rack'],
+    ]},
+  ]
+
+  const amenPills  = document.getElementById('fd-amen-pills')
+  const amenChecks = document.getElementById('fd-amen-checks')
+  if (amenPills && amenChecks) {
+    // Only show items that actually exist in the live taxonomy — if the slug
+    // is missing, the filter would return zero results anyway.
+    const liveSlugs = new Set((tax.amenities || []).map(a => a.slug))
+    const slugToControls = new Map() // slug -> { pill?, cb? }
+
+    amenPills.innerHTML  = ''
+    amenChecks.innerHTML = ''
+
+    function syncSlug(slug, on) {
+      const c = slugToControls.get(slug)
+      if (!c) return
+      if (c.pill) c.pill.classList.toggle('active', on)
+      if (c.cb)   c.cb.checked = on
+    }
+    function applySlug(slug, on) {
+      if (on) F.amenities.add(slug); else F.amenities.delete(slug)
+      syncSlug(slug, on)
+      scheduleFilterResults()
+    }
+
+    // FAQ pills
+    FAQ_PILLS.forEach(({ slug, label }) => {
+      if (!liveSlugs.has(slug)) return
+      const pill = document.createElement('button')
+      pill.type = 'button'
+      pill.className = 'fd-faq-pill'
+      pill.dataset.amen = slug
+      pill.textContent = label
+      pill.addEventListener('click', () => applySlug(slug, !pill.classList.contains('active')))
+      amenPills.appendChild(pill)
+      slugToControls.set(slug, { ...(slugToControls.get(slug) || {}), pill })
+    })
+
+    // Grouped checkboxes
+    AMEN_GROUPS.forEach(g => {
+      const items = g.items.filter(([slug]) => liveSlugs.has(slug))
+      if (!items.length) return
+      const block = document.createElement('div')
+      block.className = 'fd-amen-block'
+      block.innerHTML = `<div class="fd-amen-group-title">${escapeHtml(g.title)}</div>`
+      const grid = document.createElement('div')
+      grid.className = 'fd-amen-grid'
+      items.forEach(([slug, label]) => {
+        const row = document.createElement('label')
+        row.className = 'fd-check-row'
+        row.innerHTML = `<input type="checkbox" class="fd-amen-cb" value="${slug}" /><span>${escapeHtml(label)}</span>`
+        const cb = row.querySelector('.fd-amen-cb')
+        cb.addEventListener('change', () => applySlug(slug, cb.checked))
+        grid.appendChild(row)
+        slugToControls.set(slug, { ...(slugToControls.get(slug) || {}), cb })
+      })
+      block.appendChild(grid)
+      amenChecks.appendChild(block)
+    })
+  }
+}
+
+function paramsForCards(page = 1, opts = {}) {
+  const params = new URLSearchParams({ page: String(page), per_page: String(PER_PAGE) })
+  const shouldUseBounds = !opts.skipBounds && (!isMobileStays() || mobileView === 'map' || opts.forceBounds)
+  const bounds = shouldUseBounds ? (opts.bounds ?? mapInstance?.getBounds()) : null
+  if (bounds) {
+    params.set('bounds', [
+      bounds.getSouthWest().lat,
+      bounds.getSouthWest().lng,
+      bounds.getNorthEast().lat,
+      bounds.getNorthEast().lng,
+    ].join(','))
+  }
+
+  if (F.cat) params.set('category', F.cat)
+  if (F.type) params.set('type', F.type)
+  if (F.cats.size) params.set('cats', [...F.cats].join(','))
+  if (F.badge) params.set('badge', F.badge)
+  if (F.rateMode) params.set('rate_mode', F.rateMode)
+  if (F.priceMin > 0) params.set('price_min', String(F.priceMin))
+  if (F.priceMax < Infinity) params.set('price_max', String(F.priceMax))
+  const minBeds = Math.max(F.beds, F.bedCount)
+  if (minBeds > 0) params.set('beds', String(minBeds))
+  if (F.baths > 0) params.set('baths', String(F.baths))
+  if (F.amenities.size) params.set('amenities', [...F.amenities].join(','))
+  if (F.minRating > 0) params.set('min_rating', String(F.minRating))
+  if (F.location) params.set('location', F.location)
+
+  return params
+}
+
+function paramsForListingIndex(opts = {}) {
+  const params = paramsForCards(1, opts)
+  params.delete('page')
+  params.set('per_page', '48')
+  params.delete('badge')
+  params.delete('rate_mode')
+  if (F.rateMode === 'monthly') {
+    params.delete('price_min')
+    params.delete('price_max')
+  }
+  return params
+}
+
+function needsClientIndexFallback() {
+  return Boolean(F.badge || F.rateMode === 'monthly')
+}
+
+function cacheKeyForParams(params) {
+  const clone = new URLSearchParams(params)
+  clone.delete('page')
+  return clone.toString()
+}
+
+async function fetchListingIndex(opts = {}, signal) {
+  const baseParams = paramsForListingIndex(opts)
+  const key = cacheKeyForParams(baseParams)
+  if (listingIndexCache.has(key)) return listingIndexCache.get(key)
+
+  const firstPageParams = new URLSearchParams(baseParams)
+  firstPageParams.set('page', '1')
+  const firstPage = await fetchJson(`${WP_REST_BASE}/listings?${firstPageParams}`, { signal })
+  const listings = Array.isArray(firstPage.listings) ? [...firstPage.listings] : []
+  const pages = Number(firstPage.pages || 1)
+
+  for (let page = 2; page <= pages; page++) {
+    const pageParams = new URLSearchParams(baseParams)
+    pageParams.set('page', String(page))
+    const data = await fetchJson(`${WP_REST_BASE}/listings?${pageParams}`, { signal })
+    if (Array.isArray(data.listings)) listings.push(...data.listings)
+  }
+
+  listingIndexCache.set(key, listings)
+  return listings
+}
+
+function setLoading(isLoading, append = false) {
+  const grid = document.getElementById('st-grid')
+  const count = document.getElementById('st-count')
+  const btn = document.getElementById('st-load-more')
+  if (btn) btn.disabled = isLoading
+  if (!isLoading || append) return
+  count.textContent = 'Loading places…'
+  grid.innerHTML = Array.from({ length: 9 }, () => `
+    <div class="ac-skel">
+      <div class="ac-skel-img"></div>
+      <div class="ac-skel-body">
+        <div class="ac-skel-line"></div>
+        <div class="ac-skel-line"></div>
+        <div class="ac-skel-line"></div>
+      </div>
+    </div>
+  `).join('')
+}
+
+async function fetchCards(page = 1, opts = {}) {
+  const append = !!opts.append
+  if (fetchController) fetchController.abort()
+  const controller = new AbortController()
+  fetchController = controller
+  setLoading(true, append)
+
+  try {
+    const params = paramsForCards(page, opts)
+    const data = await fetchJson(`${WP_REST_BASE}/listings?${params}`, { signal: controller.signal })
+    let listings = Array.isArray(data.listings) ? data.listings : []
+    const hasServerFilters = data.server_filters === true
+
+    if (!hasServerFilters && needsClientIndexFallback()) {
+      const allListings = await fetchListingIndex(opts, controller.signal)
+      const filtered = allListings.filter(matchesClientFilters)
+      totalResults = filtered.length
+      totalPages = totalResults > 0 ? Math.ceil(totalResults / PER_PAGE) : 0
+      currentPage = page
+      listings = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
+    } else {
+      currentPage = Number(data.page || page)
+      totalPages = Number(data.pages || 1)
+      totalResults = Number(data.total || listings.length)
+    }
+
+    listings.forEach(l => {
+      if (l?.slug) cardCache.set(l.slug, l)
+    })
+
+    currentListings = append ? currentListings.concat(listings) : listings
+
+    renderCards(currentListings)
+    renderPagination()
+    updateApplyButton()
+  } catch (err) {
+    if (err.name === 'AbortError') return
+    console.error(err)
+    renderCards([])
+    document.getElementById('st-count').textContent = 'Could not load places'
+  } finally {
+    setLoading(false, append)
+    if (fetchController === controller) fetchController = null
+  }
+
+  updateFilterCount()
+}
+
+function renderPagination() {
+  const wrap = document.getElementById('st-page-actions')
+  const btn = document.getElementById('st-load-more')
+  if (!wrap || !btn) return
+  wrap.hidden = currentPage >= totalPages || totalPages <= 1
+  btn.textContent = currentPage < totalPages ? `Load more (${currentPage + 1} of ${totalPages})` : 'All places loaded'
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Card rendering — see src/scripts/card-template.js for the shared template.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function activeRate(l) {
+  return F.rateMode === 'monthly' ? Number(l.monthly || 0) : Number(l.price || 0)
+}
+
+function matchesClientFilters(l) {
+  if (F.rateMode === 'monthly' && !Number(l.monthly || 0)) return false
+  if (F.badge) {
+    const hasBadge = badgeLabels(l).some(badge => badgeSlug(badge).includes(F.badge))
+    if (!hasBadge) return false
+  }
+  const rate = activeRate(l)
+  if (F.priceMin > 0 && rate < F.priceMin) return false
+  if (F.priceMax < Infinity && rate > F.priceMax) return false
+  return true
+}
+
+function badgeSlug(label) {
+  return String(label || '')
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+}
+
+function badgeText(badge) {
+  if (!badge) return ''
+  if (typeof badge === 'object') {
+    return badge.label || badge.value || badge.name || badge.slug || badge.key || ''
+  }
+  return String(badge)
+}
+
+function badgeLabels(listing) {
+  const raw = Array.isArray(listing?.badges)
+    ? listing.badges
+    : Array.isArray(listing?.accommodationBadges)
+      ? listing.accommodationBadges
+      : []
+
+  return raw
+    .map(badgeText)
+    .map((badge) => badge.trim())
+    .filter(Boolean)
+}
+
+// badgeChips() lives in src/scripts/card-template.js as badgeChipsHTML().
+// Exposed on window.__badgeChipsHTML by the loader script above.
+
+function renderCards(items) {
+  const grid  = document.getElementById('st-grid')
+  const empty = document.getElementById('st-empty')
+  const count = document.getElementById('st-count')
+  const showing = items.length
+  const total = totalResults || showing
+  count.textContent = total > showing
+    ? `Showing ${showing} of ${total} place${total !== 1 ? 's' : ''} in this area`
+    : `${total} place${total !== 1 ? 's' : ''} in this area`
+
+  if (!items.length) {
+    grid.innerHTML = ''
+    empty.hidden = false
+    return
+  }
+  empty.hidden = true
+
+  const sb = window.__sb
+  grid.innerHTML = items.map(l => window.__cardHTML(l, {
+    saved:    sb ? sb.isSaved(l.slug) : false,
+    rateMode: F.rateMode,
+  })).join('')
+
+  // Init sliders on newly rendered cards (shared logic from card-slider.js)
+  window.__initSliders?.(grid)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Map
+// ─────────────────────────────────────────────────────────────────────────────
+function initMap() {
+  mapInstance = L.map('map', {
+    center: [9.9333, 125.0667],
+    zoom: 13,
+    zoomControl: true,
+  })
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CARTO',
+    subdomains: 'abcd', maxZoom: 19,
+  }).addTo(mapInstance)
+
+  window.__stMap = mapInstance
+  markerLayer = window.L.markerClusterGroup
+    ? L.markerClusterGroup({
+        showCoverageOnHover: false,
+        maxClusterRadius: 44,
+        disableClusteringAtZoom: 14,
+      }).addTo(mapInstance)
+    : L.layerGroup().addTo(mapInstance)
+
+  // Click empty map area → close popup (Leaflet map click doesn't fire when clicking a marker)
+  mapInstance.on('click', closeMapPopup)
+
+  // Keep popup anchored to its pin while panning/zooming
+  mapInstance.on('move zoom', positionPopup)
+
+  // Viewport filter — re-run when user pans or zooms (debounced)
+  mapInstance.on('moveend zoomend', function () {
+    if (isMobileStays() && mobileView !== 'map') return
+    clearTimeout(mapMoveTimer)
+    mapMoveTimer = setTimeout(function () {
+      fetchCards(1, { forceBounds: true })
+      const listPanel = document.getElementById('st-list-panel')
+      if (listPanel) listPanel.scrollTop = 0
+    }, 400)
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Map popup
+// ─────────────────────────────────────────────────────────────────────────────
+let activePopupSlug    = null
+let activePopupListing = null
+let mpCur   = 0
+let mpTotal = 0
+
+function mpGoTo(idx) {
+  const track = document.getElementById('mp-track')
+  if (!track) return
+  idx = Math.max(0, Math.min(idx, mpTotal - 1))
+  track.scrollTo({ left: idx * track.offsetWidth, behavior: 'smooth' })
+  mpCur = idx
+  document.getElementById('mp-dots')?.querySelectorAll('.sb-dot').forEach((d, i) => d.classList.toggle('active', i === idx))
+  document.getElementById('mp-prev').toggleAttribute('data-hidden', idx === 0)
+  document.getElementById('mp-next').toggleAttribute('data-hidden', idx >= mpTotal - 1)
+}
+
+function positionPopup() {
+  if (!activePopupListing || !mapInstance) return
+  const popup  = document.getElementById('map-popup')
+  const mapEl  = document.getElementById('map')
+  const coords = listingCoords(activePopupListing)
+  if (!coords) return
+
+  if (isMobileStays()) {
+    popup.style.left = ''
+    popup.style.top = ''
+    return
+  }
+
+  const point  = mapInstance.latLngToContainerPoint(L.latLng(coords[0], coords[1]))
+  const PIN_H  = 34   // approx height of .mp-pin pill
+  const GAP    = 6    // gap between pin bottom and popup top
+  const popupW = 260
+  const mapW   = mapEl.offsetWidth
+  const mapH   = mapEl.offsetHeight
+
+  // Center popup horizontally on pin, clamp to map edges
+  let left = point.x - popupW / 2
+  left = Math.max(8, Math.min(left, mapW - popupW - 8))
+
+  // Place below pin; if not enough room, flip above
+  let top = point.y + PIN_H + GAP
+  const popupH = popup.offsetHeight || 300
+  if (top + popupH > mapH - 8) top = point.y - popupH - GAP
+
+  popup.style.left = left + 'px'
+  popup.style.top  = top  + 'px'
+}
+
+function normalizePin(pin) {
+  return {
+    slug: pin.slug || '',
+    price: Number(pin.price || 0),
+    lat: Number(pin.lat || 0) || null,
+    lng: Number(pin.lng || 0) || null,
+    title: pin.title || '',
+    gallery: [],
+  }
+}
+
+async function listingForPin(pin) {
+  if (cardCache.has(pin.slug)) return cardCache.get(pin.slug)
+  const lat = Number(pin.lat)
+  const lng = Number(pin.lng)
+  if (lat && lng) {
+    try {
+      const pad = 0.00035
+      const params = new URLSearchParams({
+        page: '1',
+        per_page: '48',
+        bounds: [lat - pad, lng - pad, lat + pad, lng + pad].join(','),
+      })
+      const data = await fetchJson(`${WP_REST_BASE}/listings?${params}`)
+      const match = (data.listings || []).find(l => l.slug === pin.slug)
+      ;(data.listings || []).forEach(l => {
+        if (l?.slug) cardCache.set(l.slug, l)
+      })
+      if (match) return match
+    } catch (err) {
+      console.warn('Could not hydrate pin popup', err)
+    }
+  }
+  return normalizePin(pin)
+}
+
+async function showMapPopup(l) {
+  if (isMobileStays()) setMobileView('map')
+  l = await listingForPin(l)
+  const popup   = document.getElementById('map-popup')
+  const link    = document.getElementById('mp-card-link')
+  const sub     = document.getElementById('mp-card-sub')
+  const title   = document.getElementById('mp-card-title')
+  const stats   = document.getElementById('mp-card-stats')
+  const price   = document.getElementById('mp-card-price')
+  const heart   = document.getElementById('mp-card-heart')
+  const badges  = document.getElementById('mp-card-badges')
+
+  // Gallery slider
+  const images   = l.gallery?.length ? l.gallery : (l.thumb ? [l.thumb] : [])
+  const mpTrack  = document.getElementById('mp-track')
+  const mpDots   = document.getElementById('mp-dots')
+  const mpDotsWrap = document.getElementById('mp-dots-wrap')
+  mpTotal = images.length
+  mpCur   = 0
+
+  mpTrack.innerHTML = images.length
+    ? images.map((src, i) => `<div class="sb-slide"><img src="${escapeHtml(src)}" alt="${escapeHtml(l.title)}" loading="${i===0?'eager':'lazy'}" /></div>`).join('')
+    : `<div class="sb-slide" style="display:flex;align-items:center;justify-content:center;background:#f3f4f6;color:#d1d5db;font-size:13px;">No photo</div>`
+  badges.innerHTML = window.__badgeChipsHTML(l)
+  badges.hidden = !badges.innerHTML
+
+  // Reset scroll to first slide
+  mpTrack.scrollLeft = 0
+
+  // Dots
+  if (mpTotal > 1) {
+    mpDots.innerHTML = images.map((_, i) => `<span class="sb-dot${i===0?' active':''}"></span>`).join('')
+    mpDotsWrap.hidden = false
+  } else {
+    mpDotsWrap.hidden = true
+  }
+
+  // Arrows — always hide prev at start; hide next if only 1 image
+  document.getElementById('mp-prev').toggleAttribute('data-hidden', true)
+  document.getElementById('mp-next').toggleAttribute('data-hidden', mpTotal <= 1)
+
+  // Link
+  link.href = '/stay/' + l.slug
+
+  // Text — keep parity with cardHTML(): top line is the property name (post title),
+  // big line below is the descriptive heading (custom desc › location › sub-heading).
+  const loc = [l.barName, l.muniName].filter(Boolean).join(', ')
+  sub.textContent   = l.title || ''
+  title.textContent = l.desc?.trim() || loc || l.subHeading || 'View this stay'
+
+  // Stats
+  const parts = []
+  if (l.guests) parts.push(l.guests + ' guest' + (l.guests !== 1 ? 's' : ''))
+  if (l.beds)   parts.push(l.beds   + ' bed'   + (l.beds   !== 1 ? 's' : ''))
+  if (l.baths)  parts.push(l.baths  + ' bath'  + (l.baths  !== 1 ? 's' : ''))
+  stats.textContent = parts.join(' · ')
+
+  // Price
+  price.innerHTML = ''
+  if (l.price || l.monthly) {
+    if (l.price)   price.innerHTML += `<div class="mp-card-price-night">₱${l.price.toLocaleString()}<span class="mp-card-price-sub"> / night</span></div>`
+    if (l.monthly) price.innerHTML += `<div class="mp-card-price-month">₱${l.monthly.toLocaleString()} / month</div>`
+  }
+
+  // Host avatar
+  const avatar = document.getElementById('mp-card-avatar')
+  if (avatar) {
+    const initials = (l.hostName || '').split(' ').map(n => n[0] || '').slice(0, 2).join('').toUpperCase()
+    const SVG_PERSON = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`
+    const SVG_CHECK  = `<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
+    const inner = l.hostPic
+      ? `<img src="${escapeHtml(l.hostPic)}" alt="${escapeHtml(l.hostName || '')}" loading="lazy"/>`
+      : (initials ? `<span>${escapeHtml(initials)}</span>` : SVG_PERSON)
+    avatar.innerHTML = `<div class="mp-av-rel"><div class="mp-av">${inner}</div>${l.verified ? `<div class="mp-av-verified">${SVG_CHECK}</div>` : ''}</div>`
+  }
+
+  // Heart state
+  const sb = window.__sb
+  heart.classList.toggle('saved', sb ? sb.isSaved(l.slug) : false)
+  heart.dataset.slug = l.slug
+
+  // Highlight active pin
+  if (activePopupSlug) {
+    document.querySelectorAll(`.mp-pin[data-slug="${activePopupSlug}"]`).forEach(p => p.classList.remove('active'))
+  }
+  activePopupSlug    = l.slug
+  activePopupListing = l
+  document.querySelectorAll(`.mp-pin[data-slug="${l.slug}"]`).forEach(p => p.classList.add('active'))
+
+  // Show first so offsetHeight is available, then position
+  popup.hidden = false
+  document.body.classList.add('st-popup-open')
+  window.setTimeout(() => {
+    popup.hidden = false
+    document.body.classList.add('st-popup-open')
+    positionPopup()
+  }, isMobileStays() ? 90 : 0)
+}
+
+function closeMapPopup() {
+  document.getElementById('map-popup').hidden = true
+  document.body.classList.remove('st-popup-open')
+  if (activePopupSlug) {
+    document.querySelectorAll(`.mp-pin[data-slug="${activePopupSlug}"]`).forEach(p => p.classList.remove('active'))
+    activePopupSlug    = null
+    activePopupListing = null
+  }
+}
+
+window.closeMapPopup = closeMapPopup
+
+function mpToggleHeart() {
+  const heart = document.getElementById('mp-card-heart')
+  const slug  = heart.dataset.slug
+  const sb    = window.__sb
+  if (!sb || !slug) return
+  sb.toggle(slug)
+}
+window.mpToggleHeart = mpToggleHeart
+
+// Sync heart state with global sb:saved-changed event
+window.addEventListener('sb:saved-changed', e => {
+  const heart = document.getElementById('mp-card-heart')
+  if (heart && heart.dataset.slug === e.detail.slug) {
+    heart.classList.toggle('saved', e.detail.saved)
+  }
+})
+
+function renderAllPins(pins) {
+  if (!mapInstance || !markerLayer) return
+  markerLayer.clearLayers()
+
+  pins.forEach(pin => {
+    const l = normalizePin(pin)
+    const coords = listingCoords(l)
+    if (!coords) return
+    const label = l.price > 0 ? '₱' + l.price.toLocaleString() : (l.muniName || '')
+    if (!label) return
+
+    const icon = L.divIcon({
+      html: `<div class="mp-pin" data-slug="${l.slug}">${label}</div>`,
+      className: '',
+      iconSize: null,
+      iconAnchor: [0, 0],
+    })
+    const marker = L.marker(coords, { icon })
+    marker.on('click', async (event) => {
+      if (event?.originalEvent) L.DomEvent.stopPropagation(event.originalEvent)
+      await showMapPopup(pin)
+    })
+    markerLayer.addLayer(marker)
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Price histogram
+// ─────────────────────────────────────────────────────────────────────────────
+function buildHistogram() {
+  const prices = allPins.map(l => Number(l.price || 0)).filter(p => p > 0)
+  if (!prices.length) return []
+  const lo = priceMin || Math.min(...prices), hi = priceMax || Math.max(...prices)
+  const step = (hi - lo) / HIST_BUCKETS || 1
+  const buckets = Array(HIST_BUCKETS).fill(0)
+  prices.forEach(p => {
+    const i = Math.min(HIST_BUCKETS - 1, Math.floor((p - lo) / step))
+    buckets[i]++
+  })
+  return buckets
+}
+
+function renderHistogram(minPct, maxPct) {
+  const svg    = document.getElementById('fd-hist-svg')
+  if (!svg) return
+  const buckets = buildHistogram()
+  const maxB    = Math.max(...buckets, 1)
+  const W       = 100 / HIST_BUCKETS
+  svg.innerHTML = buckets.map((b, i) => {
+    const x    = i * W
+    const h    = (b / maxB) * 100
+    const pct  = (i / HIST_BUCKETS) * 100
+    const inRange = pct >= minPct && pct < maxPct
+    return `<rect class="fd-hist-bar" x="${x}%" y="${100-h}%" width="${W-.5}%" height="${h}%"
+      fill="${inRange ? '#1a2533' : '#e2ebf3'}" rx="1.5"/>`
+  }).join('')
+}
+
+function initPriceSlider() {
+  const rMin   = document.getElementById('fd-range-min')
+  const rMax   = document.getElementById('fd-range-max')
+  const track  = document.getElementById('fd-slider-track')
+  const lblMin = document.getElementById('fd-price-min-lbl')
+  const lblMax = document.getElementById('fd-price-max-lbl')
+
+  function update(live = false) {
+    let lo = parseInt(rMin.value), hi = parseInt(rMax.value)
+    if (lo > hi - 2) {
+      if (document.activeElement === rMin) lo = hi - 2
+      else hi = lo + 2
+      rMin.value = lo; rMax.value = hi
+    }
+    // Update fill
+    track.innerHTML = `<div class="fd-slider-fill" style="left:${lo}%;width:${hi-lo}%"></div>`
+    // Update labels (map pct → real price)
+    const realMin = Math.round(priceMin + (lo/100) * (priceMax - priceMin))
+    const realMax = Math.round(priceMin + (hi/100) * (priceMax - priceMin))
+    lblMin.textContent = '₱' + realMin.toLocaleString()
+    lblMax.textContent = hi >= 99 ? '₱' + realMax.toLocaleString() + '+' : '₱' + realMax.toLocaleString()
+    F.priceMin = realMin
+    F.priceMax = hi >= 99 ? Infinity : realMax
+    renderHistogram(lo, hi)
+    if (live) {
+      F.rateBand = 'custom'
+      document.querySelectorAll('.fd-quick-rate').forEach(btn => btn.classList.remove('active'))
+      scheduleFilterResults()
+    }
+  }
+
+  rMin.oninput = () => update(true)
+  rMax.oninput = () => update(true)
+  update()
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Filter drawer interactions
+// ─────────────────────────────────────────────────────────────────────────────
+function openFilter() {
+  document.getElementById('fd').hidden = false
+  document.getElementById('fd-backdrop').hidden = false
+  document.body.style.overflow = 'hidden'
+  updateApplyButton()
+}
+function closeFilter() {
+  document.getElementById('fd').hidden = true
+  document.getElementById('fd-backdrop').hidden = true
+  document.body.style.overflow = ''
+}
+
+function updateFilterCount() {
+  let n = 0
+  if (F.cat) n++
+  if (F.type) n++
+  if (F.cats.size) n += F.cats.size
+  if (F.badge) n++
+  if (F.rateMode !== 'daily') n++
+  if (F.rateBand !== 'any') n++
+  if (F.priceMin > priceMin || F.priceMax < priceMax) n++
+  if (F.beds) n++
+  if (F.baths) n++
+  if (F.amenities.size) n += F.amenities.size
+  if (F.minRating > 0) n++
+  const badge = document.getElementById('st-filter-count')
+  badge.textContent = n
+  badge.hidden = n === 0
+}
+
+function applyButtonLabel(count = totalResults) {
+  if (!Number.isFinite(count)) return 'Show places'
+  const noun = count === 1 ? 'result' : 'results'
+  return `Show ${count.toLocaleString()} ${noun} found`
+}
+
+function updateApplyButton(isLoading = false) {
+  const btn = document.getElementById('fd-apply')
+  if (!btn) return
+  btn.textContent = isLoading ? 'Checking places…' : applyButtonLabel(totalResults)
+}
+
+function fetchFilterResultsNow() {
+  clearTimeout(liveFilterTimer)
+  updateFilterCount()
+  updateApplyButton(true)
+  return fetchCards(1, { skipBounds: isMobileStays() && mobileView === 'list' })
+}
+
+function scheduleFilterResults() {
+  updateFilterCount()
+  updateApplyButton(true)
+  clearTimeout(liveFilterTimer)
+  liveFilterTimer = window.setTimeout(fetchFilterResultsNow, 60)
+}
+
+function clearAllFilters() {
+  F.type = ''; F.cats.clear(); F.amenities.clear()
+  F.badge = ''; F.rateMode = 'daily'; F.rateBand = 'any'
+  F.priceMin = priceMin; F.priceMax = priceMax
+  F.beds = 0; F.bedCount = 0; F.baths = 0
+  F.minRating = 0
+
+  // Reset UI
+  document.querySelectorAll('.fd-type').forEach(b => b.classList.toggle('active', b.dataset.type === ''))
+  document.querySelectorAll('.fd-rate').forEach(b => b.classList.toggle('active', b.dataset.rateMode === 'daily'))
+  document.querySelectorAll('.fd-quick-rate').forEach(b => b.classList.toggle('active', b.dataset.rateBand === 'any'))
+  document.querySelectorAll('.fd-rating-pill').forEach(b => b.classList.toggle('active', b.dataset.rating === '0'))
+  document.getElementById('fd-nomad')?.classList.remove('active')
+  document.getElementById('fd-price-sub').textContent = 'Nightly price in Philippine Peso'
+  document.querySelectorAll('.fd-pill').forEach(b => b.classList.remove('active'))
+  document.querySelectorAll('.fd-faq-pill').forEach(b => b.classList.remove('active'))
+  document.querySelectorAll('.fd-amen-cb').forEach(cb => { cb.checked = false })
+  document.querySelectorAll('[id^="step-"]').forEach(el => { el.textContent = 'Any' })
+  document.querySelectorAll('.fd-step-btn[data-step-dir="-1"]').forEach(b => b.disabled = true)
+  document.getElementById('fd-range-min').value = 0
+  document.getElementById('fd-range-max').value = 100
+  initPriceSlider()
+  document.querySelectorAll('.st-cat').forEach(b => b.classList.toggle('active', b.dataset.cat === ''))
+  F.cat = ''
+  fetchFilterResultsNow()
+}
+window.clearAllFilters = clearAllFilters
+
+function setQuickRateBand(band) {
+  F.rateBand = band || 'any'
+  document.querySelectorAll('.fd-quick-rate').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.rateBand === F.rateBand)
+  })
+  if (F.rateBand === 'under-1500') {
+    F.priceMin = 0
+    F.priceMax = 1499
+  } else if (F.rateBand === '1500-5000') {
+    F.priceMin = 1500
+    F.priceMax = 5000
+  } else if (F.rateBand === 'over-5000') {
+    F.priceMin = 5001
+    F.priceMax = Infinity
+  } else {
+    F.priceMin = priceMin
+    F.priceMax = priceMax || Infinity
+  }
+  scheduleFilterResults()
+}
+
+function applyUrlFilters() {
+  const params = new URLSearchParams(window.location.search)
+  const cats = (params.get('cats') || params.get('category') || '').split(',').map(s => s.trim()).filter(Boolean)
+
+  // Build the set of topbar pill slugs so we can route single-value URLs there
+  const topbarSlugs = new Set(
+    Array.from(document.querySelectorAll('.st-cat'))
+      .map(b => b.dataset.cat)
+      .filter(Boolean)
+  )
+
+  // Single `?cats=X` that matches a topbar pill → treat as topbar selection
+  // (so the pill lights up). Otherwise → drawer multi-select state.
+  if (cats.length === 1 && topbarSlugs.has(cats[0])) {
+    F.cat = cats[0]
+  } else {
+    cats.forEach(slug => F.cats.add(slug))
+  }
+
+  if (params.get('badge')) F.badge = params.get('badge')
+  if (params.get('rate_mode') === 'monthly') F.rateMode = 'monthly'
+  // Limasawa: honor ?location=<slug> from the homepage search (siargao seeded
+  // this only via the [location].astro hub pages, which limasawa doesn't have).
+  if (params.get('location')) F.location = params.get('location')
+
+  document.querySelectorAll('.fd-pill').forEach(btn => {
+    btn.classList.toggle('active', F.cats.has(btn.dataset.catPill))
+  })
+  // Topbar pill: highlight whichever matches F.cat; "All" when nothing selected
+  document.querySelectorAll('.st-cat').forEach(btn => {
+    const slug = btn.dataset.cat
+    const isAll = slug === ''
+    const isSelected = isAll
+      ? (!F.cat && !F.cats.size)
+      : (slug === F.cat)
+    btn.classList.toggle('active', isSelected)
+  })
+  document.querySelectorAll('.fd-rate').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.rateMode === F.rateMode)
+  })
+  document.getElementById('fd-nomad')?.classList.toggle('active', F.badge === 'digital-nomad')
+  document.getElementById('fd-price-sub').textContent =
+    F.rateMode === 'monthly' ? 'Monthly price in Philippine Peso' : 'Nightly price in Philippine Peso'
+}
+
+// Steppers
+const stepState = { 'beds': 0, 'bed-count': 0, 'baths': 0 }
+function initSteppers() {
+  document.querySelectorAll('.fd-step-btn').forEach(btn => {
+    const key = btn.dataset.stepKey
+    const dir = parseInt(btn.dataset.stepDir)
+    btn.disabled = dir === -1
+    btn.addEventListener('click', () => {
+      stepState[key] = Math.max(0, (stepState[key] || 0) + dir)
+      const el = document.getElementById(`step-${key}`)
+      el.textContent = stepState[key] === 0 ? 'Any' : stepState[key] + '+'
+      document.querySelector(`[data-step-key="${key}"][data-step-dir="-1"]`).disabled = stepState[key] === 0
+      if (key === 'beds')      F.beds     = stepState[key]
+      if (key === 'bed-count') F.bedCount = stepState[key]
+      if (key === 'baths')     F.baths    = stepState[key]
+      scheduleFilterResults()
+    })
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Boot
+// ─────────────────────────────────────────────────────────────────────────────
+async function boot() {
+  initMap()
+  setLoading(true)
+
+  // Fetch pins + taxonomies in parallel — both come from cached transients server-side
+  const [pinsRes, taxRes] = await Promise.allSettled([fetchPins(), fetchTaxonomies()])
+
+  if (pinsRes.status === 'fulfilled') {
+    allPins = pinsRes.value
+    const prices = allPins.map(p => Number(p.price || 0)).filter(p => p > 0)
+    priceMin = prices.length ? Math.min(...prices) : 0
+    priceMax = prices.length ? Math.max(...prices) : 0
+    F.priceMin = priceMin
+    F.priceMax = priceMax || Infinity
+    renderAllPins(allPins)
+    // Fit the map to all pins so the initial viewport frames Limasawa's listings
+    // (the small island means the default center+zoom may not catch every pin).
+    if (allPins.length && mapInstance) {
+      try {
+        const latlngs = allPins.map(p => [Number(p.lat), Number(p.lng)]).filter(([la, ln]) => Number.isFinite(la) && Number.isFinite(ln))
+        if (latlngs.length === 1) {
+          mapInstance.setView(latlngs[0], 14)
+        } else if (latlngs.length > 1) {
+          mapInstance.fitBounds(latlngs, { padding: [40, 40], maxZoom: 15 })
+        }
+      } catch (e) { console.warn('fitBounds failed', e) }
+    }
+  } else {
+    console.error(pinsRes.reason)
+    document.getElementById('st-count').textContent = 'Could not load map pins'
+  }
+
+  if (taxRes.status === 'fulfilled') {
+    renderDynamicFilters(taxRes.value)
+    // Apply URL filters now that pills exist (so the right one can be marked active)
+    applyUrlFilters()
+  } else {
+    console.error(taxRes.reason)
+  }
+
+  initPriceSlider()
+  initSteppers()
+  await fetchCards(1, { skipBounds: isMobileStays() })
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setMobileView('list')
+  // applyUrlFilters() runs inside boot() — after dynamic pills are rendered.
+
+  // Static "All" pill (other category pills are wired in renderDynamicFilters)
+  document.querySelectorAll('.st-cat[data-cat=""]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.st-cat').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      F.cat = ''
+      F.cats.clear()
+      document.querySelectorAll('.fd-pill').forEach(b => b.classList.remove('active'))
+      fetchCards(1, { skipBounds: true })
+    })
+  })
+
+  document.getElementById('st-load-more')?.addEventListener('click', () => {
+    if (currentPage < totalPages) fetchCards(currentPage + 1, { append: true })
+  })
+
+  document.getElementById('st-map-toggle')?.addEventListener('click', () => {
+    closeMapPopup()
+    setMobileView('map')
+    fetchCards(1, { forceBounds: true })
+  })
+
+  document.getElementById('st-list-toggle')?.addEventListener('click', () => {
+    closeMapPopup()
+    setMobileView('list')
+  })
+
+  document.getElementById('st-mobile-back')?.addEventListener('click', () => {
+    if (isMobileStays() && mobileView === 'map') {
+      closeMapPopup()
+      setMobileView('list')
+      return
+    }
+    window.location.href = '/'
+  })
+
+  document.getElementById('st-mobile-summary')?.addEventListener('click', () => {
+    if (isMobileStays() && mobileView === 'list') {
+      closeMapPopup()
+      setMobileView('map')
+      fetchCards(1, { forceBounds: true })
+    }
+  })
+
+  window.addEventListener('resize', () => {
+    if (!isMobileStays()) {
+      document.body.classList.remove('st-map-mode')
+      window.setTimeout(() => mapInstance?.invalidateSize(), 80)
+    } else {
+      setMobileView(mobileView)
+    }
+  })
+
+  // Popup slider arrows
+  document.getElementById('mp-prev')?.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); mpGoTo(mpCur - 1) })
+  document.getElementById('mp-next')?.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); mpGoTo(mpCur + 1) })
+  const mpTrackEl = document.getElementById('mp-track')
+  if (mpTrackEl) {
+    let mpRaf = 0
+    mpTrackEl.addEventListener('scroll', () => {
+      cancelAnimationFrame(mpRaf)
+      mpRaf = requestAnimationFrame(() => {
+        const idx = Math.round(mpTrackEl.scrollLeft / (mpTrackEl.offsetWidth || 1))
+        if (idx !== mpCur) {
+          mpCur = idx
+          document.getElementById('mp-dots')?.querySelectorAll('.sb-dot').forEach((d, i) => d.classList.toggle('active', i === idx))
+          document.getElementById('mp-prev').toggleAttribute('data-hidden', idx === 0)
+          document.getElementById('mp-next').toggleAttribute('data-hidden', idx >= mpTotal - 1)
+        }
+      })
+    }, { passive: true })
+  }
+
+  // Filter drawer open/close
+  document.getElementById('st-filter-btn').addEventListener('click', openFilter)
+  document.getElementById('fd-close').addEventListener('click', closeFilter)
+  document.getElementById('fd-backdrop').addEventListener('click', closeFilter)
+  document.getElementById('fd-apply').addEventListener('click', () => {
+    closeFilter()
+  })
+
+  // Type-of-place
+  document.querySelectorAll('.fd-type').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.fd-type').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      F.type = btn.dataset.type
+      scheduleFilterResults()
+    })
+  })
+
+  document.getElementById('fd-nomad')?.addEventListener('click', e => {
+    const btn = e.currentTarget
+    F.badge = F.badge === 'digital-nomad' ? '' : 'digital-nomad'
+    btn.classList.toggle('active', F.badge === 'digital-nomad')
+    scheduleFilterResults()
+  })
+
+  document.querySelectorAll('.fd-rate').forEach(btn => {
+    btn.addEventListener('click', () => {
+      F.rateMode = btn.dataset.rateMode === 'monthly' ? 'monthly' : 'daily'
+      document.querySelectorAll('.fd-rate').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      document.getElementById('fd-price-sub').textContent =
+        F.rateMode === 'monthly' ? 'Monthly price in Philippine Peso' : 'Nightly price in Philippine Peso'
+      scheduleFilterResults()
+    })
+  })
+
+  document.querySelectorAll('.fd-quick-rate').forEach(btn => {
+    btn.addEventListener('click', () => {
+      setQuickRateBand(btn.dataset.rateBand)
+    })
+  })
+
+  // Rating pills
+  document.querySelectorAll('.fd-rating-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.fd-rating-pill').forEach(b => b.classList.remove('active'))
+      btn.classList.add('active')
+      F.minRating = parseFloat(btn.dataset.rating) || 0
+      scheduleFilterResults()
+    })
+  })
+
+  // Drawer pills + amenity pills/checkboxes are wired inside renderDynamicFilters()
+  // because the elements are injected dynamically from the /taxonomies endpoint.
+
+  // Escape key
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !document.getElementById('fd').hidden) closeFilter()
+  })
+
+  boot()
+})
+</script>
+

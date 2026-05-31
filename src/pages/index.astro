@@ -1,13 +1,16 @@
 ---
 import Layout from '../layouts/Layout.astro'
-import { getListings, deriveFacets } from '../lib/api'
+import AccommodationCard from '../components/AccommodationCard.astro'
+import { getListings, getAccommodations, deriveFacets } from '../lib/api'
 
-// All current listings, fetched at build time. Drives the featured strip + facets.
+// All current listings, fetched at build time. Drives the facets (tiles + search).
 const { listings, total } = await getListings({ perPage: 48 })
 const { categories, locations } = deriveFacets(listings)
 
-const featured = [...listings]
-  .sort((a, b) => (b.tier === 'featured' ? 1 : 0) - (a.tier === 'featured' ? 1 : 0))
+// Reshaped nodes for the ported AccommodationCard (siargao card design).
+const { nodes } = await getAccommodations(48)
+const featured = [...nodes]
+  .sort((a, b) => (b.listingTier === 'featured' ? 1 : 0) - (a.listingTier === 'featured' ? 1 : 0))
   .slice(0, 6)
 
 // Hero background: a real listing photo when available, else the gradient alone.
@@ -30,23 +33,16 @@ const peso = (n: number) => '₱' + Number(n).toLocaleString('en-PH')
         <form class="search" action="/stays" method="get">
           <div class="search-field">
             <label for="s-loc">Where</label>
-            <select id="s-loc" name="loc">
+            <select id="s-loc" name="location">
               <option value="">Anywhere in Limasawa</option>
               {locations.map((l) => <option value={l.slug}>{l.name} ({l.count})</option>)}
             </select>
           </div>
           <div class="search-field">
             <label for="s-cat">Type</label>
-            <select id="s-cat" name="cat">
+            <select id="s-cat" name="category">
               <option value="">Any type</option>
               {categories.map((c) => <option value={c.slug}>{c.name} ({c.count})</option>)}
-            </select>
-          </div>
-          <div class="search-field">
-            <label for="s-guests">Guests</label>
-            <select id="s-guests" name="guests">
-              <option value="">Any</option>
-              {guestOpts.map((g) => <option value={g}>{g}+ guests</option>)}
             </select>
           </div>
           <button type="submit" class="search-btn">Search</button>
@@ -65,17 +61,7 @@ const peso = (n: number) => '₱' + Number(n).toLocaleString('en-PH')
           <p class="muted">Listings are being added — check back soon.</p>
         ) : (
           <div class="grid grid-3">
-            {featured.map((l) => (
-              <a href={`/stay/${l.slug}`} class="stay-card">
-                {l.thumb ? <img src={l.thumb} alt={l.title} loading="lazy" /> : <div class="ph"></div>}
-                {l.verified && <span class="stay-badge">✓ Verified</span>}
-                <div class="stay-card-body">
-                  <h3>{l.title}</h3>
-                  {l.muniName && <p class="muted sm">{l.muniName}</p>}
-                  <strong>{l.price > 0 ? `${peso(l.price)} / night` : 'Inquire for price'}</strong>
-                </div>
-              </a>
-            ))}
+            {featured.map((node) => <AccommodationCard listing={node} />)}
           </div>
         )}
       </div>
@@ -88,7 +74,7 @@ const peso = (n: number) => '₱' + Number(n).toLocaleString('en-PH')
           <div class="section-head"><h2>Browse by type</h2></div>
           <div class="tile-row">
             {categories.map((c) => (
-              <a href={`/stays?cat=${c.slug}`} class="tile" style={c.image ? `background-image: linear-gradient(180deg, rgba(13,30,43,.15), rgba(13,30,43,.7)), url(${c.image})` : ''}>
+              <a href={`/stays?category=${c.slug}`} class="tile" style={c.image ? `background-image: linear-gradient(180deg, rgba(13,30,43,.15), rgba(13,30,43,.7)), url(${c.image})` : ''}>
                 <span class="tile-name">{c.name}</span>
                 <span class="tile-count">{c.count} {c.count === 1 ? 'place' : 'places'}</span>
               </a>
@@ -105,7 +91,7 @@ const peso = (n: number) => '₱' + Number(n).toLocaleString('en-PH')
           <div class="section-head"><h2>Browse by location</h2></div>
           <div class="tile-row">
             {locations.map((l) => (
-              <a href={`/stays?loc=${l.slug}`} class="tile" style={l.image ? `background-image: linear-gradient(180deg, rgba(13,30,43,.15), rgba(13,30,43,.7)), url(${l.image})` : ''}>
+              <a href={`/stays?location=${l.slug}`} class="tile" style={l.image ? `background-image: linear-gradient(180deg, rgba(13,30,43,.15), rgba(13,30,43,.7)), url(${l.image})` : ''}>
                 <span class="tile-name">{l.name}</span>
                 <span class="tile-count">{l.count} {l.count === 1 ? 'place' : 'places'}</span>
               </a>

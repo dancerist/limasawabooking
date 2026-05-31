@@ -1,0 +1,253 @@
+/* ============================================================================
+ * Listing card — shared across homepage, /stays grid, and (CSS-only) map popup
+ * Pairs with src/scripts/card-template.js
+ * ========================================================================== */
+
+/* ── Card shell ─────────────────────────────────────────────────────────── */
+.ac {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #f3f4f6;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .05);
+  transition: box-shadow 200ms, transform 200ms;
+  overflow: hidden;
+}
+.ac:hover {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .1);
+  transform: translateY(-2px);
+}
+
+/* ── Skeleton loader ────────────────────────────────────────────────────── */
+.ac-skel {
+  border-radius: 16px;
+  border: 1px solid #f3f4f6;
+  background: #fff;
+  overflow: hidden;
+}
+.ac-skel-img {
+  aspect-ratio: 4 / 3;
+  background: linear-gradient(90deg, #f1f5f9, #e2ebf3, #f1f5f9);
+  background-size: 200% 100%;
+  animation: ac-skel 1.15s ease-in-out infinite;
+}
+.ac-skel-body { padding: 16px; }
+.ac-skel-line { height: 12px; border-radius: 999px; background: #e2ebf3; margin-top: 10px; }
+.ac-skel-line:first-child  { margin-top: 0; width: 58%; }
+.ac-skel-line:nth-child(2) { width: 92%; }
+.ac-skel-line:nth-child(3) { width: 68%; }
+@keyframes ac-skel {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* ── Image area + slider ────────────────────────────────────────────────── */
+.ac-img-wrap { position: relative; }
+.ac-img-inner {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: 16px 16px 0 0;
+  overflow: hidden;
+  background: #f3f4f6;
+}
+.ac-img-inner img { width: 100%; height: 100%; object-fit: cover; transition: transform 300ms; }
+.ac:hover .ac-img-inner img { transform: scale(1.04); }
+.ac-img-empty {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  color: #d1d5db;
+}
+
+.sb-track {
+  display: flex;
+  width: 100%; height: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.sb-track::-webkit-scrollbar { display: none; }
+
+.sb-slide {
+  flex: 0 0 100%;
+  width: 100%; height: 100%;
+  scroll-snap-align: start;
+}
+.sb-slide img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+  transition: transform 300ms;
+}
+.ac:hover .sb-slide img { transform: scale(1.04); }
+
+/* Arrows — show on card hover */
+.sb-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  z-index: 10;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .92);
+  border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #222;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, .22);
+  opacity: 0; pointer-events: none;
+  transition: opacity 160ms;
+}
+.sb-prev { left: 10px; }
+.sb-next { right: 10px; }
+.ac:hover .sb-arrow,
+.mp-card-img-wrap:hover .sb-arrow {
+  opacity: 1;
+  pointer-events: auto;
+}
+/* Touch devices: arrows are always visible + clickable since :hover never
+   fires reliably. Without this, taps fall through to the underlying <a>
+   anchor and navigate to the listing page instead of advancing the slider. */
+@media (hover: none) {
+  .sb-arrow { opacity: 1; pointer-events: auto; }
+}
+.sb-arrow:hover { background: #fff; }
+.sb-arrow[data-hidden] { opacity: 0 !important; pointer-events: none !important; }
+
+/* Dots */
+.sb-dots {
+  position: absolute; bottom: 10px; left: 0; right: 0;
+  display: flex; justify-content: center;
+  z-index: 5;
+  pointer-events: none;
+}
+.sb-dots-clip { width: 50px; overflow: hidden; }
+.sb-dots-track {
+  display: flex; gap: 5px;
+  transition: transform 220ms ease;
+  will-change: transform;
+}
+.sb-dot {
+  flex-shrink: 0;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .55);
+  transition: background 150ms, transform 150ms;
+}
+.sb-dot.active { background: #fff; transform: scale(1.15); }
+
+/* Heart saved state */
+.sb-heart--saved { color: #e53e3e !important; }
+.sb-heart--saved svg { fill: #e53e3e; stroke: #e53e3e; }
+
+/* ── Heart button ───────────────────────────────────────────────────────── */
+.ac-heart {
+  position: absolute; top: 10px; right: 10px;
+  z-index: 10;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .9);
+  border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: #6b7280;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .18);
+  transition: all 180ms;
+}
+.ac-heart:hover { color: #e53e3e; transform: scale(1.1); }
+
+/* ── Badges (top-left overlay) ──────────────────────────────────────────── */
+.ac-badges {
+  position: absolute; top: 10px; left: 10px;
+  z-index: 11;
+  display: flex; flex-wrap: wrap; gap: 6px;
+  max-width: calc(100% - 58px);
+}
+.ac-badge {
+  display: inline-flex; align-items: center;
+  min-height: 26px; padding: 0 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .94);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, .14);
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 11px; font-weight: 800; line-height: 1;
+  white-space: nowrap;
+}
+.ac-badge-featured                 { color: #0f6d73; }
+.ac-badge-digital-nomad-friendly,
+.ac-badge-digital-nomad            { color: #279DA3; }
+
+/* ── Host avatar (straddles image/body boundary) ────────────────────────── */
+.ac-avatar-outer {
+  position: absolute; bottom: 0; left: 16px;
+  transform: translateY(50%);
+  z-index: 10;
+}
+.ac-avatar-rel { position: relative; width: 56px; height: 56px; }
+.ac-avatar {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  border: 2.5px solid #fff;
+  background: #e5e7eb;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  color: #6b7280;
+  font-size: 14px; font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .12);
+}
+.ac-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.ac-verified {
+  position: absolute; bottom: -2px; right: -2px;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 2px solid #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── Card body ──────────────────────────────────────────────────────────── */
+.ac-body { padding: 40px 16px 16px; position: relative; }
+.ac-sub  {
+  font-size: 13px; color: #6b7280;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+.ac-title {
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600; font-size: 15px;
+  color: #111827;
+  line-height: 1.375;
+  margin-top: 2px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.ac-stats {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 10px;
+  font-size: 13px; color: #6b7280;
+}
+.ac-stat { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.ac-sep  { color: #d1d5db; flex-shrink: 0; }
+
+.ac-price-row {
+  display: flex; justify-content: flex-end;
+  margin-top: 12px;
+  text-align: right;
+}
+.ac-price-night { font-size: 14px; font-weight: 600; color: #111827; line-height: 1.25; }
+.ac-price-sub   { font-weight: 400; color: #9ca3af; font-size: 13px; }
+.ac-price-month { font-size: 12px; color: #6b7280; margin-top: 2px; }
+
+/* Rating pill — top-right of body, aligned with bottom of host avatar */
+.card-rating-pill {
+  position: absolute; top: 12px; right: 16px;
+  display: inline-flex; align-items: center; gap: 4px;
+  background: #fffbeb; color: #92400e;
+  border: 1px solid #fde68a; border-radius: 8px;
+  font-size: 12px; font-weight: 700;
+  padding: 4px 9px; line-height: 1.3;
+}

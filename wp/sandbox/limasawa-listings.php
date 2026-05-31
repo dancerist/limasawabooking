@@ -220,56 +220,131 @@ if (defined('ABSPATH')) {
             'permission_callback' => '__return_true',
             'callback'            => 'sb_map_pins',
         ]);
+        register_rest_route($ns, '/taxonomies', [
+            'methods'             => 'GET',
+            'permission_callback' => '__return_true',
+            'callback'            => 'sb_taxonomies',
+        ]);
     });
 
     if (!function_exists('sb_listings_query_args')) {
-        // Shared WP_Query args builder so /listings and /map-pins filter identically.
-        function sb_listings_query_args(WP_REST_Request $req, $per_page) {
+        /**
+         * WP_Query args from the rich filter params StaysExperience sends.
+         * Handles the clean taxonomy/numeric filters here; price/type/badge/bounds
+         * are applied in sb_post_filter() because they need the formatted row.
+         * Always fetches all matches (posts_per_page=-1) — limasawa has ~25
+         * listings, so post-filter + manual paginate is cheap and robust.
+         */
+        function sb_listings_query_args(WP_REST_Request $req) {
             $args = [
                 'post_type'      => 'accommodation',
                 'post_status'    => 'publish',
-                'posts_per_page' => $per_page,
+                'posts_per_page' => -1,
                 'orderby'        => 'date',
                 'order'          => 'DESC',
-                'no_found_rows'  => false,
+                'no_found_rows'  => true,
             ];
 
+            // Category: `category` + legacy `cat` + `cats` (csv) → accommodation-category (OR).
+            $catSlugs = [];
+            foreach (['category', 'cat'] as $p) {
+                $v = sanitize_title((string) $req->get_param($p));
+                if ($v !== '') $catSlugs[] = $v;
+            }
+            foreach (explode(',', (string) $req->get_param('cats')) as $c) {
+                $c = sanitize_title($c);
+                if ($c !== '') $catSlugs[] = $c;
+            }
+            $catSlugs = array_values(array_unique(array_filter($catSlugs)));
+
+            // Location: `location` (siargao) or `loc` (legacy).
+            $loc = sanitize_title((string) $req->get_param('location'));
+            if ($loc === '') $loc = sanitize_title((string) $req->get_param('loc'));
+
+            // Amenities: `amenities` (csv) + `amenity` (single) → accommodation-amenity (AND).
+            $amenSlugs = [];
+            foreach (explode(',', (string) $req->get_param('amenities')) as $a) {
+                $a = sanitize_title($a);
+                if ($a !== '') $amenSlugs[] = $a;
+            }
+            $amOne = sanitize_title((string) $req->get_param('amenity'));
+            if ($amOne !== '') $amenSlugs[] = $amOne;
+            $amenSlugs = array_values(array_unique(array_filter($amenSlugs)));
+
             $tax = [];
-            $cat = sanitize_title((string) $req->get_param('cat'));
-            $loc = sanitize_title((string) $req->get_param('loc'));
-            $am  = sanitize_title((string) $req->get_param('amenity'));
-            if ($cat !== '') {
-                $tax[] = ['taxonomy' => 'accommodation-category', 'field' => 'slug', 'terms' => $cat];
+            if (!empty($catSlugs)) {
+                $tax[] = ['taxonomy' => 'accommodation-category', 'field' => 'slug', 'terms' => $catSlugs, 'operator' => 'IN'];
             }
             if ($loc !== '') {
-                $tax[] = ['taxonomy' => 'location', 'field' => 'slug', 'terms' => $loc];
+                $tax[] = ['taxonomy' => 'location', 'field' => 'slug', 'terms' => [$loc], 'operator' => 'IN'];
             }
-            if ($am !== '') {
-                $tax[] = ['taxonomy' => 'accommodation-amenity', 'field' => 'slug', 'terms' => $am];
+            foreach ($amenSlugs as $a) {
+                $tax[] = ['taxonomy' => 'accommodation-amenity', 'field' => 'slug', 'terms' => [$a], 'operator' => 'IN'];
             }
-            if (count($tax) > 1) {
-                $tax['relation'] = 'AND';
-            }
-            if (!empty($tax)) {
-                $args['tax_query'] = $tax;
-            }
+            if (count($tax) > 1) $tax['relation'] = 'AND';
+            if (!empty($tax)) $args['tax_query'] = $tax;
 
+            // Numeric meta: guests / beds / baths >=.
+            $meta = [];
             $guests = (int) $req->get_param('guests');
-            if ($guests > 0) {
-                $args['meta_query'] = [[
-                    'key'     => 'accommodation_number_of_guests',
-                    'value'   => $guests,
-                    'compare' => '>=',
-                    'type'    => 'NUMERIC',
-                ]];
-            }
+            if ($guests > 0) $meta[] = ['key' => 'accommodation_number_of_guests', 'value' => $guests, 'compare' => '>=', 'type' => 'NUMERIC'];
+            $beds = (int) $req->get_param('beds');
+            if ($beds > 0)   $meta[] = ['key' => 'accommodation_beds', 'value' => $beds, 'compare' => '>=', 'type' => 'NUMERIC'];
+            $baths = (int) $req->get_param('baths');
+            if ($baths > 0)  $meta[] = ['key' => 'accommodation_bathrooms', 'value' => $baths, 'compare' => '>=', 'type' => 'NUMERIC'];
+            if (count($meta) > 1) $meta['relation'] = 'AND';
+            if (!empty($meta)) $args['meta_query'] = $meta;
 
             $q = sanitize_text_field((string) $req->get_param('q'));
-            if ($q !== '') {
-                $args['s'] = $q;
-            }
+            if ($q !== '') $args['s'] = $q;
 
             return $args;
+        }
+    }
+
+    if (!function_exists('sb_post_filter')) {
+        // PHP-side filters that need the formatted row: price/type/badge/bounds.
+        function sb_post_filter(array $rows, WP_REST_Request $req) {
+            $rateMode = $req->get_param('rate_mode') === 'monthly' ? 'monthly' : 'daily';
+            $priceMin = (float) $req->get_param('price_min');
+            $priceMaxRaw = $req->get_param('price_max');
+            $priceMax = ($priceMaxRaw !== null && $priceMaxRaw !== '') ? (float) $priceMaxRaw : 0;
+            $type  = (string) $req->get_param('type');   // '' | 'room' | 'entire'
+            $badge = sanitize_title((string) $req->get_param('badge'));
+
+            $box = null;
+            $bounds = (string) $req->get_param('bounds'); // swLat,swLng,neLat,neLng
+            if ($bounds !== '') {
+                $b = array_map('floatval', explode(',', $bounds));
+                if (count($b) === 4) $box = $b;
+            }
+
+            $out = [];
+            foreach ($rows as $r) {
+                $rate = $rateMode === 'monthly' ? (float) $r['monthly'] : (float) $r['price'];
+                if ($rateMode === 'monthly' && $rate <= 0) continue;
+                if ($priceMin > 0 && $rate > 0 && $rate < $priceMin) continue;
+                if ($priceMax > 0 && $rate > $priceMax) continue;
+
+                if ($type === 'entire' && stripos((string) $r['placeType'], 'entire') === false) continue;
+                if ($type === 'room'   && stripos((string) $r['placeType'], 'room')   === false) continue;
+
+                if ($badge !== '') {
+                    $has = false;
+                    foreach ((array) $r['badges'] as $bd) {
+                        if (strpos(sanitize_title((string) $bd), $badge) !== false) { $has = true; break; }
+                    }
+                    if (!$has) continue;
+                }
+
+                if ($box) {
+                    if (!is_numeric($r['lat']) || !is_numeric($r['lng'])) continue;
+                    if ($r['lat'] < $box[0] || $r['lat'] > $box[2] || $r['lng'] < $box[1] || $r['lng'] > $box[3]) continue;
+                }
+
+                $out[] = $r;
+            }
+            return $out;
         }
     }
 
@@ -279,20 +354,23 @@ if (defined('ABSPATH')) {
             $per  = (int) $req->get_param('per_page');
             $per  = $per > 0 ? min(48, $per) : 12;
 
-            $args = sb_listings_query_args($req, $per);
-            $args['paged'] = $page;
-
-            $query = new WP_Query($args);
-            $listings = [];
+            $query = new WP_Query(sb_listings_query_args($req));
+            $rows = [];
             foreach ($query->posts as $post) {
-                $listings[] = sb_listing_format($post->ID, false);
+                $rows[] = sb_listing_format($post->ID, false);
             }
 
+            $rows  = sb_post_filter($rows, $req);
+            $total = count($rows);
+            $pages = $total > 0 ? (int) ceil($total / $per) : 1;
+            $slice = array_slice($rows, ($page - 1) * $per, $per);
+
             return new WP_REST_Response([
-                'listings' => $listings,
-                'total'    => (int) $query->found_posts,
-                'pages'    => max(1, (int) $query->max_num_pages),
-                'page'     => $page,
+                'listings'       => array_values($slice),
+                'total'          => $total,
+                'pages'          => max(1, $pages),
+                'page'           => $page,
+                'server_filters' => true,
             ], 200);
         }
     }
@@ -315,9 +393,7 @@ if (defined('ABSPATH')) {
 
     if (!function_exists('sb_map_pins')) {
         function sb_map_pins(WP_REST_Request $req) {
-            $args = sb_listings_query_args($req, 200);
-            $args['no_found_rows'] = true;
-            $query = new WP_Query($args);
+            $query = new WP_Query(sb_listings_query_args($req));
 
             $pins = [];
             foreach ($query->posts as $post) {
@@ -325,17 +401,39 @@ if (defined('ABSPATH')) {
                 if (!is_array($map) || !isset($map['lat'], $map['lng'])) {
                     continue;
                 }
+                $locs = sb_terms($post->ID, 'location');
                 $pins[] = [
-                    'id'    => (int) $post->ID,
-                    'slug'  => $post->post_name,
-                    'title' => html_entity_decode(get_the_title($post->ID), ENT_QUOTES),
-                    'price' => (float) sb_acf('accommodation_daily_rent', $post->ID, 0),
-                    'lat'   => (float) $map['lat'],
-                    'lng'   => (float) $map['lng'],
+                    'id'       => (int) $post->ID,
+                    'slug'     => $post->post_name,
+                    'title'    => html_entity_decode(get_the_title($post->ID), ENT_QUOTES),
+                    'price'    => (float) sb_acf('accommodation_daily_rent', $post->ID, 0),
+                    'lat'      => (float) $map['lat'],
+                    'lng'      => (float) $map['lng'],
+                    'muniSlug' => $locs['slugs'][0] ?? '',
                 ];
             }
 
-            return new WP_REST_Response(['pins' => $pins], 200);
+            // siargao's fetchPins() expects a bare JSON array.
+            return new WP_REST_Response($pins, 200);
+        }
+    }
+
+    if (!function_exists('sb_taxonomies')) {
+        // Filter facets for StaysExperience: { categories:[{slug,name,count}], amenities:[...] }.
+        function sb_taxonomies(WP_REST_Request $req) {
+            $mapTerms = function ($taxonomy) {
+                $terms = get_terms(['taxonomy' => $taxonomy, 'hide_empty' => true]);
+                if (is_wp_error($terms) || !is_array($terms)) return [];
+                $out = [];
+                foreach ($terms as $t) {
+                    $out[] = ['slug' => $t->slug, 'name' => $t->name, 'count' => (int) $t->count];
+                }
+                return $out;
+            };
+            return new WP_REST_Response([
+                'categories' => $mapTerms('accommodation-category'),
+                'amenities'  => $mapTerms('accommodation-amenity'),
+            ], 200);
         }
     }
 }

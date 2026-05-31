@@ -1,231 +1,1278 @@
 ---
 import Layout from '../../layouts/Layout.astro'
-import { getListings, getListing, type ListingDetail } from '../../lib/api'
+import { getAccommodations } from '../../lib/api'
+
+const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+
+interface PathProps {
+  title: string
+  description: string
+  image?: string
+  jsonLd?: Record<string, any>
+}
 
 export async function getStaticPaths() {
-  const { listings } = await getListings({ perPage: 48 })
-  const entries = await Promise.all(
-    listings.map(async (l) => {
-      const detail = await getListing(l.slug)
-      return detail ? { params: { slug: l.slug }, props: { listing: detail } } : null
-    })
-  )
-  return entries.filter((e): e is { params: { slug: string }; props: { listing: ListingDetail } } => e !== null)
+  // Map our accommodation-category slugs → schema.org LodgingBusiness subtypes.
+  // Anything not in the map falls back to plain LodgingBusiness.
+  // Inlined inside getStaticPaths because Astro hoists it into its own context.
+  const SCHEMA_TYPE_BY_CATEGORY: Record<string, string> = {
+    'apartment': 'Apartment',
+    'homestay':  'BedAndBreakfast',
+    'hotel':     'Hotel',
+    'hut':       'LodgingBusiness',
+    'lodging':   'LodgingBusiness',
+    'resort':    'Resort',
+    'resorts':   'Resort',
+  }
+
+  let paths: { params: { slug: string }; props: PathProps }[] = []
+  let after: string | undefined = undefined
+  let hasMore = true
+  while (hasMore) {
+    const page = await getAccommodations(100, after)
+    if (!page?.nodes?.length) break
+    paths = paths.concat(
+      page.nodes
+        .filter((l: any) => l.slug)
+        .map((l: any) => {
+          const data = l.accommodationData ?? {}
+          const gallery = data.accommodationGallery?.nodes ?? []
+          const image: string | undefined =
+            gallery[0]?.sourceUrl ||
+            l.featuredImage?.node?.sourceUrl ||
+            undefined
+          const muni = (l.locations?.nodes || []).find((t: any) => t?.databaseId)?.name || ''
+          const catNode = l.accommodationsCategory?.nodes?.[0]
+          const cat = catNode?.name || ''
+          const catSlug = catNode?.slug || ''
+          const fallbackDesc = [cat, muni && `in ${muni}, Limasawa`].filter(Boolean).join(' ').trim()
+          const description =
+            (data.customAccommodationShortDescription || '').trim() ||
+            (l.excerpt || '').replace(/<[^>]*>/g, '').trim().slice(0, 160) ||
+            fallbackDesc ||
+            'Find this accommodation on Limasawa Booking.'
+          const title = data.accommodationSubHeading || l.title || 'Listing'
+
+          // ─── Build LodgingBusiness JSON-LD ──────────────────────────────────
+          const schemaType = SCHEMA_TYPE_BY_CATEGORY[catSlug] || 'LodgingBusiness'
+          const url = `https://limasawabooking.com/stay/${l.slug}`
+          const dailyRate = Number(data.accommodationDailyRent || 0)
+          const monthlyRate = Number(data.accommodationMonthlyRent || 0)
+          const lat = data.accommodationLocation?.latitude
+          const lng = data.accommodationLocation?.longitude
+          const amenityNames = (l.accommodationAmenities?.nodes || [])
+            .map((a: any) => a?.name).filter(Boolean)
+          const galleryImages = gallery
+            .map((g: any) => g?.sourceUrl).filter(Boolean).slice(0, 6)
+          // Map nightly rate → schema.org priceRange ($/$$/$$$/$$$$).
+          // Bands tuned to the Limasawa market: <1500/1500-3500/3500-7000/>7000.
+          const priceRange =
+            dailyRate <= 0     ? undefined :
+            dailyRate < 1500   ? '$' :
+            dailyRate < 3500   ? '$$' :
+            dailyRate < 7000   ? '$$$' :
+                                 '$$$$'
+
+          const jsonLd: Record<string, any> = {
+            '@context': 'https://schema.org',
+            '@type': schemaType,
+            name: title,
+            description: description.slice(0, 320),
+            url,
+            ...(galleryImages.length ? { image: galleryImages } : image ? { image } : {}),
+            ...(priceRange ? { priceRange } : {}),
+            ...(dailyRate > 0 ? {
+              offers: {
+                '@type': 'Offer',
+                price: dailyRate,
+                priceCurrency: 'PHP',
+                availability: 'https://schema.org/InStock',
+                url,
+              },
+            } : {}),
+            address: {
+              '@type': 'PostalAddress',
+              ...(muni ? { addressLocality: muni } : {}),
+              addressRegion: 'Surigao del Norte',
+              addressCountry: 'PH',
+            },
+            ...(typeof lat === 'number' && typeof lng === 'number' ? {
+              geo: {
+                '@type': 'GeoCoordinates',
+                latitude: lat,
+                longitude: lng,
+              },
+            } : {}),
+            ...(amenityNames.length ? {
+              amenityFeature: amenityNames.slice(0, 30).map((name: string) => ({
+                '@type': 'LocationFeatureSpecification',
+                name,
+                value: true,
+              })),
+            } : {}),
+            ...(data.accommodationBedrooms > 0 ? { numberOfRooms: Number(data.accommodationBedrooms) } : {}),
+            ...(monthlyRate > 0 ? {
+              additionalProperty: [{
+                '@type': 'PropertyValue',
+                name: 'monthlyRate',
+                value: monthlyRate,
+                unitText: 'PHP/month',
+              }],
+            } : {}),
+          }
+
+          return {
+            params: { slug: l.slug },
+            props: {
+              title,
+              description: description.slice(0, 200),
+              image,
+              jsonLd,
+            },
+          }
+        })
+    )
+    hasMore = page.pageInfo?.hasNextPage ?? false
+    after   = page.pageInfo?.endCursor   ?? undefined
+  }
+  return paths
 }
 
-const { listing } = Astro.props as { listing: ListingDetail }
-const peso = (n: number) => '₱' + Number(n).toLocaleString('en-PH')
-
-const facts = [
-  listing.placeType,
-  listing.bedrooms ? `${listing.bedrooms} bedroom${listing.bedrooms > 1 ? 's' : ''}` : '',
-  listing.beds ? `${listing.beds} bed${listing.beds > 1 ? 's' : ''}` : '',
-  listing.baths ? `${listing.baths} bath${listing.baths > 1 ? 's' : ''}` : '',
-  listing.guests ? `${listing.guests} guest${listing.guests > 1 ? 's' : ''}` : '',
-].filter(Boolean)
-
-// FAQ amenity slugs → human labels.
-const amenityLabels: Record<string, string> = {
-  faq_wifi: 'Wifi',
-  faq_pets_allowed: 'Pets allowed',
-  faq_dedicated_workspace: 'Workspace',
-  faq_free_parking_on_premises: 'Free parking',
-  faq_kitchen: 'Kitchen',
-  faq_beach_access: 'Beach access',
-  faq_exterior_security_cameras_on_property: 'Security cameras',
-  faq_generator: 'Generator',
-  faq_air_conditioning: 'Air conditioning',
-  'faq_hot_&_cold_shower': 'Hot & cold shower',
-}
-const amenities = Object.entries(listing.detail.faqAmenities || {})
-  .filter(([, on]) => on)
-  .map(([k]) => amenityLabels[k] ?? k)
-
-const links = Object.entries({
-  'Book direct': listing.detail.links.booking,
-  'Booking.com': listing.detail.links.bookingcom,
-  Airbnb: listing.detail.links.airbnb,
-  Website: listing.detail.links.website,
-  Facebook: listing.detail.links.facebook,
-  Instagram: listing.detail.links.instagram,
-}).filter(([, url]) => url)
-
-const locationLine = [listing.barName, listing.muniName, listing.detail.address1].filter(Boolean).join(', ')
-const mapsKey = import.meta.env.PUBLIC_GOOGLE_MAPS_KEY ?? ''
-const hasCoords = typeof listing.lat === 'number' && typeof listing.lng === 'number'
+const { slug } = Astro.params
+const { title, description, image, jsonLd } = Astro.props as PathProps
 ---
 
-<Layout title={listing.title} description={listing.subHeading || listing.desc || listing.title} image={listing.thumb || undefined} type="product">
-  <main class="detail">
-    <nav class="crumbs"><a href="/stays">← Back to all stays</a></nav>
+<Layout title={title} description={description} image={image} type="product" showNav={false} jsonLd={jsonLd}>
+  <main class="stay-page">
 
-    {listing.gallery.length > 0 ? (
-      <div class={`gallery gallery-${Math.min(listing.gallery.length, 5)}`}>
-        {listing.gallery.slice(0, 5).map((src, i) => (
-          <img src={src} alt={`${listing.title} photo ${i + 1}`} class={i === 0 ? 'gallery-main' : ''} loading={i === 0 ? 'eager' : 'lazy'} />
-        ))}
-      </div>
-    ) : listing.thumb ? (
-      <div class="gallery gallery-1"><img src={listing.thumb} alt={listing.title} class="gallery-main" /></div>
-    ) : null}
-
-    <div class="detail-grid">
-      <div class="detail-main">
-        <header class="detail-head">
-          <div>
-            <h1>{listing.title}</h1>
-            {locationLine && <p class="detail-loc">📍 {locationLine}</p>}
-          </div>
-          {listing.verified && <span class="verified-pill">✓ Verified</span>}
-        </header>
-
-        {listing.subHeading && <p class="detail-sub">{listing.subHeading}</p>}
-
-        {facts.length > 0 && (
-          <ul class="facts">
-            {facts.map((f) => <li>{f}</li>)}
-          </ul>
-        )}
-
-        {(listing.desc || listing.detail.content) && (
-          <section class="block">
-            <h2>About this place</h2>
-            {listing.desc && <p>{listing.desc}</p>}
-            {listing.detail.content && <div class="rich" set:html={listing.detail.content} />}
-          </section>
-        )}
-
-        {amenities.length > 0 && (
-          <section class="block">
-            <h2>What this place offers</h2>
-            <ul class="amenities">
-              {amenities.map((a) => <li>{a}</li>)}
-            </ul>
-          </section>
-        )}
-
-        {listing.detail.services.length > 0 && (
-          <section class="block">
-            <h2>Services</h2>
-            <ul class="services">
-              {listing.detail.services.map((s) => (
-                <li><strong>{s.name}</strong>{s.description && <span> — {s.description}</span>}</li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {hasCoords && (
-          <section class="block">
-            <h2>Where you'll be</h2>
-            <div id="detail-map" class="detail-map"></div>
-            {!mapsKey && <p class="section-sub">Map unavailable — <code>PUBLIC_GOOGLE_MAPS_KEY</code> not set.</p>}
-          </section>
-        )}
-      </div>
-
-      <aside class="detail-aside">
-        <div class="booking-card">
-          <div class="price">
-            {listing.price > 0 ? <><strong>{peso(listing.price)}</strong> <span>/ night</span></> : <strong>Inquire for price</strong>}
-          </div>
-          {listing.monthly > 0 && <p class="monthly">{peso(listing.monthly)} / month</p>}
-
-          {links.length > 0 && (
-            <div class="book-links">
-              {links.map(([label, url], i) => (
-                <a href={url} target="_blank" rel="noopener noreferrer" class={i === 0 ? 'btn-primary' : 'btn-outline'}>{label}</a>
-              ))}
-            </div>
-          )}
-
-          {(listing.detail.host.name || listing.detail.host.contact || listing.detail.host.whatsapp || listing.detail.host.email) && (
-            <div class="host">
-              <h3>Host</h3>
-              {listing.hostPic && <img src={listing.hostPic} alt={listing.detail.host.name || 'Host'} class="host-pic" />}
-              {listing.detail.host.name && <p class="host-name">{listing.detail.host.name}</p>}
-              {listing.detail.host.whatsapp && <a href={`https://wa.me/${listing.detail.host.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
-              {listing.detail.host.contact && <p class="host-contact">{listing.detail.host.contact}</p>}
-              {listing.detail.host.email && <a href={`mailto:${listing.detail.host.email}`}>{listing.detail.host.email}</a>}
-            </div>
-          )}
+    <!-- ── Sticky header (always static) ── -->
+    <header class="listing-header">
+      <nav class="listing-nav" aria-label="Listing navigation">
+        <a href="/stays" class="back-link">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+          Back to listings
+        </a>
+        <div class="title-actions">
+          <button class="icon-action" id="share-btn" type="button">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/></svg>
+            Share
+          </button>
+          <button class="icon-action save-action" id="save-btn" type="button" data-slug={slug}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+            <span id="save-label">Save</span>
+          </button>
         </div>
-      </aside>
+      </nav>
+    </header>
+
+    <div class="stay-wrap">
+      <!-- Loading skeleton -->
+      <div id="skel">
+        <div class="skel-title">
+          <div class="skel-bar" style="width:58%;height:40px;border-radius:8px;"></div>
+          <div class="skel-bar" style="width:32%;height:17px;border-radius:6px;margin-top:11px;"></div>
+        </div>
+        <div class="skel-gallery">
+          <div class="skel-main"></div>
+          <div></div><div></div><div></div><div></div>
+        </div>
+        <div class="skel-body">
+          <div class="skel-bar" style="width:100%;height:17px;border-radius:6px;"></div>
+          <div class="skel-bar" style="width:78%;height:17px;border-radius:6px;margin-top:13px;"></div>
+          <div class="skel-bar" style="width:88%;height:17px;border-radius:6px;margin-top:13px;"></div>
+          <div class="skel-bar" style="width:65%;height:17px;border-radius:6px;margin-top:13px;"></div>
+        </div>
+      </div>
+
+      <!-- Content shell (hidden until JS fills it) -->
+      <div id="stay-content" style="display:none">
+        <div id="sl-title"></div>
+        <section id="sl-photos" class="photo-grid" aria-label="Listing photos"></section>
+        <div class="content-grid">
+          <div class="main-col" id="sl-main"></div>
+          <aside class="booking-card" id="sl-book" aria-label="Booking options"></aside>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dialogs injected by JS -->
+    <div id="sl-dialogs"></div>
+
+    <!-- ── Owner performance panel ── -->
+    <div id="owner-panel" style="display:none; max-width:900px; margin:2rem auto; padding:0 1.5rem 3rem;">
+      <div style="background:#fff; border:1.5px solid #E2EBF3; border-radius:16px; overflow:hidden; box-shadow:0 2px 12px rgba(62,199,207,.07);">
+        <div style="padding:1rem 1.25rem; border-bottom:1px solid #E2EBF3; display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:.6rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3EC7CF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span style="font-weight:700; font-size:.875rem; color:#1A2533;">Your listing performance</span>
+          </div>
+          <span id="owner-tier-badge" style="font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; padding:.2rem .55rem; border-radius:999px; background:#E6F9FA; color:#3EC7CF; border:1px solid #BEF0F3;"></span>
+        </div>
+        <div id="owner-stats-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:.75rem; padding:1.1rem 1.25rem;"></div>
+        <div style="padding:.6rem 1.25rem 1rem; border-top:1px solid #E2EBF3; display:flex; gap:1rem; align-items:center;">
+          <a id="owner-edit-link" href="#" style="font-size:.78rem; font-weight:700; color:#1A2533; text-decoration:none; border:1.5px solid #1A2533; padding:.4rem .85rem; border-radius:8px; display:inline-flex; align-items:center; gap:.4rem;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Edit listing
+          </a>
+          <a href="/dashboard" style="font-size:.78rem; font-weight:600; color:#3EC7CF; text-decoration:none;">View full dashboard</a>
+        </div>
+      </div>
     </div>
   </main>
-</Layout>
 
-{hasCoords && (
-  <script is:inline define:vars={{ lat: listing.lat, lng: listing.lng, title: listing.title, mapsKey }}>
-    window.initSbDetailMap = function () {
-      if (!window.google || !window.google.maps) return
-      var canvas = document.getElementById('detail-map')
-      if (!canvas) return
-      var pos = { lat: lat, lng: lng }
-      var map = new google.maps.Map(canvas, { center: pos, zoom: 15, mapTypeControl: false, streetViewControl: false, fullscreenControl: false })
-      new google.maps.Marker({ position: pos, map: map, title: title })
+  <style is:global>
+    .stay-page { background: #fff; color: #1f2933; }
+    .stay-wrap { max-width: 1120px; margin: 0 auto; padding: 32px 24px 72px; }
+    .listing-header { position: sticky; top: 0; z-index: 50; border-bottom: 1px solid #E2EBF3; background: rgba(255,255,255,.96); backdrop-filter: blur(14px); }
+    .listing-nav { max-width: 1120px; height: 72px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    .back-link { display: inline-flex; align-items: center; gap: 8px; color: #4C5B6C; font-size: 15px; font-weight: 800; text-decoration: none; }
+    .back-link:hover { color: #1A2533; }
+    .title-row { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 18px; }
+    .title-row h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 42px); line-height: 1.04; letter-spacing: 0; color: #1A2533; }
+    .meta-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: #64748B; font-size: 15px; }
+    .meta-line span:not(:last-child)::after { content: "·"; margin-left: 12px; color: #CBD5E1; }
+    .verified-dot { color: #0f8b65; font-weight: 800; }
+    .title-rating { color: #1A2533; text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+    .title-rating:hover { color: var(--sb-primary); }
+    .title-rating strong { font-weight: 800; }
+    .title-rating u { text-decoration: underline; text-underline-offset: 3px; }
+
+    /* Host block (own row, after intro) */
+    .host-section { padding-top: 16px; padding-bottom: 16px; border-top: 1px solid #E2EBF3; border-bottom: 1px solid #E2EBF3; }
+    .host-block { display: flex; align-items: center; gap: 16px; }
+    .host-block-avatar { width: 56px; height: 56px; border-radius: 50%; overflow: hidden; background: #E2EBF3; display: flex; align-items: center; justify-content: center; color: #475569; font-weight: 700; font-size: 16px; flex-shrink: 0; }
+    .host-block-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .host-block-meta { flex: 1; min-width: 0; }
+    .host-block-name { font-family: 'DM Sans', sans-serif; font-size: 1.05rem; font-weight: 700; color: #1A2533; }
+    .host-block-sub  { font-size: 0.85rem; color: #64748B; margin-top: 2px; }
+    .host-claim-link { display:inline-block; margin-top:12px; font-size:13px; font-weight:600; color:#64748B; text-decoration:none; transition:color .12s; }
+    .host-claim-link:hover { color:#1A2533; text-decoration:underline; text-underline-offset:3px; }
+    .host-claim-pending {
+      display:inline-flex; align-items:center; gap:6px; margin-top:12px;
+      font-size:12.5px; font-weight:600; color:#9A3412;
+      background:#FFF7ED; border:1px solid #FED7AA; padding:5px 10px; border-radius:999px;
+      cursor:default;
     }
+    .host-verified-pill { background: #ECFDF5; color: #047857; border: 1px solid #BBF7D0; padding: 4px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; flex-shrink: 0; }
+    .title-actions { display: flex; gap: 10px; align-items: center; padding-top: 4px; }
+    .icon-action { display: inline-flex; align-items: center; gap: 8px; border: 0; background: transparent; color: #1A2533; font: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; padding: 8px; border-radius: 999px; }
+    .icon-action:hover { background: #F5F8FB; }
+    .save-action.saved svg { fill: #ff385c; stroke: #ff385c; }
+
+    /* Skeleton */
+    .skel-bar { background: linear-gradient(90deg, #E2EBF3 25%, #EEF3F7 50%, #E2EBF3 75%); background-size: 200% 100%; animation: skel-shine 1.5s infinite; }
+    .skel-title { margin-bottom: 22px; }
+    .skel-gallery { display: grid; grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 210px 210px; gap: 8px; border-radius: 18px; overflow: hidden; margin-bottom: 38px; }
+    .skel-gallery > div { background: linear-gradient(90deg, #E2EBF3 25%, #EEF3F7 50%, #E2EBF3 75%); background-size: 200% 100%; animation: skel-shine 1.5s infinite; }
+    .skel-gallery .skel-main { grid-row: span 2; }
+    .skel-body { max-width: 580px; }
+    @keyframes skel-shine { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    .photo-grid { position: relative; display: grid; grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 210px 210px; gap: 8px; border-radius: 18px; overflow: hidden; background: #E2EBF3; margin-bottom: 42px; }
+    .photo-tile { position: relative; overflow: hidden; background: #E2EBF3; border: 0; padding: 0; cursor: pointer; }
+    .photo-tile img { width: 100%; height: 100%; object-fit: cover; transition: transform .35s ease; }
+    .photo-tile:hover img { transform: scale(1.025); }
+    .photo-tile-1 { grid-row: span 2; }
+    .photo-more { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(26,37,51,.46); color: #fff; font-weight: 900; font-size: 18px; }
+    .photo-more-mobile { display: none; }
+    .photo-empty { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; color: #94A3B8; }
+    .content-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 72px; align-items: start; }
+    .main-col { min-width: 0; }
+    .section { padding: 32px 0; border-bottom: 1px solid #E2EBF3; }
+    .section h2 { margin: 0 0 16px; font-size: 25px; line-height: 1.15; color: #1A2533; }
+    .section-head p, .lead-copy, .description-copy { color: #4C5B6C; font-size: 17px; line-height: 1.72; }
+    .intro-section { display: flex; justify-content: space-between; gap: 28px; align-items: flex-start; padding-top: 0; }
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .stay-badge { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--sb-primary-mid); background: var(--sb-primary-light); color: var(--sb-primary-deeper); font-family: 'DM Sans', system-ui, sans-serif; font-size: 11px; font-weight: 900; line-height: 1; text-transform: uppercase; letter-spacing: .06em; }
+    .stay-badge-featured { border-color: rgba(76,91,108,.22); background: var(--sb-secondary-light); color: var(--sb-secondary); }
+    .sub-meta { color: #64748B; margin: -8px 0 0; }
+    .host-mini { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+    .host-avatar { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; background: var(--sb-primary-light); color: var(--sb-primary-deeper); font-weight: 900; flex: 0 0 auto; }
+    .host-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .host-avatar span { display: grid; place-items: center; width: 100%; height: 100%; }
+    .host-mini span { display: block; color: #64748B; font-size: 13px; }
+    .host-mini strong { color: #1A2533; }
+    .description-copy.collapsed { max-height: 190px; overflow: hidden; position: relative; }
+    .description-copy.collapsed::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 62px; background: linear-gradient(to bottom, rgba(255,255,255,0), #fff); }
+    .description-copy > * + * { margin-top: 0.85em; }
+    .description-copy h1, .description-copy h2 { color: #1A2533; font-size: 22px; font-weight: 800; line-height: 1.3; margin-top: 1.2em; }
+    .description-copy h3 { color: #1A2533; font-size: 18px; font-weight: 700; line-height: 1.35; margin-top: 1em; }
+    .description-copy p  { margin: 0; }
+    .description-copy strong, .description-copy b { color: #1A2533; font-weight: 700; }
+    .description-copy em, .description-copy i { font-style: italic; }
+    .description-copy ul, .description-copy ol { padding-left: 1.4em; margin: 0; }
+    .description-copy ul { list-style: disc; }
+    .description-copy ol { list-style: decimal; }
+    .description-copy li { margin-top: 0.35em; padding-left: 0.15em; }
+    .description-copy li::marker { color: #94A3B8; }
+    .description-copy a { color: var(--sb-primary); text-decoration: underline; text-underline-offset: 2px; }
+    .description-copy a:hover { color: var(--sb-primary-deeper); }
+    .description-copy blockquote { border-left: 3px solid #E2EBF3; padding-left: 14px; color: #64748B; margin: 0; }
+    .text-button { margin-top: 12px; border: 0; background: none; padding: 0; color: #1A2533; font-weight: 900; text-decoration: underline; cursor: pointer; }
+    .amenity-highlight-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+    .amenity-highlight { display: flex; align-items: center; gap: 14px; min-height: 58px; border: 1px solid #D8E3ED; border-radius: 14px; padding: 14px 16px; font-weight: 600; color: #1A2533; }
+    .amenity-highlight.is-muted { color: #94A3B8; background: #F8FAFC; text-decoration: line-through; }
+    .amenity-icon { width: 26px; height: 26px; flex: 0 0 auto; color: #1A2533; display: block; }
+    .amenity-highlight.is-muted .amenity-icon { color: #94A3B8; }
+    .outline-button { margin-top: 22px; border: 1.5px solid #1A2533; border-radius: 10px; background: #fff; color: #1A2533; min-height: 46px; padding: 0 18px; font-weight: 900; cursor: pointer; }
+    .things-list { display: grid; gap: 28px; margin-top: 18px; }
+    .thing-item { display: grid; gap: 12px; }
+    .thing-item h3 { margin: 0; color: #1A2533; font-size: 21px; line-height: 1.2; }
+    .thing-item p { margin: 0; color: #4C5B6C; font-size: 17px; line-height: 1.55; }
+    .thing-gallery { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+    .thing-gallery::-webkit-scrollbar { display: none; }
+    .thing-gallery img { width: min(320px, 72vw); aspect-ratio: 4 / 3; object-fit: cover; border-radius: 14px; background: #E2EBF3; flex: 0 0 auto; }
+    .services-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 32px; margin-top: 22px; }
+    .service-item { display: flex; align-items: flex-start; gap: 16px; min-width: 0; }
+    .service-item img, .service-icon-fallback { width: 38px; height: 38px; object-fit: contain; flex: 0 0 auto; }
+    .service-icon-fallback { display: grid; place-items: center; border-radius: 10px; background: #F5F8FB; color: #4C5B6C; font-size: 24px; }
+    .service-item strong { display: block; color: #1A2533; font-size: 18px; line-height: 1.25; }
+    .service-item p { margin: 5px 0 0; color: #64748B; line-height: 1.5; }
+    .chip-list { display: flex; flex-wrap: wrap; gap: 10px; }
+    .chip-list span { border: 1px solid #FECACA; color: #B91C1C; background: #FEF2F2; border-radius: 999px; padding: 8px 12px; font-size: 14px; }
+    .map-location { color: #64748B; margin: -8px 0 16px; }
+    .map-frame { height: 360px; border-radius: 18px; overflow: hidden; border: 1px solid #D8E3ED; background: #F5F8FB; }
+    .map-frame iframe { width: 100%; height: 100%; border: 0; }
+    .booking-card { position: sticky; top: 96px; border: 1px solid #D8E3ED; border-radius: 18px; padding: 24px; box-shadow: 0 14px 42px rgba(26,37,51,.12); background: #fff; max-height: calc(100vh - 120px); overflow-y: auto; }
+    .price-block strong { font-size: 30px; color: #1A2533; }
+    .price-block span, .price-block p, .booking-note, .no-booking { color: #64748B; }
+    .booking-note { margin: 14px 0 18px; font-size: 14px; line-height: 1.5; }
+    .booking-links { display: grid; gap: 10px; }
+    .booking-links a { display: flex; align-items: center; justify-content: center; min-height: 52px; border-radius: 12px; background: var(--sb-primary); color: #fff; text-decoration: none; font-weight: 900; }
+    .booking-links a:not(:first-child) { background: #F5F8FB; color: #1A2533; border: 1px solid #D8E3ED; }
+    .host-contact { border-top: 1px solid #E2EBF3; margin-top: 20px; padding-top: 18px; }
+    .host-contact span { display: block; color: #64748B; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+    .host-contact strong { display: block; font-size: 16px; font-weight: 700; color: #1A2533; margin-top: 4px; }
+    .contact-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .contact-btn {
+      flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      min-height: 40px; padding: 0 12px; border-radius: 10px;
+      font-size: 14px; font-weight: 700; text-decoration: none;
+      transition: filter .12s, transform .12s;
+    }
+    .contact-btn:hover { transform: translateY(-1px); filter: brightness(.94); }
+    .contact-btn-call { background: #F5F8FB; color: #1A2533; border: 1px solid #D8E3ED; }
+    .contact-btn-wa   { background: #25D366; color: #fff; }
+    .social-links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+    .social-links a { color: var(--sb-primary-deeper); font-weight: 800; }
+    .amenities-dialog { width: min(760px, calc(100vw - 32px)); max-height: min(820px, calc(100vh - 32px)); border: 0; border-radius: 24px; padding: 0; overflow: hidden; box-shadow: 0 24px 80px rgba(15,23,42,.28); margin: auto; }
+    .amenities-dialog::backdrop, .gallery-dialog::backdrop { background: rgba(15,23,42,.48); }
+    .amenities-modal { position: relative; background: #fff; }
+    .modal-close { position: absolute; top: 18px; left: 18px; z-index: 3; width: 34px; height: 34px; border: 0; border-radius: 50%; background: #fff; color: #1A2533; font-size: 26px; line-height: 1; cursor: pointer; }
+    .modal-close:hover { background: #F5F8FB; }
+    .modal-scroll { max-height: min(820px, calc(100vh - 32px)); overflow: auto; padding: 76px 40px 36px; }
+    .modal-scroll h2 { margin: 0 0 28px; color: #1A2533; font-size: 28px; line-height: 1.15; }
+    .modal-amenity-groups { display: grid; gap: 28px; }
+    .modal-amenity-group { border-bottom: 1px solid #E2EBF3; padding-bottom: 22px; }
+    .modal-amenity-group:last-child { border-bottom: 0; padding-bottom: 0; }
+    .modal-amenity-group h3 { margin: 0 0 14px; color: #1A2533; font-size: 20px; font-weight: 800; line-height: 1.25; }
+    .modal-amenity-group ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0; }
+    .modal-amenity-group li { display: flex; align-items: center; gap: 16px; min-height: 58px; color: #4C5B6C; font-size: 18px; border-bottom: 1px solid #EEF3F7; }
+    .modal-amenity-group li:last-child { border-bottom: 0; }
+    .modal-amenity-group li span { color: var(--sb-primary); font-weight: 900; font-size: 22px; }
+    .gallery-dialog { width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh; border: 0; padding: 0; margin: 0; background: #fff; overflow: hidden; }
+    .gallery-modal { position: relative; height: 100%; background: #fff; }
+    .gallery-close { position: fixed; top: 20px; left: 24px; box-shadow: 0 6px 20px rgba(15,23,42,.12); }
+    .gallery-modal-scroll { height: 100%; overflow: auto; padding: 86px clamp(18px, 4vw, 58px) 48px; }
+    .gallery-masonry { columns: 3 280px; column-gap: 14px; max-width: 1280px; margin: 0 auto; }
+    .gallery-masonry img { display: block; width: 100%; height: auto; break-inside: avoid; margin: 0 0 14px; border-radius: 16px; background: #E2EBF3; }
+    /* Inline price line on narrow screens (booking sidebar drops below the
+       fold at <=860px, so users would otherwise have to scroll to see price) */
+    .intro-price-inline { display: none; }
+    @media (max-width: 860px) {
+      .stay-wrap { padding: 22px 18px 56px; }
+      .listing-nav { height: 64px; padding: 0 18px; }
+      .title-row { flex-direction: column; gap: 14px; }
+      .intro-price-inline {
+        display: block; margin-top: 12px; font-size: 17px; color: #1A2533;
+      }
+      .intro-price-inline strong { font-size: 22px; font-weight: 800; }
+      .intro-price-inline > span { color: #475569; }
+      .intro-price-inline .intro-price-monthly {
+        display: inline-block; margin-left: 8px; font-size: 14px; color: #64748B; font-weight: 500;
+      }
+      .photo-grid { grid-template-columns: minmax(0, 2.2fr) minmax(92px, 1fr); grid-template-rows: repeat(3, minmax(84px, 1fr)); gap: 6px; border-radius: 16px; }
+      .photo-tile-1 { grid-row: span 3; }
+      .photo-tile:nth-child(n+5) { display: none; }
+      .photo-tile-4 .photo-more-mobile { display: flex; padding: 12px; text-align: center; font-size: clamp(15px, 4.2vw, 24px); line-height: 1.25; text-decoration: underline; text-underline-offset: 4px; }
+      .content-grid { display: block; }
+      .booking-card { position: static; margin-top: 28px; }
+      .intro-section { flex-direction: column; }
+      .amenity-highlight-grid, .services-grid { grid-template-columns: 1fr 1fr; }
+      .skel-gallery { grid-template-columns: minmax(0, 2.2fr) minmax(92px, 1fr); grid-template-rows: repeat(3, minmax(84px, 1fr)); }
+      .skel-gallery .skel-main { grid-row: span 3; }
+    }
+    @media (max-width: 560px) {
+      .listing-nav { padding: 0 14px; }
+      .back-link, .icon-action { font-size: 13px; }
+      .title-actions { gap: 4px; }
+      .title-row h1 { font-size: 29px; }
+      .meta-line { font-size: 14px; }
+      .photo-grid { grid-template-rows: repeat(3, minmax(82px, 28vw)); margin: 0 -6px 28px; border-radius: 12px; }
+      .section { padding: 26px 0; }
+      .amenity-highlight-grid, .services-grid { grid-template-columns: 1fr; }
+      .map-frame { height: 300px; }
+      .amenities-dialog { width: 100vw; max-height: calc(100vh - 24px); border-radius: 22px 22px 0 0; margin-bottom: 0; }
+      .modal-scroll { max-height: calc(100vh - 24px); padding: 72px 24px 30px; }
+      .modal-scroll h2 { font-size: 25px; }
+      .modal-amenity-group li { font-size: 17px; }
+      .gallery-modal-scroll { padding: 76px 14px 28px; }
+      .gallery-masonry { columns: 1; }
+      .skel-gallery { display: none; }
+    }
+
+    /* ── Reviews ──────────────────────────────────────────────────────────── */
+    .rv-section { margin-top: 0; }
+    .rv-header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 22px; }
+    .rv-header h2 { margin: 0; }
+    .rv-aggregate { display: flex; align-items: center; gap: 10px; }
+    .rv-agg-stars { color: #F59E0B; font-size: 19px; letter-spacing: 1px; }
+    .rv-agg-avg { font-size: 24px; font-weight: 900; color: #1A2533; line-height: 1; }
+    .rv-agg-count { font-size: 14px; color: #64748B; }
+    .rv-write-btn { margin-left: auto; border: 1.5px solid #1A2533; border-radius: 10px; background: #fff; color: #1A2533; min-height: 40px; padding: 0 16px; font-weight: 900; cursor: pointer; font-size: 14px; white-space: nowrap; }
+    .rv-write-btn:hover { background: #F5F8FB; }
+    .rv-item { padding: 22px 0; border-bottom: 1px solid #E2EBF3; }
+    .rv-item:last-child { border-bottom: 0; }
+    .rv-item-head { display: flex; gap: 13px; align-items: flex-start; margin-bottom: 10px; }
+    .rv-avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--sb-primary-light); color: var(--sb-primary-deeper); font-weight: 900; font-size: 16px; display: grid; place-items: center; flex: 0 0 auto; }
+    .rv-meta strong { display: block; color: #1A2533; font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+    .rv-meta { color: #F59E0B; font-size: 14px; letter-spacing: 1px; }
+    .rv-month { color: #94A3B8; font-size: 13px; margin-left: 8px; }
+    .rv-source-badge { display: inline-block; margin-left: 8px; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; font-weight: 600; }
+    .rv-content { margin: 0; color: #4C5B6C; font-size: 16px; line-height: 1.72; }
+    .rv-host-reply { margin-top: 14px; background: #F5F8FB; border-left: 3px solid var(--sb-primary); border-radius: 0 10px 10px 0; padding: 12px 16px; }
+    .rv-host-reply strong { display: block; color: #1A2533; font-size: 13px; font-weight: 700; margin-bottom: 5px; }
+    .rv-host-reply p { margin: 0; color: #4C5B6C; font-size: 15px; line-height: 1.6; }
+    .rv-empty { color: #94A3B8; font-size: 16px; padding: 8px 0; }
+    .rv-form-inner { background: #F5F8FB; border-radius: 16px; padding: 24px; margin-top: 20px; }
+    .rv-form-inner h3 { margin: 0 0 16px; color: #1A2533; font-size: 20px; }
+    .rv-star-picker { display: flex; gap: 4px; margin-bottom: 4px; }
+    .rv-star-btn { border: 0; background: none; color: #CBD5E1; font-size: 0; cursor: pointer; padding: 0 2px; transition: color .1s, transform .1s; line-height: 1; display: inline-flex; align-items: center; }
+    .rv-star-btn.is-active, .rv-star-btn.is-hover { color: #F59E0B; }
+    .rv-star-btn:hover { transform: scale(1.15); }
+    .rv-star-label { margin: 0 0 14px; font-size: 13px; color: #64748B; min-height: 1.4em; }
+    .rv-loggedin-note { margin: 6px 0 12px; font-size: 12px; color: #64748B; display: flex; align-items: center; gap: 5px; }
+    .rv-loggedin-note::before { content: "✓"; color: #059669; font-weight: 700; }
+    .rv-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+    .rv-form-inner input, .rv-form-inner textarea { width: 100%; border: 1.5px solid #D8E3ED; border-radius: 10px; padding: 11px 13px; font: inherit; font-size: 15px; color: #1A2533; background: #fff; box-sizing: border-box; outline: none; transition: border-color .15s; resize: vertical; }
+    .rv-form-inner input:focus, .rv-form-inner textarea:focus { border-color: var(--sb-primary); }
+    .rv-error { color: #DC2626; font-size: 13px; padding: 8px 0 2px; }
+    .rv-form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+    .rv-cancel-btn { border: 1.5px solid #CBD5E1; border-radius: 10px; background: #fff; color: #64748B; padding: 0 16px; min-height: 42px; font-weight: 700; cursor: pointer; font-size: 14px; }
+    .rv-cancel-btn:hover { background: #F5F8FB; }
+    .rv-submit-btn { border: 0; border-radius: 10px; background: var(--sb-primary); color: #fff; padding: 0 20px; min-height: 42px; font-weight: 900; cursor: pointer; font-size: 14px; }
+    .rv-submit-btn:hover { background: var(--sb-primary-deeper); }
+    .rv-submit-btn:disabled { opacity: .6; cursor: not-allowed; }
+    .rv-success { padding: 16px 0; text-align: center; }
+    .rv-success strong { display: block; color: #059669; font-size: 19px; margin-bottom: 8px; }
+    .rv-success p { color: #64748B; font-size: 15px; margin: 0; }
+    .sb-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(16px); background: #1A2533; color: #fff; padding: 13px 20px; border-radius: 12px; font-size: 14px; font-weight: 600; z-index: 9999; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; max-width: calc(100vw - 40px); text-align: center; }
+    .sb-toast.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    @media (max-width: 560px) {
+      .rv-form-row { grid-template-columns: 1fr; }
+      .rv-write-btn { margin-left: 0; }
+    }
+  </style>
+
+  <script define:vars={{ WP_REST, listingSlug: slug }} is:inline>
+    window.WP_REST     = WP_REST
+    window.listingSlug = listingSlug
   </script>
-)}
+  <script is:inline>
+  ;(function () {
+    const API  = window.WP_REST || 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+    const SLUG = window.listingSlug
 
-{hasCoords && mapsKey && (
-  <script is:inline async src={`https://maps.googleapis.com/maps/api/js?key=${mapsKey}&callback=initSbDetailMap&loading=async`}></script>
-)}
+    // ─── Helpers ───────────────────────────────────────────────────────────────
+    function esc(s) {
+      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    }
+    function badgeClass(label) {
+      return String(label).toLowerCase().replace(/&/g,'and').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')
+    }
 
-<style>
-  .detail { max-width: 1120px; margin: 0 auto; padding: 1.5rem; }
-  .crumbs { margin-bottom: 1rem; }
-  .crumbs a { color: var(--sb-text-muted); text-decoration: none; font-size: .9rem; }
-  .crumbs a:hover { color: var(--sb-primary-deeper); }
+    const FAQ_ITEMS = [
+      { key:'wifi',      label:'Wifi',              icon:'wifi'    },
+      { key:'ac',        label:'Air conditioning',  icon:'snow'    },
+      { key:'kitchen',   label:'Kitchen',           icon:'kitchen' },
+      { key:'parking',   label:'Free parking',      icon:'car'     },
+      { key:'beach',     label:'Beach access',      icon:'beach'   },
+      { key:'workspace', label:'Workspace',         icon:'laptop'  },
+      { key:'pets',      label:'Pets allowed',      icon:'paw'     },
+      { key:'generator', label:'Generator',         icon:'zap'     },
+      { key:'shower',    label:'Hot & cold shower', icon:'shower'  },
+      { key:'security',  label:'Security cameras',  icon:'shield'  },
+    ]
 
-  .gallery { display: grid; gap: 8px; border-radius: var(--sb-radius-lg); overflow: hidden; margin-bottom: 2rem; }
-  .gallery img { width: 100%; height: 100%; object-fit: cover; }
-  .gallery-1 { grid-template-columns: 1fr; }
-  .gallery-1 .gallery-main { height: 420px; }
-  .gallery-2, .gallery-3, .gallery-4, .gallery-5 { grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 1fr 1fr; height: 420px; }
-  .gallery-main { grid-row: 1 / 3; grid-column: 1; }
+    // Lucide-style line icons (24x24 viewBox)
+    const FAQ_ICON_PATHS = {
+      wifi:    '<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>',
+      snow:    '<line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/>',
+      kitchen: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
+      car:     '<path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2"/><circle cx="6.5" cy="16.5" r="2.5"/><circle cx="16.5" cy="16.5" r="2.5"/>',
+      beach:   '<path d="M13 8c0-2.76-2.46-5-5.5-5S2 5.24 2 8h2l1-1 1 1h4"/><path d="M13 7.14A5.82 5.82 0 0 1 16.5 6c3.04 0 5.5 2.24 5.5 5h-3l-1-1-1 1h-3"/><path d="M5.89 9.71c-2.15 2.15-2.3 5.47-.35 7.43l4.24-4.25.7-.7.71-.71 2.12-2.12c-1.95-1.96-5.27-1.8-7.42.35z"/><path d="M11 15.5c.5 2.5-.17 4.5-1 6.5h4c2-5.5-.5-12-1-14"/>',
+      laptop:  '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
+      paw:     '<circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/>',
+      zap:     '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+      shower:  '<path d="M4 4h3a3 3 0 0 1 3 3v2"/><path d="M2 13h20l-1 7H3z"/><path d="M12 13v9"/><path d="M16 17h.01"/><path d="M18 19h.01"/><path d="M14 19h.01"/><path d="M8 17h.01"/><path d="M6 19h.01"/><path d="M10 19h.01"/>',
+      shield:  '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    }
+    function faqIconSvg(name) {
+      return `<svg class="amenity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${FAQ_ICON_PATHS[name] || ''}</svg>`
+    }
 
-  .detail-grid { display: grid; grid-template-columns: 1fr 360px; gap: 2.5rem; align-items: start; }
-  .detail-head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
-  .detail-head h1 { font-size: 1.75rem; margin: 0 0 .35rem; }
-  .detail-loc { color: var(--sb-text-muted); margin: 0; }
-  .verified-pill { flex: none; background: var(--sb-primary-light); color: var(--sb-primary-deeper); font-weight: 700; font-size: .8rem; padding: .3rem .7rem; border-radius: 999px; }
-  .detail-sub { font-size: 1.05rem; color: var(--sb-secondary); margin: 1rem 0 0; }
+    // Some listings have raw scraped Airbnb HTML pasted into the amenity field.
+    // Strip tags, decode entities, drop junk, dedupe case-insensitively.
+    const _decodeEl = document.createElement('textarea')
+    function decodeEntities(s) {
+      _decodeEl.innerHTML = String(s || '')
+      return _decodeEl.value
+    }
+    function cleanAmenityNames(names) {
+      const seen = new Set()
+      const out = []
+      for (const raw of (names || [])) {
+        const stripped = String(raw || '').replace(/<[^>]*>/g, ' ')
+        const clean    = decodeEntities(stripped).replace(/\s+/g, ' ').trim()
+        // Filter out obvious junk: empty, too long for an amenity label, or sentence-like text
+        if (!clean || clean.length > 60 || /[.!?]/.test(clean)) continue
+        const key = clean.toLowerCase()
+        if (seen.has(key)) continue
+        seen.add(key)
+        out.push(clean)
+      }
+      return out
+    }
 
-  .facts { list-style: none; display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; padding: 1rem 0; margin: 1rem 0; border-top: 1px solid var(--sb-border); border-bottom: 1px solid var(--sb-border); color: var(--sb-secondary); font-weight: 600; }
-  .facts li { position: relative; }
-  .facts li:not(:last-child)::after { content: '·'; position: absolute; right: -0.8rem; color: var(--sb-border); }
+    function groupAmenities(names) {
+      const GROUPS = [
+        { title:'Essentials',         re:/wifi|internet|essential|linen|towel|soap|shampoo|hot water|bidet|clothing|hanger|mosquito|blanket/i },
+        { title:'Kitchen & Dining',   re:/kitchen|refrigerator|fridge|stove|oven|coffee|toaster|blender|rice|dining|dishes|silverware|freezer|barbecue|bbq|kettle/i },
+        { title:'Comfort & Safety',   re:/air|fan|heating|fire|alarm|safe|security|first aid|camera|generator/i },
+        { title:'Outdoor & Location', re:/beach|view|patio|balcony|backyard|outdoor|garden|pool|hammock|waterfront|parking|entrance/i },
+        { title:'Services & Extras',  re:/pet|long term|clean|laundromat|host|luggage|self check|children|baby|board game|workspace/i },
+      ]
+      const used = new Set()
+      const result = GROUPS.map(g => ({
+        title: g.title,
+        items: (names||[]).filter(n => g.re.test(n) && !used.has(n) && (used.add(n), true))
+      })).filter(g => g.items.length)
+      const rest = (names||[]).filter(n => !used.has(n))
+      if (rest.length) result.push({ title:'More amenities', items:rest })
+      return result
+    }
 
-  .block { padding: 1.75rem 0; border-bottom: 1px solid var(--sb-border); }
-  .block h2 { font-size: 1.25rem; margin: 0 0 1rem; }
-  .rich :global(p) { margin: 0 0 .75rem; line-height: 1.7; }
-  .amenities { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; padding: 0; }
-  .amenities li { padding-left: 1.5rem; position: relative; }
-  .amenities li::before { content: '✓'; position: absolute; left: 0; color: var(--sb-primary-deeper); font-weight: 700; }
-  .services { list-style: none; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
-  .detail-map { width: 100%; height: 320px; border-radius: var(--sb-radius); overflow: hidden; }
-  .section-sub { color: var(--sb-text-muted); }
+    // ─── Render functions (return HTML strings) ────────────────────────────────
+    function renderTitleSection(d, loc) {
+      const meta = [
+        d.category && `<span>${esc(d.category)}</span>`,
+        loc        && `<span>${esc(loc)}</span>`,
+        d.verified && `<span class="verified-dot">Verified</span>`,
+        d.ratingCount > 0 && `<a class="title-rating" href="#sl-reviews"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:inline-block;vertical-align:-2px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> <strong>${Number(d.ratingAvg).toFixed(2)}</strong> · <u>${d.ratingCount} review${d.ratingCount === 1 ? '' : 's'}</u></a>`,
+      ].filter(Boolean).join('')
+      return `<div class="title-row"><div>
+        <h1>${esc(d.subHeading || d.title || 'Listing')}</h1>
+        ${meta ? `<div class="meta-line">${meta}</div>` : ''}
+      </div></div>`
+    }
 
-  .detail-aside { position: sticky; top: 1.5rem; }
-  .booking-card { background: #fff; border: 1px solid var(--sb-border); border-radius: var(--sb-radius-lg); padding: 1.5rem; box-shadow: var(--sb-shadow); }
-  .price strong { font-size: 1.5rem; color: var(--sb-text); }
-  .price span { color: var(--sb-text-muted); }
-  .monthly { color: var(--sb-text-muted); font-size: .9rem; margin: .25rem 0 0; }
-  .book-links { display: flex; flex-direction: column; gap: .6rem; margin: 1.25rem 0; }
-  .book-links a { text-align: center; }
-  .host { border-top: 1px solid var(--sb-border); padding-top: 1.25rem; }
-  .host h3 { font-size: 1rem; margin: 0 0 .75rem; }
-  .host-pic { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; margin-bottom: .5rem; }
-  .host-name { font-weight: 700; margin: 0 0 .35rem; }
-  .host a { display: block; color: var(--sb-primary-deeper); text-decoration: none; font-size: .9rem; margin-top: .25rem; }
-  .host-contact { color: var(--sb-text-muted); font-size: .9rem; margin: .25rem 0 0; }
+    function renderHostBlock(d) {
+      if (!d.hostName) return ''
+      const initials = (d.hostName||'').split(' ').map(p => p[0] || '').slice(0, 2).join('').toUpperCase()
+      const inner = d.hostPic
+        ? `<img src="${esc(d.hostPic)}" alt="${esc(d.hostName||'')}" loading="lazy" />`
+        : `<span>${esc(initials)}</span>`
+      const verified = d.verified ? `<span class="host-verified-pill">Verified host</span>` : ''
+      // Slug is exposed in this script as SLUG (via define:vars). Use that
+      // — referring to bare `slug` here returns undefined and the link
+      // never renders.
+      const claimSlug = (typeof SLUG === 'string' && SLUG) ? SLUG : ''
+      // Only render the claim CTA when the current author is an admin
+      // (i.e. we imported the listing manually). Listings owned by a real
+      // user are already claimed and shouldn't show the link.
+      // updateClaimLinkState() may further swap this to a "claim under
+      // review" pill once /my-claims resolves.
+      const claimLink = (claimSlug && d.claimable)
+        ? `<a id="host-claim-link" class="host-claim-link" data-listing-id="${d.id}" href="/claim-listing?listing=${encodeURIComponent(claimSlug)}">Are you the host? Claim this listing &rarr;</a>`
+        : ''
+      return `<section class="section host-section">
+        <div class="host-block">
+          <div class="host-block-avatar">${inner}</div>
+          <div class="host-block-meta">
+            <div class="host-block-name">Hosted by ${esc(d.hostName)}</div>
+            ${d.hostingSince ? `<div class="host-block-sub">${esc(d.hostingSince)}</div>` : ''}
+          </div>
+          ${verified}
+        </div>
+        ${claimLink}
+      </section>`
+    }
 
-  @media (max-width: 900px) {
-    .detail-grid { grid-template-columns: 1fr; }
-    .detail-aside { position: static; }
-    .gallery-2, .gallery-3, .gallery-4, .gallery-5 { grid-template-columns: 1fr; grid-template-rows: none; height: auto; }
-    .gallery-main { grid-row: auto; grid-column: auto; }
-    .gallery img:not(.gallery-main) { display: none; }
-    .gallery-1 .gallery-main, .gallery img { height: 280px; }
+    function renderPhotoGrid(gallery) {
+      if (!gallery.length) return '<div class="photo-empty">No photos available</div>'
+      const vis = gallery.slice(0, 5)
+      const rem = Math.max(0, gallery.length - 5)
+      return vis.map((img, i) => {
+        const extra = (i === 4 && rem > 0)
+          ? `<span class="photo-more">+${rem} photo${rem===1?'':'s'}</span>`
+          : (i === 3 && gallery.length > 4)
+            ? `<span class="photo-more photo-more-mobile">Show all ${gallery.length} photos</span>`
+            : ''
+        return `<button class="photo-tile photo-tile-${i+1}" type="button" data-open-gallery>
+          <img src="${esc(img.src)}" alt="${esc(img.alt)}" loading="${i===0?'eager':'lazy'}" />
+          ${extra}
+        </button>`
+      }).join('')
+    }
+
+    function renderIntro(d, loc) {
+      const badges = (d.badges||[]).map(b =>
+        `<span class="stay-badge stay-badge-${badgeClass(b)}">${esc(b)}</span>`
+      ).join('')
+      const stats = [
+        d.guests   && `${d.guests} guest${d.guests===1?'':'s'}`,
+        d.bedrooms && `${d.bedrooms} bedroom${d.bedrooms===1?'':'s'}`,
+        d.beds     && `${d.beds} bed${d.beds===1?'':'s'}`,
+        d.baths    && `${d.baths} bathroom${d.baths===1?'':'s'}`,
+      ].filter(Boolean).join(' · ')
+      const introH = d.desc ||
+        ([d.placeType, d.category].filter(Boolean).join(' ') + (loc ? ` in ${loc}` : '')).trim() ||
+        d.title
+      // Host moved out into its own .host-section block (see renderHostBlock).
+      // Inline price line — only shown on narrow screens where the booking
+      // sidebar drops below the fold (CSS toggles visibility at <=860px).
+      const priceInline = d.price
+        ? `<p class="intro-price-inline">
+             <strong>₱${Number(d.price).toLocaleString()}</strong><span> / night</span>
+             ${d.monthly ? `<span class="intro-price-monthly">· ₱${Number(d.monthly).toLocaleString()} / month</span>` : ''}
+           </p>`
+        : ''
+      return `<section class="section intro-section">
+        <div>
+          ${badges ? `<div class="badge-row">${badges}</div>` : ''}
+          <h2>${esc(introH)}</h2>
+          ${stats ? `<p class="sub-meta">${esc(stats)}</p>` : ''}
+          ${priceInline}
+        </div>
+      </section>`
+    }
+
+    function renderDescription(d) {
+      if (!d.content) return ''
+      return `<section class="section">
+        <h2>About this place</h2>
+        <div class="description-copy collapsed" id="description-copy">${d.content}</div>
+        <button class="text-button" id="description-toggle" type="button">Show more</button>
+      </section>`
+    }
+
+    function renderThingsToKnow(d) {
+      const items = []
+      for (const item of (d.customInfo||[])) {
+        const imgs = (item.images||[]).slice(0,4)
+          .map(img=>`<img src="${esc(img.src)}" alt="${esc(img.alt)}" loading="lazy" />`).join('')
+        items.push(`<article class="thing-item">
+          ${imgs ? `<div class="thing-gallery">${imgs}</div>` : ''}
+          ${item.title ? `<h3>${esc(item.title)}</h3>` : ''}
+          ${item.label ? `<p>${esc(item.label)}</p>` : ''}
+        </article>`)
+      }
+      if (d.generatorSchedule) {
+        items.push(`<article class="thing-item">
+          <h3>Generator schedule</h3><p>${esc(d.generatorSchedule)}</p>
+        </article>`)
+      }
+      if (!items.length) return ''
+      return `<section class="section"><h2>Things to know</h2>
+        <div class="things-list">${items.join('')}</div>
+      </section>`
+    }
+
+    function renderAmenities(d, groups, cleanNames) {
+      const highlights = FAQ_ITEMS.map(item => {
+        const avail = d.faqAmenities?.[item.key] || false
+        return `<div class="amenity-highlight ${avail?'':'is-muted'}">
+          ${faqIconSvg(item.icon)}
+          <span>${esc(item.label)}</span>
+        </div>`
+      }).join('')
+      const total = cleanNames.length
+      const btn = groups.length
+        ? `<button class="outline-button" id="amenities-toggle" type="button">Show all ${total} amenities</button>`
+        : ''
+      return `<section class="section">
+        <div class="section-head">
+          <h2>What this place offers</h2>
+          <p>Key amenities are shown first. Unavailable ones are muted so guests know what to expect.</p>
+        </div>
+        <div class="amenity-highlight-grid">${highlights}</div>
+        ${btn}
+      </section>`
+    }
+
+    function renderServices(d) {
+      if (!d.services?.length) return ''
+      // Services tab is a Pro+ feature. Free-tier listings shouldn't show
+      // it even if legacy data left an entry behind.
+      const tier = d.tier || 'free'
+      if (tier === 'free') return ''
+      const items = d.services.map(s => {
+        const ico = s.icon
+          ? `<img src="${esc(s.icon)}" alt="${esc(s.name)}" loading="lazy" />`
+          : `<span class="service-icon-fallback">+</span>`
+        return `<div class="service-item">${ico}<div>
+          <strong>${esc(s.name)}</strong>
+          ${s.description ? `<p>${esc(s.description)}</p>` : ''}
+        </div></div>`
+      }).join('')
+      return `<section class="section"><h2>Our services</h2>
+        <div class="services-grid">${items}</div>
+      </section>`
+    }
+
+    function renderExclusions(d) {
+      if (!d.exclusions?.length) return ''
+      return `<section class="section"><h2>Not included</h2>
+        <div class="chip-list">${d.exclusions.map(e=>`<span>${esc(e)}</span>`).join('')}</div>
+      </section>`
+    }
+
+    function renderMap(d, loc) {
+      if (!d.lat || !d.lng) return ''
+      const lat = d.lat, lng = d.lng
+      const bb = `${lng-0.012}%2C${lat-0.012}%2C${lng+0.012}%2C${lat+0.012}`
+      return `<section class="section"><h2>Where you'll be</h2>
+        ${loc ? `<p class="map-location">${esc(loc)}</p>` : ''}
+        <div class="map-frame">
+          <iframe title="Map location" loading="lazy"
+            src="https://www.openstreetmap.org/export/embed.html?bbox=${bb}&layer=mapnik&marker=${lat}%2C${lng}">
+          </iframe>
+        </div>
+      </section>`
+    }
+
+    function renderBookingCard(d) {
+      const tier = d.tier || 'free'
+      const isFree = tier === 'free'
+      // Tier rules:
+      //   Free  → phone/WhatsApp only. ONE fallback booking link if no phone.
+      //   Pro+  → all booking + social channels.
+      let bLinks = [
+        { label:'Book Direct', url:d.bookingLink,    type:'direct'     },
+        { label:'Booking.com', url:d.bookingcomLink, type:'bookingcom' },
+        { label:'Airbnb',      url:d.airbnbLink,     type:'airbnb'     },
+        { label:'Website',     url:d.websiteLink,    type:'website'    },
+      ].filter(l=>l.url)
+      let sLinks = [
+        { label:'Facebook',  url:d.facebookLink,  type:'facebook'  },
+        { label:'Instagram', url:d.instagramLink, type:'instagram' },
+      ].filter(l=>l.url)
+      if (isFree) {
+        // Free hosts get one channel. If a phone exists, that's their channel
+        // (rendered separately by renderContactBlock) and external booking
+        // links are hidden. If no phone, expose the first booking link as a
+        // fallback so guests still have a way to reach them.
+        sLinks = []
+        bLinks = d.contactNumber ? [] : bLinks.slice(0, 1)
+      }
+      const hasAnyChannel = bLinks.length || d.contactNumber
+      const linksHtml = bLinks.length
+        ? `<div class="booking-links">${bLinks.map(l=>`<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer" onclick="sbTrackClick('${l.type}')">${esc(l.label)}</a>`).join('')}</div>`
+        : (hasAnyChannel ? '' : `<p class="no-booking">No booking links available yet.</p>`)
+      // For Free tier, the "Booking is handled through links" copy is misleading
+      // when the only channel is a phone number. Tighten the wording.
+      const noteCopy = isFree
+        ? 'Reach out to the host directly using the contact below.'
+        : 'Booking is handled through the links this host provided.'
+      return `
+        <div class="price-block">
+          ${d.price ? `<div><strong>₱${Number(d.price).toLocaleString()}</strong><span> / night</span></div>` : ''}
+          ${d.monthly ? `<p>₱${Number(d.monthly).toLocaleString()} / month</p>` : ''}
+        </div>
+        <div class="booking-note">${noteCopy}</div>
+        ${linksHtml}
+        ${d.contactNumber ? renderContactBlock(d.contactNumber) : ''}
+        ${sLinks.length ? `<div class="social-links">${sLinks.map(l=>`<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer" onclick="sbTrackClick('${l.type}')">${esc(l.label)}</a>`).join('')}</div>` : ''}
+      `
+    }
+
+    // Normalise a phone string into a wa.me-friendly digits-only form. PH
+    // numbers may come in as "09171234567" or "+63 917 123 4567" — both
+    // become "639171234567". Returns '' if the string isn't long enough.
+    function waNormalize(raw) {
+      const digits = String(raw || '').replace(/\D+/g, '')
+      if (digits.length < 7) return ''
+      // PH local 09XX → 639XX
+      if (digits.length === 11 && digits.startsWith('0')) return '63' + digits.slice(1)
+      return digits
+    }
+
+    function renderContactBlock(num) {
+      const wa = waNormalize(num)
+      const telDigits = String(num || '').replace(/[^\d+]/g, '')
+      const SVG_PHONE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.6 19.79 19.79 0 0 1 1.61 5.06 2 2 0 0 1 3.6 2.87h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 10.4a16 16 0 0 0 5.69 5.69l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>'
+      const SVG_WA    = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413"/></svg>'
+      const callBtn = telDigits
+        ? `<a class="contact-btn contact-btn-call" href="tel:${esc(telDigits)}" onclick="sbTrackClick('phone')">${SVG_PHONE} Call</a>`
+        : ''
+      const waBtn = wa
+        ? `<a class="contact-btn contact-btn-wa" href="https://wa.me/${esc(wa)}" target="_blank" rel="noopener noreferrer" onclick="sbTrackClick('whatsapp')">${SVG_WA} WhatsApp</a>`
+        : ''
+      return `<div class="host-contact">
+        <span>Host contact</span>
+        <strong>${esc(num)}</strong>
+        <div class="contact-actions">${callBtn}${waBtn}</div>
+      </div>`
+    }
+
+    function renderAmenitiesDialog(groups) {
+      if (!groups.length) return ''
+      return `<dialog class="amenities-dialog" id="amenities-dialog">
+        <div class="amenities-modal">
+          <button class="modal-close" id="close-amenities" aria-label="Close">×</button>
+          <div class="modal-scroll">
+            <h2>What this place offers</h2>
+            <div class="modal-amenity-groups">
+              ${groups.map(g=>`<section class="modal-amenity-group">
+                <h3>${esc(g.title)}</h3>
+                <ul>${g.items.map(item=>`<li><span>✓</span>${esc(item)}</li>`).join('')}</ul>
+              </section>`).join('')}
+            </div>
+          </div>
+        </div>
+      </dialog>`
+    }
+
+    function renderGalleryDialog(gallery) {
+      if (!gallery.length) return ''
+      return `<dialog class="gallery-dialog" id="gallery-dialog">
+        <div class="gallery-modal">
+          <button class="modal-close gallery-close" id="close-gallery" aria-label="Close gallery">×</button>
+          <div class="gallery-modal-scroll">
+            <div class="gallery-masonry">
+              ${gallery.map(img=>`<img src="${esc(img.src)}" alt="${esc(img.alt)}" loading="lazy" />`).join('')}
+            </div>
+          </div>
+        </div>
+      </dialog>`
+    }
+
+    // ─── Wire interactivity after render ──────────────────────────────────────
+    function wireInteractivity() {
+      // Description show more/less
+      const desc    = document.getElementById('description-copy')
+      const descBtn = document.getElementById('description-toggle')
+      if (desc && descBtn) {
+        descBtn.addEventListener('click', () => {
+          const c = desc.classList.toggle('collapsed')
+          descBtn.textContent = c ? 'Show more' : 'Show less'
+        })
+      }
+      // Amenities dialog
+      const amenDlg = document.getElementById('amenities-dialog')
+      document.getElementById('amenities-toggle')?.addEventListener('click', () => amenDlg?.showModal?.())
+      document.getElementById('close-amenities')?.addEventListener('click', () => amenDlg?.close())
+      amenDlg?.addEventListener('click', e => { if (e.target === amenDlg) amenDlg.close() })
+      // Gallery dialog
+      const galDlg = document.getElementById('gallery-dialog')
+      document.querySelectorAll('[data-open-gallery]').forEach(btn =>
+        btn.addEventListener('click', () => galDlg?.showModal?.())
+      )
+      document.getElementById('close-gallery')?.addEventListener('click', () => galDlg?.close())
+      galDlg?.addEventListener('click', e => { if (e.target === galDlg) galDlg.close() })
+    }
+
+    // ─── Main render ──────────────────────────────────────────────────────────
+    function renderPage(d) {
+      const gallery = d.galleryFull?.length
+        ? d.galleryFull
+        : (d.gallery||[]).map(src => ({ src, alt: d.title||'' }))
+      const loc        = [d.muniName, d.barName].filter(Boolean).join(', ')
+      const cleanNames = cleanAmenityNames(d.amenityNames)
+      const groups     = groupAmenities(cleanNames)
+
+      document.getElementById('sl-title').innerHTML       = renderTitleSection(d, loc)
+      document.getElementById('sl-photos').innerHTML      = renderPhotoGrid(gallery)
+      document.getElementById('sl-main').innerHTML        = [
+        renderIntro(d, loc),
+        renderHostBlock(d),
+        renderDescription(d),
+        renderThingsToKnow(d),
+        renderAmenities(d, groups, cleanNames),
+        renderServices(d),
+        renderExclusions(d),
+        renderMap(d, loc),
+        '<div id="sl-reviews"></div>',
+      ].join('')
+      document.getElementById('sl-book').innerHTML        = renderBookingCard(d)
+      document.getElementById('sl-dialogs').innerHTML     = renderAmenitiesDialog(groups) + renderGalleryDialog(gallery)
+
+      document.getElementById('skel').style.display        = 'none'
+      document.getElementById('stay-content').style.display = ''
+
+      wireInteractivity()
+      updateClaimLinkState(d)
+    }
+
+    // Replaces the "Are you the host? Claim this listing" link with a
+    // "Claim under review" pill if the logged-in user has a pending claim
+    // on this listing, or hides it entirely if their claim was already
+    // approved (post_author should match too, but defensive).
+    async function updateClaimLinkState(d) {
+      const link = document.getElementById('host-claim-link')
+      if (!link) return
+      const token = localStorage.getItem('sb_token')
+      if (!token) return
+      try {
+        const res = await fetch(`${API}/my-claims`, { headers: { Authorization: `Bearer ${token}` } })
+        if (!res.ok) return
+        const data = await res.json()
+        const mine = (data.claims || []).find(c => Number(c.listing_id) === Number(d.id))
+        if (!mine) return
+        if (mine.status === 'pending') {
+          link.outerHTML = '<span class="host-claim-pending" title="We will email you when this is approved or if we need more info.">'
+            + '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'
+            + 'Your claim is being reviewed</span>'
+        } else if (mine.status === 'approved') {
+          // post_author should already match; remove the link to be safe.
+          link.remove()
+        }
+        // 'rejected' → leave the original CTA so the host can re-submit.
+      } catch (_) { /* silent — non-critical */ }
+    }
+
+    // ─── Reviews ──────────────────────────────────────────────────────────────
+    const SVG_STAR_FULL  = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
+    const SVG_STAR_EMPTY = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
+    const SVG_STAR_ICON  = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`
+
+    function starsHtml(n, cls) {
+      const full = Math.floor(n), half = (n - full) >= 0.5 ? 1 : 0, empty = 5 - full - half
+      return `<span class="${cls||'rv-stars'}" style="display:inline-flex;align-items:center;gap:1px">${SVG_STAR_FULL.repeat(full)}${half?`<span class="half-star" style="opacity:.55">${SVG_STAR_FULL}</span>`:''}${SVG_STAR_EMPTY.repeat(empty)}</span>`
+    }
+
+    function renderReviewItem(r) {
+      const SRC = { airbnb:'Airbnb', google:'Google', 'booking-com':'Booking.com', direct:'Direct' }
+      const badge = r.source && r.source !== 'limasawa-booking'
+        ? `<span class="rv-source-badge">From ${esc(SRC[r.source] || r.source)}</span>` : ''
+      const month = r.stayMonth ? `<span class="rv-month">${esc(r.stayMonth)}</span>` : ''
+      const reply = r.hostReply
+        ? `<div class="rv-host-reply"><strong>Host response</strong><p>${esc(r.hostReply)}</p></div>` : ''
+      const stars = `<span style="display:inline-flex;align-items:center;gap:1px;color:#F59E0B">${SVG_STAR_FULL.repeat(r.rating)}</span><span style="display:inline-flex;align-items:center;gap:1px;color:#CBD5E1">${SVG_STAR_EMPTY.repeat(5-r.rating)}</span>`
+      return `<div class="rv-item" data-id="${r.id}">
+        <div class="rv-item-head">
+          <div class="rv-avatar">${esc(r.author.charAt(0).toUpperCase())}</div>
+          <div class="rv-meta">
+            <strong>${esc(r.author)}</strong>
+            <span style="display:inline-flex;align-items:center;gap:1px">${stars}</span>
+            ${month}${badge}
+          </div>
+        </div>
+        <p class="rv-content">${esc(r.content)}</p>
+        ${reply}
+      </div>`
+    }
+
+    function renderReviewForm() {
+      return `<div class="rv-form-inner">
+        <h3>Share your experience</h3>
+        <div class="rv-star-picker" id="rv-star-picker">
+          ${[1,2,3,4,5].map(n=>`<button type="button" class="rv-star-btn" data-val="${n}" aria-label="${n} star${n>1?'s':''}">${SVG_STAR_ICON}</button>`).join('')}
+        </div>
+        <p class="rv-star-label" id="rv-star-label">Select a rating</p>
+        <div class="rv-form-row">
+          <input type="text"  id="rv-name"    placeholder="Your name *"   maxlength="80"  />
+          <input type="email" id="rv-email"   placeholder="Your email *"  maxlength="120" />
+        </div>
+        <input type="month"   id="rv-month"   placeholder="Month of stay" style="width:100%;box-sizing:border-box;margin-bottom:12px" />
+        <textarea id="rv-text" rows="5" placeholder="Tell us about your stay (min. 20 characters) *" maxlength="2000"></textarea>
+        <div id="rv-error" class="rv-error" style="display:none"></div>
+        <div class="rv-form-actions">
+          <button type="button" id="rv-cancel" class="rv-cancel-btn">Cancel</button>
+          <button type="button" id="rv-submit" class="rv-submit-btn">Submit review</button>
+        </div>
+      </div>`
+    }
+
+    function wireReviewForm() {
+      let selectedRating = 0
+      const LABELS = ['','Poor','Fair','Good','Very good','Excellent']
+
+      // Pre-fetch user info immediately so it's ready when the form opens
+      const token = localStorage.getItem('sb_token')
+      if (token) {
+        fetch(`${API}/me`, { headers: { Authorization: `Bearer ${token}` } })
+          .then(r => r.ok ? r.json() : null)
+          .then(resp => {
+            // /me returns { success: true, user: { name, email, ... } }
+            const u = resp?.user || resp
+            if (!u || (!u.name && !u.email)) return
+            const nameEl  = document.getElementById('rv-name')
+            const emailEl = document.getElementById('rv-email')
+            if (nameEl  && !nameEl.value  && (u.name || u.display_name))
+              nameEl.value = u.name || u.display_name
+            if (emailEl && !emailEl.value && u.email) {
+              emailEl.value    = u.email
+              emailEl.readOnly = true
+              emailEl.style.cssText += ';background:#F5F8FB;color:#64748B;cursor:default'
+              emailEl.title = 'Using your account email'
+              if (!document.querySelector('.rv-loggedin-note')) {
+                const note = document.createElement('p')
+                note.className = 'rv-loggedin-note'
+                note.textContent = `Reviewing as ${u.name || u.display_name || u.email}`
+                emailEl.closest('.rv-form-row')?.insertAdjacentElement('afterend', note)
+              }
+            }
+          })
+          .catch(() => {})
+      }
+
+      document.getElementById('rv-write-btn')?.addEventListener('click', () => {
+        const w = document.getElementById('rv-form-wrap')
+        if (!w) return
+        w.style.display = ''
+        w.scrollIntoView({ behavior:'smooth', block:'nearest' })
+        document.getElementById('rv-name')?.focus()
+      })
+      document.getElementById('rv-cancel')?.addEventListener('click', () => {
+        const w = document.getElementById('rv-form-wrap')
+        if (w) w.style.display = 'none'
+      })
+
+      const starBtns = document.querySelectorAll('.rv-star-btn')
+      const starLabel = document.getElementById('rv-star-label')
+      starBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          selectedRating = parseInt(btn.dataset.val)
+          starBtns.forEach(b => b.classList.toggle('is-active', parseInt(b.dataset.val) <= selectedRating))
+          if (starLabel) starLabel.textContent = LABELS[selectedRating] || ''
+        })
+        btn.addEventListener('mouseover', () => starBtns.forEach(b => b.classList.toggle('is-hover', parseInt(b.dataset.val) <= parseInt(btn.dataset.val))))
+        btn.addEventListener('mouseout',  () => starBtns.forEach(b => b.classList.remove('is-hover')))
+      })
+
+      document.getElementById('rv-submit')?.addEventListener('click', async () => {
+        const name    = document.getElementById('rv-name')?.value.trim()
+        const email   = document.getElementById('rv-email')?.value.trim()
+        const content = document.getElementById('rv-text')?.value.trim()
+        const month   = document.getElementById('rv-month')?.value
+        const errEl   = document.getElementById('rv-error')
+        const showErr = m => { if (errEl) { errEl.textContent = m; errEl.style.display = '' } }
+        const clrErr  = () => { if (errEl) errEl.style.display = 'none' }
+        clrErr()
+        if (!name)               return showErr('Please enter your name.')
+        if (!email)              return showErr('Please enter your email address.')
+        if (!selectedRating)     return showErr('Please select a star rating.')
+        if (!content || content.length < 20) return showErr('Please write at least 20 characters.')
+        const btn = document.getElementById('rv-submit')
+        btn.disabled = true; btn.textContent = 'Sending…'
+        try {
+          const token   = localStorage.getItem('sb_token')
+          const headers = { 'Content-Type': 'application/json' }
+          if (token) headers['Authorization'] = `Bearer ${token}`
+          const res  = await fetch(`${API}/reviews`, {
+            method: 'POST', headers,
+            body: JSON.stringify({ slug:SLUG, author:name, email, rating:selectedRating, content, stayMonth:month })
+          })
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.message || 'Submission failed')
+          const wrap = document.getElementById('rv-form-wrap')
+          // Backend returns verified:true when the user is logged in (no email step needed)
+          const msg = data.verified
+            ? `<p>Your review is awaiting host approval and will appear here once approved.</p>`
+            : `<p>Check your email to verify your review. Once verified, the host will review and approve it.</p>`
+          if (wrap) wrap.innerHTML = `<div class="rv-success"><strong>✓ Review submitted!</strong>${msg}</div>`
+        } catch (err) {
+          showErr(err.message || 'Something went wrong. Please try again.')
+          btn.disabled = false; btn.textContent = 'Submit review'
+        }
+      })
+
+      document.getElementById('rv-load-more')?.addEventListener('click', async e => {
+        const btn  = e.currentTarget
+        const page = parseInt(btn.dataset.page || 2)
+        btn.textContent = 'Loading…'; btn.disabled = true
+        try {
+          const data = await fetch(`${API}/reviews?slug=${SLUG}&page=${page}&per_page=10`).then(r=>r.json())
+          const list = document.getElementById('rv-list')
+          if (list && data.reviews?.length) list.insertAdjacentHTML('beforeend', data.reviews.map(renderReviewItem).join(''))
+          if (page >= data.pages) btn.remove()
+          else { btn.dataset.page = page + 1; btn.textContent = 'Show more reviews'; btn.disabled = false }
+        } catch (_) { btn.textContent = 'Show more reviews'; btn.disabled = false }
+      })
+    }
+
+    async function loadReviews() {
+      const el = document.getElementById('sl-reviews')
+      if (!el) return
+      try {
+        const data = await fetch(`${API}/reviews?slug=${SLUG}&per_page=10`).then(r=>r.json())
+        const { ratingAvg=0, ratingCount=0, reviews=[], total=0 } = data
+        const aggrHtml = ratingCount >= 1
+          ? `<div class="rv-aggregate">${starsHtml(ratingAvg,'rv-agg-stars')}<span class="rv-agg-avg">${ratingAvg.toFixed(1)}</span><span class="rv-agg-count">${ratingCount} review${ratingCount!==1?'s':''}</span></div>`
+          : ''
+        const listHtml = reviews.length
+          ? reviews.map(renderReviewItem).join('')
+          : '<p class="rv-empty">No reviews yet — be the first to share your experience.</p>'
+        const moreBtn = total > reviews.length
+          ? `<button class="outline-button" id="rv-load-more" data-page="2" type="button">Show more reviews</button>` : ''
+        el.innerHTML = `<section class="section rv-section">
+          <div class="rv-header">
+            <h2>Guest Reviews</h2>${aggrHtml}
+            <button class="rv-write-btn" id="rv-write-btn" type="button">Write a review</button>
+          </div>
+          <div id="rv-list">${listHtml}</div>
+          ${moreBtn}
+          <div id="rv-form-wrap" style="display:none">${renderReviewForm()}</div>
+        </section>`
+        wireReviewForm()
+      } catch (_) {}
+    }
+
+    function checkVerificationToast() {
+      const p = new URLSearchParams(location.search).get('review')
+      if (!p) return
+      history.replaceState(null, '', location.pathname)
+      const msg = p === 'verified'
+        ? '✓ Email verified! Your review is now pending approval from the host.'
+        : p === 'already_verified' ? 'Your review was already verified.' : null
+      if (!msg) return
+      const t = document.createElement('div')
+      t.className = 'sb-toast'
+      t.textContent = msg
+      document.body.appendChild(t)
+      setTimeout(() => t.classList.add('is-visible'), 10)
+      setTimeout(() => { t.classList.remove('is-visible'); setTimeout(() => t.remove(), 300) }, 5000)
+    }
+
+    // ─── Boot ─────────────────────────────────────────────────────────────────
+    async function boot() {
+      checkVerificationToast()
+      try {
+        const res = await fetch(`${API}/listing/${SLUG}`)
+        if (!res.ok) throw new Error('not found')
+        renderPage(await res.json())
+        loadReviews()
+      } catch (_) {
+        document.getElementById('skel').innerHTML =
+          `<p style="color:#64748B;text-align:center;padding:64px 0">
+            Listing not found. <a href="/stays" style="color:var(--sb-primary);font-weight:700">Browse all stays</a>
+          </p>`
+      }
+    }
+
+    boot()
+
+    // ─── Share & Save (static header — wire immediately) ─────────────────────
+    document.getElementById('share-btn')?.addEventListener('click', async () => {
+      try {
+        if (navigator.share) await navigator.share({ title: document.title, url: location.href })
+        else {
+          await navigator.clipboard.writeText(location.href)
+          const btn = document.getElementById('share-btn')
+          const old = btn.innerHTML
+          btn.textContent = 'Link copied'
+          setTimeout(() => { btn.innerHTML = old }, 1500)
+        }
+      } catch (_) {}
+    })
+
+    const saveBtn   = document.getElementById('save-btn')
+    const saveLabel = document.getElementById('save-label')
+    const syncSaved = () => {
+      const saved = window.__sb?.isSaved?.(SLUG)
+      saveBtn?.classList.toggle('saved', !!saved)
+      if (saveLabel) saveLabel.textContent = saved ? 'Saved' : 'Save'
+    }
+    saveBtn?.addEventListener('click', () => { window.__sb?.toggle?.(SLUG); syncSaved() })
+    window.addEventListener('sb:saved-changed', e => { if (e.detail?.slug === SLUG) syncSaved() })
+    window.addEventListener('sb:saved-synced', syncSaved)
+    syncSaved()
+
+  })()
+
+  // ─── Tracking ──────────────────────────────────────────────────────────────
+  const _API  = window.WP_REST || 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+  const _SLUG = window.listingSlug
+  ;(function sbTrackView() {
+    const params = new URLSearchParams(location.search)
+    fetch(`${_API}/track/view`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        slug: _SLUG,
+        referrer:  document.referrer || '',
+        utmSource: params.get('utm_source') || '',
+      }),
+      keepalive: true,
+    }).catch(()=>{})
+  })()
+  function sbTrackClick(type) {
+    fetch(`${_API}/track/click`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ slug: _SLUG, type }), keepalive: true,
+    }).catch(()=>{})
   }
-</style>
+  </script>
+
+  <!-- ── Owner performance panel ── -->
+  <script is:inline>
+  (async function ownerPanel() {
+    const token = localStorage.getItem('sb_token')
+    if (!token) return
+    const API  = window.WP_REST || 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+    const slug = window.listingSlug
+    try {
+      const res = await fetch(`${API}/listing-stats?slug=${slug}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!res.ok) return
+      const d = await res.json()
+      if (!d.success) return
+      const TIER_ORDER  = ['free','pro','featured']
+      const TIER_LABELS = { free:'Island Listing', pro:'Pro Host', featured:'Featured Stay' }
+      // All paid tiers see all click types — only views are free-tier accessible.
+      const STAT_TIER   = { views:'free', whatsapp_clicks:'pro', location_clicks:'pro',
+        airbnb_clicks:'pro', bookingcom_clicks:'pro', facebook_clicks:'pro', instagram_clicks:'pro' }
+      const tier    = d.tier || 'free'
+      const tierIdx = TIER_ORDER.indexOf(tier)
+      const stats   = [
+        { key:'views',             label:'Total views' },
+        { key:'whatsapp_clicks',   label:'WhatsApp' },
+        { key:'location_clicks',   label:'Map clicks' },
+        { key:'airbnb_clicks',     label:'Airbnb' },
+        { key:'bookingcom_clicks', label:'Booking.com' },
+        { key:'facebook_clicks',   label:'Facebook' },
+        { key:'instagram_clicks',  label:'Instagram' },
+      ]
+      const lockSVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`
+      document.getElementById('owner-tier-badge').textContent = TIER_LABELS[tier] || tier
+      document.getElementById('owner-stats-grid').innerHTML = stats.map(s => {
+        const req      = TIER_ORDER.indexOf(STAT_TIER[s.key] || 'free')
+        const unlocked = tierIdx >= req
+        const val      = d[s.key] ?? 0
+        const valHtml  = unlocked
+          ? `<div style="font-size:1.4rem;font-weight:800;color:#1A2533;line-height:1;">${val>=1000?(val/1000).toFixed(1)+'k':val}</div>`
+          : `<div style="font-size:1.4rem;font-weight:800;color:#1A2533;line-height:1;filter:blur(5px);user-select:none;">${val}</div>`
+        const lockEl = !unlocked
+          ? `<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.2rem;background:rgba(255,255,255,.6);">${lockSVG}<span style="font-size:.55rem;font-weight:700;color:#94A3B8;text-transform:uppercase;">${TIER_LABELS[STAT_TIER[s.key]]||''}+</span></div>`
+          : ''
+        return `<div style="position:relative;background:#F5F8FB;border-radius:10px;padding:.75rem .9rem;border:1px solid #E2EBF3;overflow:hidden;">
+          ${valHtml}
+          <div style="font-size:.65rem;color:#64748B;font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem;">${s.label}</div>
+          ${lockEl}
+        </div>`
+      }).join('')
+      document.getElementById('owner-panel').style.display = 'block'
+      // Wire the "Edit listing" link with the post ID. The /listing/:slug response
+      // now includes id (added to sb_listing_payload).
+      try {
+        const meta = await fetch(`${API}/listing/${slug}`).then(r => r.json())
+        if (meta && meta.id) {
+          const editLink = document.getElementById('owner-edit-link')
+          if (editLink) editLink.href = `/list-your-home?edit=${meta.id}`
+        }
+      } catch (_) {}
+    } catch (_) {}
+  })()
+  </script>
+</Layout>

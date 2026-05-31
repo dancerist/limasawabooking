@@ -1,0 +1,84 @@
+---
+/**
+ * Thin wrapper that normalises a GraphQL listing → flat REST-shape object,
+ * then defers to the shared cardHTML() template.
+ *
+ * One source of truth for the card lives in src/scripts/card-template.js
+ * and src/styles/card.css.
+ */
+import { parseLocationNames } from '../lib/locations'
+import { cardHTML } from '../scripts/card-template.js'
+
+interface Props {
+  listing: any
+}
+
+const { listing } = Astro.props
+const d = listing.accommodationData ?? {}
+const { municipality, barangay } = parseLocationNames(listing.locations?.nodes ?? [])
+
+// Gallery → flat string array, capped by listing tier so free hosts don't
+// surface more than 8 photos on the card slider. Keeps parity with the
+// /listings REST endpoint (sb_gallery_urls applies the same cap).
+const TIER_PHOTO_LIMITS: Record<string, number> = { free: 8, pro: 25, featured: 50 }
+const tier: string = (listing.listingTier ?? 'free').toLowerCase()
+const tierLimit = TIER_PHOTO_LIMITS[tier] ?? 8
+const CARD_HARD_CAP = 10  // mirrors the caller cap in sb_gallery_urls($post_id, 10)
+const galleryCap = Math.min(tierLimit, CARD_HARD_CAP)
+
+const galleryNodes: { sourceUrl?: string }[] = d?.accommodationGallery?.nodes ?? []
+const featured = listing.featuredImage?.node
+const gallery: string[] = galleryNodes.length
+  ? galleryNodes.map((n) => n.sourceUrl ?? '').filter(Boolean).slice(0, galleryCap)
+  : featured?.sourceUrl ? [featured.sourceUrl] : []
+
+// Place type can come back as an array from WPGraphQL — flatten it
+const rawType = d?.whatTypeOfPlaceWillGuestsHave
+const placeType: string = Array.isArray(rawType) ? (rawType[0] ?? '') : (rawType ?? '')
+const category: string = listing.accommodationsCategory?.nodes?.[0]?.name ?? ''
+
+// Build a "Type, Category in Location" fallback heading (matches old logic)
+const fallbackParts = [
+  placeType && category ? `${placeType}, ${category}` : placeType || category,
+  [municipality, barangay].filter(Boolean).join(', '),
+].filter(Boolean)
+const fallbackHeading = fallbackParts.length
+  ? `${fallbackParts[0]}${fallbackParts[1] ? ` in ${fallbackParts[1]}` : ''}`
+  : (listing.title ?? '')
+
+// Normalise to REST API "flat" shape that cardHTML expects
+const flat = {
+  slug:       listing.slug ?? '',
+  title:      listing.title ?? '',
+  price:      Number(d?.accommodationDailyRent ?? 0),
+  monthly:    Number(d?.accommodationMonthlyRent ?? 0),
+  beds:       Number(d?.accommodationBeds ?? 0),
+  baths:      Number(d?.accommodationBathrooms ?? 0),
+  guests:     Number(d?.accommodationNumberOfGuests ?? 0),
+  thumb:      gallery[0] ?? '',
+  gallery,
+  hostName:   d?.accommodationHostName ?? '',
+  hostPic:    d?.accommodationHostPicture?.node?.sourceUrl ?? '',
+  // Verified is auto-true on paid tiers (pro / featured) — paying members
+  // get the badge regardless of the manual ACF flag. Mirrors the backend
+  // sb_is_verified_listing() helper.
+  verified:   ['pro', 'featured', 'local', 'prime'].includes(tier) || !!d?.accommodationFullyVerified,
+  desc:       (d?.customAccommodationShortDescription ?? '').trim() || fallbackHeading,
+  subHeading: d?.accommodationSubHeading ?? '',
+  muniName:   municipality,
+  barName:    barangay,
+  badges:     d?.accommodationBadges ?? d?.badges ?? [],
+}
+
+const html = cardHTML(flat)
+---
+
+<Fragment set:html={html} />
+
+<script>
+  // Wire scroll-snap nav + dots + heart state on the card we just emitted.
+  import { initSliders } from '../scripts/card-slider.js'
+  document.readyState === 'loading'
+    ? document.addEventListener('DOMContentLoaded', () => initSliders())
+    : initSliders()
+</script>
