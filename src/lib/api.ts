@@ -78,6 +78,43 @@ export interface ListingsResponse {
   page: number
 }
 
+export interface Facet {
+  slug: string
+  name: string
+  count: number
+  image: string
+}
+
+/**
+ * Aggregate categories + locations from a set of listings (build-time facets
+ * for the homepage search/browse sections). Only terms that actually have a
+ * listing appear; each carries a count and a representative listing image.
+ */
+export function deriveFacets(listings: Listing[]): { categories: Facet[]; locations: Facet[] } {
+  const cats = new Map<string, Facet>()
+  const locs = new Map<string, Facet>()
+  for (const l of listings) {
+    l.cats.forEach((slug, i) => {
+      if (!slug) return
+      const f = cats.get(slug) ?? { slug, name: l.catNames[i] ?? slug, count: 0, image: '' }
+      f.count++
+      if (!f.image && l.thumb) f.image = l.thumb
+      cats.set(slug, f)
+    })
+    if (l.muniSlug) {
+      const f = locs.get(l.muniSlug) ?? { slug: l.muniSlug, name: l.muniName || l.muniSlug, count: 0, image: '' }
+      f.count++
+      if (!f.image && l.thumb) f.image = l.thumb
+      locs.set(l.muniSlug, f)
+    }
+  }
+  const byCount = (a: Facet, b: Facet) => b.count - a.count || a.name.localeCompare(b.name)
+  return {
+    categories: [...cats.values()].sort(byCount),
+    locations: [...locs.values()].sort(byCount),
+  }
+}
+
 export interface ListFilters {
   page?: number
   perPage?: number

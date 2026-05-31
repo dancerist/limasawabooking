@@ -1,17 +1,17 @@
 ---
 import Layout from '../layouts/Layout.astro'
-import { getListings } from '../lib/api'
+import { getListings, deriveFacets } from '../lib/api'
 
 // Fetched at build time (static). per_page=48 covers all current listings.
 const { listings, total } = await getListings({ perPage: 48 })
+const { categories, locations } = deriveFacets(listings)
 
-// Only listings with real coordinates get a map marker.
 const pins = listings
   .filter((l) => typeof l.lat === 'number' && typeof l.lng === 'number')
   .map((l) => ({ slug: l.slug, title: l.title, price: l.price, lat: l.lat, lng: l.lng }))
 
 const mapsKey = import.meta.env.PUBLIC_GOOGLE_MAPS_KEY ?? ''
-
+const guestOpts = [1, 2, 4, 6, 8, 10]
 const peso = (n: number) => '₱' + Number(n).toLocaleString('en-PH')
 ---
 
@@ -19,71 +19,154 @@ const peso = (n: number) => '₱' + Number(n).toLocaleString('en-PH')
   <div class="stays-shell">
     <div class="stays-list">
       <div class="stays-header">
-        <h1>All Stays</h1>
-        <span class="stays-count">{total} {total === 1 ? 'place' : 'places'} in Limasawa</span>
+        <h1>Stays in Limasawa</h1>
+        <span class="stays-count" id="stays-count">{total} {total === 1 ? 'place' : 'places'}</span>
       </div>
 
-      {listings.length === 0 ? (
-        <p class="empty-msg">No listings available right now. Please check back soon.</p>
-      ) : (
-        <div class="stays-grid">
-          {listings.map((l) => (
-            <a href={`/stay/${l.slug}`} class="stay-card" data-slug={l.slug}>
-              {l.thumb ? (
-                <img src={l.thumb} alt={l.title} loading="lazy" />
-              ) : (
-                <div class="stay-card-img-placeholder"></div>
-              )}
-              {l.verified && <span class="stay-badge">✓ Verified</span>}
-              <div class="stay-card-body">
-                <h3>{l.title}</h3>
-                {(l.muniName || l.barName) && (
-                  <p class="stay-loc">{[l.barName, l.muniName].filter(Boolean).join(', ')}</p>
-                )}
-                {l.subHeading && <p class="stay-sub">{l.subHeading}</p>}
-                <strong>{l.price > 0 ? `${peso(l.price)} / night` : 'Inquire for price'}</strong>
-              </div>
-            </a>
-          ))}
-        </div>
-      )}
+      <form class="filters" id="filters">
+        <select name="loc" aria-label="Location">
+          <option value="">Anywhere</option>
+          {locations.map((l) => <option value={l.slug}>{l.name} ({l.count})</option>)}
+        </select>
+        <select name="cat" aria-label="Type">
+          <option value="">Any type</option>
+          {categories.map((c) => <option value={c.slug}>{c.name} ({c.count})</option>)}
+        </select>
+        <select name="guests" aria-label="Guests">
+          <option value="">Any guests</option>
+          {guestOpts.map((g) => <option value={g}>{g}+ guests</option>)}
+        </select>
+        <button type="button" id="clear-filters" class="clear" hidden>Clear</button>
+      </form>
+
+      <p class="empty-msg" id="empty-msg" hidden>No places match these filters.</p>
+
+      <div class="stays-grid" id="stays-grid">
+        {listings.map((l) => (
+          <a
+            href={`/stay/${l.slug}`}
+            class="stay-card"
+            data-slug={l.slug}
+            data-loc={l.muniSlug}
+            data-cats={l.cats.join(' ')}
+            data-guests={l.guests}
+          >
+            {l.thumb ? <img src={l.thumb} alt={l.title} loading="lazy" /> : <div class="ph"></div>}
+            {l.verified && <span class="stay-badge">✓ Verified</span>}
+            <div class="stay-card-body">
+              <h3>{l.title}</h3>
+              {(l.muniName || l.barName) && <p class="stay-loc">{[l.barName, l.muniName].filter(Boolean).join(', ')}</p>}
+              {l.subHeading && <p class="stay-sub">{l.subHeading}</p>}
+              <strong>{l.price > 0 ? `${peso(l.price)} / night` : 'Inquire for price'}</strong>
+            </div>
+          </a>
+        ))}
+      </div>
     </div>
 
     <div class="stays-map">
       <div id="map" class="map-canvas"></div>
       {!mapsKey && (
-        <div class="map-fallback">
-          <p>Map unavailable — <code>PUBLIC_GOOGLE_MAPS_KEY</code> is not set.</p>
-        </div>
+        <div class="map-fallback"><p>Map unavailable — <code>PUBLIC_GOOGLE_MAPS_KEY</code> is not set.</p></div>
       )}
     </div>
   </div>
 </Layout>
 
 <script is:inline define:vars={{ pins, mapsKey }}>
-  window.__sbPins = pins
+  // ── shared filter state, read from the URL ──────────────────────────────
+  function currentFilters() {
+    var p = new URLSearchParams(location.search)
+    return { loc: p.get('loc') || '', cat: p.get('cat') || '', guests: p.get('guests') || '' }
+  }
+  function cardMatches(card, f) {
+    if (f.loc && card.dataset.loc !== f.loc) return false
+    if (f.cat && (card.dataset.cats || '').split(' ').indexOf(f.cat) === -1) return false
+    if (f.guests && Number(card.dataset.guests || 0) < Number(f.guests)) return false
+    return true
+  }
+
+  var markers = {}
+  var gmap = null
+
+  function applyFilters() {
+    var f = currentFilters()
+    var cards = document.querySelectorAll('.stay-card')
+    var visible = 0
+    cards.forEach(function (card) {
+      var show = cardMatches(card, f)
+      card.style.display = show ? '' : 'none'
+      if (show) visible++
+      var m = markers[card.dataset.slug]
+      if (m) m.setMap(show && gmap ? gmap : null)
+    })
+
+    // count + empty state
+    var countEl = document.getElementById('stays-count')
+    if (countEl) countEl.textContent = visible + (visible === 1 ? ' place' : ' places')
+    var empty = document.getElementById('empty-msg')
+    if (empty) empty.hidden = visible !== 0
+
+    // clear button + select values
+    var any = f.loc || f.cat || f.guests
+    var clearBtn = document.getElementById('clear-filters')
+    if (clearBtn) clearBtn.hidden = !any
+    var form = document.getElementById('filters')
+    if (form) { form.loc.value = f.loc; form.cat.value = f.cat; form.guests.value = f.guests }
+
+    // refit map to visible markers
+    if (gmap && window.google) {
+      var bounds = new google.maps.LatLngBounds()
+      var n = 0
+      pins.forEach(function (p) {
+        if (cardMatches({ dataset: markerData(p.slug) }, f)) { bounds.extend({ lat: p.lat, lng: p.lng }); n++ }
+      })
+      if (n > 1) gmap.fitBounds(bounds)
+      else if (n === 1) { gmap.setCenter(bounds.getCenter()); gmap.setZoom(15) }
+    }
+  }
+
+  // marker filtering needs the same data attrs the card carries
+  function markerData(slug) {
+    var card = document.querySelector('.stay-card[data-slug="' + slug + '"]')
+    return card ? card.dataset : {}
+  }
+
+  function setParam(key, val) {
+    var p = new URLSearchParams(location.search)
+    if (val) p.set(key, val); else p.delete(key)
+    history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p.toString() : ''))
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var form = document.getElementById('filters')
+    if (form) {
+      ;['loc', 'cat', 'guests'].forEach(function (name) {
+        form[name].addEventListener('change', function () { setParam(name, form[name].value); applyFilters() })
+      })
+      var clearBtn = document.getElementById('clear-filters')
+      if (clearBtn) clearBtn.addEventListener('click', function () {
+        history.replaceState(null, '', location.pathname)
+        applyFilters()
+      })
+    }
+    applyFilters() // honor inbound ?loc=&cat=&guests= from the homepage search
+  })
+
+  // ── Google Map ──────────────────────────────────────────────────────────
   window.initSbMap = function () {
     if (!window.google || !window.google.maps) return
     var canvas = document.getElementById('map')
     if (!canvas) return
-
-    // Limasawa Island center as a sensible default.
-    var center = { lat: 9.9333, lng: 125.0667 }
-    var map = new google.maps.Map(canvas, {
-      center: center,
+    gmap = new google.maps.Map(canvas, {
+      center: { lat: 9.9333, lng: 125.0667 },
       zoom: 12,
-      mapTypeControl: false,
-      streetViewControl: false,
-      fullscreenControl: false,
+      mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
     })
-
-    var bounds = new google.maps.LatLngBounds()
     var info = new google.maps.InfoWindow()
-
-    window.__sbPins.forEach(function (p) {
-      var pos = { lat: p.lat, lng: p.lng }
-      var marker = new google.maps.Marker({ position: pos, map: map, title: p.title })
-      bounds.extend(pos)
+    pins.forEach(function (p) {
+      var marker = new google.maps.Marker({ position: { lat: p.lat, lng: p.lng }, map: gmap, title: p.title })
+      markers[p.slug] = marker
       marker.addListener('click', function () {
         var price = p.price > 0 ? '₱' + Number(p.price).toLocaleString('en-PH') + ' / night' : 'Inquire for price'
         info.setContent(
@@ -91,33 +174,27 @@ const peso = (n: number) => '₱' + Number(n).toLocaleString('en-PH')
           '<span style="color:#64748B;font-size:.85rem">' + price + '</span><br/>' +
           '<a href="/stay/' + p.slug + '" style="color:#3EC7CF;font-weight:600;font-size:.85rem">View details →</a></div>'
         )
-        info.open(map, marker)
+        info.open(gmap, marker)
       })
     })
-
-    if (window.__sbPins.length > 1) {
-      map.fitBounds(bounds)
-    } else if (window.__sbPins.length === 1) {
-      map.setCenter(window.__sbPins[0])
-      map.setZoom(15)
-    }
+    applyFilters() // sync markers with any active filters once the map exists
   }
 </script>
 
 {mapsKey && (
-  <script
-    is:inline
-    async
-    src={`https://maps.googleapis.com/maps/api/js?key=${mapsKey}&callback=initSbMap&loading=async`}
-  ></script>
+  <script is:inline async src={`https://maps.googleapis.com/maps/api/js?key=${mapsKey}&callback=initSbMap&loading=async`}></script>
 )}
 
 <style>
   .stays-shell { display: flex; height: calc(100vh - 64px); overflow: hidden; }
-  .stays-list { flex: 0 0 520px; overflow-y: auto; padding: 1.5rem; border-right: 1px solid var(--sb-border); }
-  .stays-header { margin-bottom: 1.25rem; }
-  .stays-header h1 { font-size: 1.5rem; margin: 0 0 0.2rem; }
-  .stays-count { font-size: 0.875rem; color: var(--sb-text-muted); }
+  .stays-list { flex: 0 0 540px; overflow-y: auto; padding: 1.5rem; border-right: 1px solid var(--sb-border); }
+  .stays-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 1rem; }
+  .stays-header h1 { font-size: 1.5rem; margin: 0; }
+  .stays-count { font-size: 0.875rem; color: var(--sb-text-muted); white-space: nowrap; }
+  .filters { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .filters select { flex: 1; min-width: 120px; padding: .55rem .7rem; border: 1.5px solid var(--sb-border); border-radius: var(--sb-radius); background: #fff; font-family: inherit; font-size: .9rem; color: var(--sb-text); cursor: pointer; }
+  .filters select:focus { outline: none; border-color: var(--sb-primary); }
+  .clear { background: none; border: none; color: var(--sb-primary-deeper); font-weight: 600; cursor: pointer; font-size: .9rem; padding: 0 .5rem; }
   .stays-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
   .stays-map { flex: 1; background: var(--sb-secondary-pale); position: relative; }
   .map-canvas { width: 100%; height: 100%; }
@@ -127,19 +204,16 @@ const peso = (n: number) => '₱' + Number(n).toLocaleString('en-PH')
   @media (max-width: 900px) {
     .stays-shell { flex-direction: column; height: auto; }
     .stays-list { flex: none; border-right: none; }
-    .stays-grid { grid-template-columns: 1fr 1fr; }
     .stays-map { height: 360px; flex: none; }
   }
-  @media (max-width: 560px) {
-    .stays-grid { grid-template-columns: 1fr; }
-  }
+  @media (max-width: 560px) { .stays-grid { grid-template-columns: 1fr; } }
 </style>
 
 <style is:global>
   .stay-card { position: relative; display: block; text-decoration: none; color: var(--sb-text); background: #fff; border: 1px solid var(--sb-border); border-radius: var(--sb-radius-lg); overflow: hidden; transition: box-shadow .2s, transform .15s; }
   .stay-card:hover { box-shadow: var(--sb-shadow-lg); transform: translateY(-2px); }
   .stay-card img { width: 100%; height: 150px; object-fit: cover; display: block; }
-  .stay-card-img-placeholder { width: 100%; height: 150px; background: var(--sb-secondary-pale); }
+  .stay-card .ph { width: 100%; height: 150px; background: var(--sb-secondary-pale); }
   .stay-badge { position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,.92); color: var(--sb-primary-deeper); font-size: .7rem; font-weight: 700; padding: .2rem .5rem; border-radius: 999px; box-shadow: var(--sb-shadow); }
   .stay-card-body { padding: .85rem; }
   .stay-card-body h3 { font-size: .95rem; margin: 0 0 .2rem; line-height: 1.3; }
