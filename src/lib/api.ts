@@ -15,7 +15,7 @@ export interface Listing {
   title: string
   slug: string
   excerpt: string
-  tier: 'free' | 'featured' | string
+  tier: 'free' | 'pro' | 'featured' | string
   thumb: string
   badges: string[]
   price: number

@@ -125,11 +125,30 @@ if (defined('ABSPATH')) {
     }
     if (!function_exists('sb_user_payload')) {
         function sb_user_payload(WP_User $user) {
+            $uid   = (int) $user->ID;
+            $saved = get_user_meta($uid, 'sb_saved', true);
+            $saved = is_array($saved) ? $saved : [];
+            $listings = new WP_Query([
+                'post_type'      => 'accommodation',
+                'post_status'    => ['publish', 'pending', 'draft'],
+                'author'         => $uid,
+                'posts_per_page' => 1,
+                'fields'         => 'ids',
+            ]);
+            $pic_id = (int) get_user_meta($uid, 'sb_profile_picture_id', true);
+            $avatar = $pic_id ? wp_get_attachment_image_url($pic_id, 'thumbnail') : get_avatar_url($uid, ['size' => 96]);
             return [
-                'id'    => (int) $user->ID,
-                'name'  => $user->display_name,
-                'email' => $user->user_email,
-                'role'  => sb_user_role($user),
+                'id'               => $uid,
+                'name'             => $user->display_name,
+                'username'         => $user->user_login,
+                'email'            => $user->user_email,
+                'contact'          => (string) get_user_meta($uid, 'sb_contact', true),
+                'role'             => sb_user_role($user),
+                'avatar'           => $avatar,
+                'profilePictureId' => $pic_id,
+                'savedCount'       => count($saved),
+                'listingCount'     => (int) $listings->found_posts,
+                'reviewCount'      => (int) get_user_meta($uid, 'sb_review_count', true),
             ];
         }
     }
@@ -257,7 +276,7 @@ if (defined('ABSPATH')) {
             ];
             if (in_array($origin, $allowed, true)) {
                 header('Access-Control-Allow-Origin: ' . $origin);
-                header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+                header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
                 header('Access-Control-Allow-Headers: Authorization, Content-Type');
                 header('Access-Control-Allow-Credentials: true');
             }
