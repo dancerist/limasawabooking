@@ -46,9 +46,22 @@ import Layout from '../layouts/Layout.astro'
 </style>
 
 <script>
-  const REST = 'https://admin.limasawabooking.com/wp-json'
+  const REST = 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
   const params = new URLSearchParams(location.search)
   const redirect = params.get('redirect') || '/dashboard'
+
+  // Map backend error codes (limasawa-auth.php) → friendly messages.
+  const ERRORS: Record<string, string> = {
+    INVALID_EMAIL:       'Please enter a valid email address.',
+    WEAK_PASSWORD:       'Password must be at least 8 characters.',
+    EMAIL_EXISTS:        'An account with that email already exists. Try signing in.',
+    INVALID_CREDENTIALS: 'Incorrect email or password.',
+    RATE_LIMITED:        'Too many attempts — please wait a moment and try again.',
+    CREATE_FAILED:       'Could not create your account. Please try again.',
+  }
+  function friendly(data: any, fallback: string) {
+    return (data && ERRORS[data.error]) || (data && data.message) || fallback
+  }
 
   function parseJWT(t: string) {
     try { return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))) } catch { return null }
@@ -84,14 +97,14 @@ import Layout from '../layouts/Layout.astro'
     const email    = (document.getElementById('login-email') as HTMLInputElement).value
     const password = (document.getElementById('login-password') as HTMLInputElement).value
     try {
-      const res = await fetch(`${REST}/jwt-auth/v1/token`, {
+      const res = await fetch(`${REST}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: email, password }),
+        body: JSON.stringify({ email, password }),
       })
       const data = await res.json()
-      if (!res.ok || !data.token) throw new Error(data.message || 'Login failed')
-      localStorage.setItem('sb_token', data.token)
+      if (!res.ok || !data.authToken) throw new Error(friendly(data, 'Login failed'))
+      localStorage.setItem('sb_token', data.authToken)
       location.href = redirect
     } catch (err: any) {
       errEl.textContent = err.message || 'Login failed'
@@ -107,15 +120,15 @@ import Layout from '../layouts/Layout.astro'
     const email    = (document.getElementById('reg-email') as HTMLInputElement).value
     const password = (document.getElementById('reg-password') as HTMLInputElement).value
     try {
-      const res = await fetch(`${REST}/limasawa/v1/register`, {
+      const res = await fetch(`${REST}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.message || 'Registration failed')
-      if (data.token) { localStorage.setItem('sb_token', data.token); location.href = redirect }
-      else showTab('login')
+      if (!res.ok || !data.authToken) throw new Error(friendly(data, 'Registration failed'))
+      localStorage.setItem('sb_token', data.authToken)
+      location.href = redirect
     } catch (err: any) {
       errEl.textContent = err.message || 'Registration failed'
       errEl.hidden = false
