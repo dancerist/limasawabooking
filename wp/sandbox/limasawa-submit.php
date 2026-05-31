@@ -26,10 +26,10 @@ if (defined('ABSPATH')) {
      * ---------------------------------------------------------------------- */
     if (!function_exists('sb_tiers')) {
         function sb_tiers() {
+            // Mirrors the form's TIER_PRICES (free / pro / featured).
             return [
                 'free'     => ['photos' => 5,    'monthly' => 0,   'yearly' => 0],
-                'local'    => ['photos' => 15,   'monthly' => 399, 'yearly' => 3990],
-                'prime'    => ['photos' => 9999, 'monthly' => 699, 'yearly' => 6990],
+                'pro'      => ['photos' => 15,   'monthly' => 399, 'yearly' => 3990],
                 'featured' => ['photos' => 9999, 'monthly' => 999, 'yearly' => 9990],
             ];
         }

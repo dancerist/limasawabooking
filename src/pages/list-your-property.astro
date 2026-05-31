@@ -1,48 +1,3163 @@
 ---
-import Layout from '../layouts/Layout.astro'
+import { MUNICIPALITIES } from '../lib/locations'
+import '../styles/global.css'
+const GOOGLE_MAPS_KEY = import.meta.env.PUBLIC_GOOGLE_MAPS_KEY ?? ''
+const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+const categories = ['Apartment','Homestay','Hotel','Hut','Lodging']
+const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "BBQ grill", "Beach access", "Beach view", "Bed linens", "Bidet", "Body soap", "Building staff", "Cleaning available during stay", "Coffee", "Conditioner", "Dedicated workspace", "Essentials", "Extra pillows and blankets", "Fire extinguisher", "First aid kit", "Free parking on premises", "Kitchen", "Long term stays allowed", "Outdoor dining area", "Outdoor shower", "Pets allowed", "Private entrance", "Resort access", "Safe", "Self check-in", "Shampoo", "Smoking allowed", "TV", "Waterfront"]
 ---
 
-<Layout title="List Your Property — Limasawa Booking" noindex={true}>
-  <div class="lp-wrap">
-    <div class="lp-inner">
-      <h1>List your property</h1>
-      <p>Reach travellers coming to Limasawa Island. Listing is free.</p>
-      <div id="lp-step-container">
-        <p class="loading-msg">Loading form…</p>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>List Your Property — Limasawa Booking</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20260502" />
+  <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png?v=20260502" />
+  <link rel="shortcut icon" href="/favicon.ico?v=20260502" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=20260502" />
+  <link rel="manifest" href="/site.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Nunito+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style is:global>
+    :root {
+      --primary: #3EC7CF; --primary-dark: #32B5BC; --primary-light: #E6F9FA;
+      --primary-trans-10: rgba(62,199,207,0.10); --primary-trans-50: rgba(62,199,207,0.50);
+      --secondary: #4C5B6C; --bg: #F5F8FB;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Nunito Sans', system-ui, sans-serif; background: var(--bg); }
+    h1,h2,h3,h4,h5,h6 { font-family: 'DM Sans', system-ui, sans-serif; }
+
+    /* Steps */
+    .step {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 5rem 1.5rem 5rem;
+      opacity: 0; transform: translateY(60px);
+      transition: opacity 0.45s cubic-bezier(0.4,0,0.2,1), transform 0.45s cubic-bezier(0.4,0,0.2,1);
+      pointer-events: none;
+    }
+    .step.active {
+      opacity: 1; transform: translateY(0); pointer-events: auto;
+    }
+    .step.exiting {
+      opacity: 0; transform: translateY(-40px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    /* Input base */
+    .form-input {
+      width: 100%; max-width: 540px;
+      background: transparent; border: none; border-bottom: 2px solid #d1d5db;
+      padding: 0.6rem 0; font-size: 1.25rem; color: #1a1a1a;
+      outline: none; transition: border-color 0.2s;
+    }
+    .form-input:focus { border-color: var(--primary); }
+    .form-input::placeholder { color: #9ca3af; }
+
+    /* Choice chips */
+    .choice-chip {
+      cursor: pointer; border: 2px solid #e5e7eb; border-radius: 12px;
+      padding: 0.85rem 1.25rem; text-align: left; background: white;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+      font-size: 0.95rem; color: #374151;
+    }
+    .choice-chip:hover { border-color: var(--primary); }
+    .choice-chip.selected { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+    .choice-btn {
+      padding: .75rem 1rem; border: 2px solid #e5e7eb; border-radius: 12px;
+      background: #fff; font-size: .95rem; font-weight: 600; color: #374151;
+      cursor: pointer; transition: border-color .2s, background .2s, color .2s;
+      font-family: inherit; text-align: center;
+    }
+    .choice-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .choice-btn.selected { border-color: var(--primary); background: var(--primary-light); color: var(--primary); }
+
+    /* Counter */
+    .counter-btn {
+      width: 36px; height: 36px; border-radius: 50%; border: 2px solid #e5e7eb;
+      background: white; cursor: pointer; font-size: 1.2rem; color: #374151;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .counter-btn:hover { border-color: var(--primary); color: var(--primary); }
+    .counter-val { width: 2.5rem; text-align: center; font-size: 1.1rem; font-weight: 600; }
+
+    /* Amenity chips */
+    .amenity-chip {
+      cursor: pointer; border: 1.5px solid #e5e7eb; border-radius: 100px;
+      padding: 0.5rem 1rem; font-size: 0.875rem; color: #374151; background: white;
+      transition: border-color 0.15s, background 0.15s, color 0.15s; white-space: nowrap;
+    }
+    .amenity-chip.selected { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+    /* Tier cards */
+    .tier-card {
+      border: 2px solid #e5e7eb; border-radius: 18px; padding: 1.6rem 1.5rem;
+      cursor: pointer; background: white; transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+      display: flex; flex-direction: column; min-height: 100%;
+    }
+    .tier-card:hover { border-color: var(--primary); box-shadow: 0 6px 20px rgba(42,114,101,0.12); transform: translateY(-2px); }
+    .tier-card.selected { border-color: var(--primary); background: var(--primary-light); }
+    .tier-card.featured { border-color: var(--primary-dark); background: var(--primary-dark); color: white; }
+    .tier-card.featured.selected { box-shadow: 0 8px 26px rgba(42,114,101,0.38); }
+
+    /* Header: name + "Most popular" pill */
+    .tier-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.4rem; }
+    .tier-name { font-family:'DM Sans',sans-serif; font-size:1.1rem; font-weight:800; color:#1a1a1a; line-height:1; }
+    .tier-card.featured .tier-name { color:#fff; }
+    .tier-popular { font-size:.65rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; padding:.2rem .55rem; border-radius:999px; background:var(--primary-light); color:var(--primary); }
+    .tier-card.featured .tier-popular { background:rgba(255,255,255,.15); color:#fff; }
+
+    /* "Best for" tagline */
+    .tier-tagline { font-size:.78rem; line-height:1.4; color:#6b7280; margin-bottom:.85rem; min-height:2.2em; }
+    .tier-card.featured .tier-tagline { color:rgba(255,255,255,.85); }
+
+    /* Price block — vertical stack, dominant final price */
+    .tier-price-row { display:flex; align-items:baseline; gap:.45rem; margin-bottom:.15rem; line-height:1; flex-wrap:wrap; }
+    .tier-price-now { font-size:2rem; font-weight:800; color:#1a1a1a; letter-spacing:-0.02em; }
+    .tier-card.featured .tier-price-now { color:#fff; }
+
+    /* Inline strikethrough used by the multi-listing 50%-off render. Defaults
+       to muted grey on the white cards; switches to a translucent white on
+       the Featured card so it stays readable on the dark teal background. */
+    .tier-strike-inline { text-decoration:line-through; font-weight:600; opacity:.55; color:#9ca3af; margin-right:.35em; font-size:.55em; }
+    .tier-card.featured .tier-strike-inline { color:rgba(255,255,255,.7); opacity:.8; }
+    .yr-strike-inline { text-decoration:line-through; font-weight:600; opacity:.55; color:#9ca3af; margin-right:.4em; }
+    .tier-card.featured .yr-strike-inline { color:rgba(255,255,255,.7); opacity:.8; }
+    .tier-price-period { font-size:.85rem; font-weight:500; color:#9ca3af; margin-left:.1rem; }
+    .tier-card.featured .tier-price-period { color:rgba(255,255,255,.7); }
+
+    /* Yearly sub-row */
+    .tier-yearly-row {
+      display:flex; align-items:baseline; gap:.4rem; padding:.35rem 0 .85rem;
+      font-size:.78rem; color:#6b7280; border-bottom:1px solid #f1f5f9; margin-bottom:.85rem;
+    }
+    .tier-card.featured .tier-yearly-row { color:rgba(255,255,255,.78); border-bottom-color:rgba(255,255,255,.15); }
+    .tier-yearly-row .yr-label { font-weight:600; }
+    .tier-yearly-row .yr-now { font-weight:700; color:#1a1a1a; }
+    .tier-card.featured .tier-yearly-row .yr-now { color:#fff; }
+
+    /* Inclusions list */
+    .tier-includes { list-style:none; padding:0; margin:0 0 .25rem; flex:1; display:flex; flex-direction:column; gap:.45rem; }
+    .tier-includes li { font-size:.83rem; line-height:1.4; color:#4b5563; display:flex; align-items:flex-start; gap:.5rem; }
+    .tier-card.featured .tier-includes li { color:rgba(255,255,255,.92); }
+    .tier-includes li svg { flex-shrink:0; margin-top:2px; color:var(--primary); }
+    .tier-card.featured .tier-includes li svg { color:#fff; }
+
+    /* Legacy support — kept for callers that still target this in JS */
+    .price-line { display: flex; justify-content: space-between; gap: .75rem; font-size: .78rem; line-height: 1.4; }
+    .price-line strong { color: #1a1a1a; }
+    .tier-card.featured .price-line strong { color: #fff; }
+    .tier-card.featured .price-line { color: rgba(255,255,255,.82); }
+
+    .billing-card,
+    .payment-method-card {
+      border: 2px solid #e5e7eb; border-radius: 14px; background: #fff;
+      padding: 1rem; cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s;
+    }
+    .billing-card:hover,
+    .payment-method-card:hover { border-color: var(--primary); }
+    .billing-card.selected,
+    .payment-method-card.selected { border-color: var(--primary); background: var(--primary-light); box-shadow: 0 8px 22px rgba(42,114,101,.10); }
+    .payment-qr {
+      display: none; margin-top: 1rem; padding: 1rem; border: 1px solid #e5e7eb;
+      border-radius: 14px; background: #fff;
+    }
+    .payment-qr.active { display: block; }
+    .payment-qr img { width: min(260px, 100%); max-height: 320px; object-fit: contain; margin: 0 auto; display: block; border-radius: 12px; }
+
+    /* OK button */
+    .ok-btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: var(--primary); color: white; border: none; border-radius: 8px;
+      padding: 0.75rem 1.5rem; font-size: 0.95rem; font-weight: 600; cursor: pointer;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    .ok-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .ok-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* Skip link */
+    .skip-link {
+      color: #9ca3af; font-size: 0.85rem; cursor: pointer; text-decoration: underline;
+      text-underline-offset: 3px; background: none; border: none; padding: 0;
+    }
+    .skip-link:hover { color: #6b7280; }
+
+    /* Review rows */
+    .review-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 0.6rem 0; border-bottom: 1px solid #e5e7eb; gap: 1rem; }
+    .review-label { font-size: 0.8rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; min-width: 110px; }
+    .review-value { font-size: 0.95rem; color: #1a1a1a; text-align: right; word-break: break-all; }
+
+    /* Progress bar fill */
+    #progress-fill { transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+
+    /* Drop zone */
+    .drop-zone {
+      border: 2px dashed #e5e7eb; border-radius: 16px;
+      padding: 2rem 1.5rem; text-align: center; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s; background: white;
+      position: relative;
+    }
+    .drop-zone:hover, .drop-zone.drag-over { border-color: var(--primary); background: var(--primary-light); }
+    .drop-zone.has-media { border-style: solid; border-color: var(--primary); padding: 0.75rem; }
+    .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+    /* Host photo preview */
+    .host-photo-preview {
+      width: 96px; height: 96px; border-radius: 50%; object-fit: cover;
+      border: 3px solid var(--primary); display: block; margin: 0 auto;
+    }
+
+    /* Gallery grid */
+    .gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 1rem; }
+    @media (min-width: 640px) { .gallery-grid { grid-template-columns: repeat(4, 1fr); } }
+    .gallery-thumb { position: relative; aspect-ratio: 4/3; border-radius: 10px; overflow: hidden; background: #f3f4f6; }
+    .gallery-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .gallery-thumb-remove {
+      position: absolute; top: 5px; right: 5px; width: 22px; height: 22px; border-radius: 50%;
+      background: rgba(0,0,0,0.55); border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; color: white;
+      transition: background 0.15s;
+    }
+    .gallery-thumb-remove:hover { background: rgba(239,68,68,0.85); }
+    .gallery-thumb-uploading { display: flex; align-items: center; justify-content: center; background: #f3f4f6; }
+
+    /* Map step */
+    #map-container { height: 280px; border-radius: 14px; overflow: hidden; border: 2px solid #e5e7eb; background: #f3f4f6; }
+    #map-container.active-map { border-color: var(--primary); }
+    .map-search-result { padding: 0.65rem 1rem; font-size: 0.875rem; cursor: pointer; color: #1a1a1a; border-bottom: 1px solid #f3f4f6; }
+    .map-search-result:hover { background: #f9fafb; }
+    .map-search-result:last-child { border-bottom: none; }
+    .map-search-result strong { display: block; font-weight: 600; }
+    .map-search-result small { color: #9ca3af; font-size: 0.78rem; }
+
+    /* Generator toggle */
+    .generator-toggle { display: flex; gap: 0.75rem; }
+    .gen-opt {
+      flex: 1; border: 2px solid #e5e7eb; border-radius: 12px; padding: 0.9rem 1rem;
+      cursor: pointer; background: white; text-align: center; font-size: 0.95rem;
+      font-weight: 500; color: #374151; transition: border-color 0.15s, background 0.15s;
+    }
+    .gen-opt:hover { border-color: var(--primary); }
+    .gen-opt.selected { border-color: var(--primary); background: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+    /* Spinner */
+    @keyframes _spin { to { transform: rotate(360deg); } }
+    .upload-spinner {
+      width: 22px; height: 22px; border: 2.5px solid #e5e7eb;
+      border-top-color: var(--primary); border-radius: 50%;
+      animation: _spin 0.7s linear infinite;
+    }
+
+    @media (max-width: 640px) {
+      body {
+        background: var(--bg);
+        overscroll-behavior: none;
+      }
+
+      #app {
+        background: var(--bg) !important;
+      }
+
+      #app > .absolute.top-0 {
+        padding-top: env(safe-area-inset-top);
+        background: rgba(245, 248, 251, .94);
+        border-bottom: 1px solid rgba(226, 235, 243, .9);
+        backdrop-filter: blur(14px);
+      }
+
+      #app > .absolute.top-0 .h-1 {
+        height: 3px;
+      }
+
+      #app > .absolute.top-0 .flex.items-center {
+        min-height: 48px;
+        padding: 9px 18px 10px;
+      }
+
+      #back-btn,
+      #step-counter,
+      #app > .absolute.top-0 a {
+        font-size: 14px !important;
+        line-height: 1;
+      }
+
+      #app > .absolute.top-0 a {
+        max-width: 44vw;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .step {
+        justify-content: center;
+        align-items: stretch;
+        padding: calc(92px + env(safe-area-inset-top)) 18px calc(34px + env(safe-area-inset-bottom));
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .step > .w-full {
+        max-width: none;
+      }
+
+      .step[data-step="tier"],
+      .step[data-step="billing"],
+      .step[data-step="accommodationCategory"],
+      .step[data-step="placeType"],
+      .step[data-step="municipality"],
+      .step[data-step="barangay"],
+      .step[data-step="mapLocation"],
+      .step[data-step="amenities"],
+      .step[data-step="gallery"],
+      .step[data-step="payment"],
+      .step[data-step="review"] {
+        justify-content: flex-start;
+      }
+
+      .step h1,
+      .step h2 {
+        font-size: 24px !important;
+        line-height: 1.12 !important;
+        letter-spacing: 0;
+      }
+
+      .step h1 {
+        font-size: 28px !important;
+      }
+
+      .step p {
+        line-height: 1.45;
+      }
+
+      .step[data-step="tier"] > .w-full > p:first-child,
+      .step[data-step="billing"] > .w-full > p:first-child {
+        display: none;
+      }
+
+      .step[data-step="tier"] h2,
+      .step[data-step="billing"] h2 {
+        margin-top: 4px !important;
+        margin-bottom: 4px !important;
+      }
+
+      .step[data-step="tier"] h2 + p,
+      .step[data-step="billing"] h2 + p {
+        margin-bottom: 12px !important;
+        font-size: 13px !important;
+      }
+
+      .tier-card {
+        border-width: 1.5px;
+        border-radius: 14px;
+        padding: 16px 18px;
+      }
+
+      .tier-card p.font-bold {
+        font-size: 16px !important;
+        margin-bottom: 4px !important;
+      }
+
+      .tier-card .text-2xl {
+        font-size: 28px !important;
+        line-height: 1.05 !important;
+        margin-bottom: 12px !important;
+      }
+
+      .tier-card .text-sm,
+      .tier-card .text-xs {
+        font-size: 13px !important;
+      }
+
+      .tier-card ul {
+        gap: 4px;
+      }
+
+      .tier-card li {
+        line-height: 1.25;
+      }
+
+      .price-line {
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      .billing-card,
+      .payment-method-card,
+      .choice-chip,
+      .choice-btn {
+        border-width: 1.5px;
+        border-radius: 14px;
+      }
+
+      .step[data-step="tier"] .grid,
+      .step[data-step="billing"] .grid {
+        gap: 12px !important;
+      }
+
+      .step[data-step="tier"] .flex.justify-end,
+      .step[data-step="billing"] .flex.justify-end {
+        position: static;
+        margin: 16px 0 0;
+        padding: 0 0 calc(10px + env(safe-area-inset-bottom));
+        background: transparent;
+      }
+
+      .step[data-step="tier"] .ok-btn,
+      .step[data-step="billing"] .ok-btn {
+        width: 100%;
+        justify-content: center;
+        min-height: 48px;
+      }
+
+      .form-input {
+        font-size: 20px;
+      }
+
+      .drop-zone {
+        padding: 1.4rem 1rem;
+      }
+
+      #map-container {
+        height: min(300px, 42vh);
+      }
+
+      #amenity-dropdown {
+        max-height: min(282px, 36vh);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+        scrollbar-color: var(--primary) #eef3f7;
+      }
+
+      #amenity-dropdown::-webkit-scrollbar {
+        width: 7px;
+      }
+
+      #amenity-dropdown::-webkit-scrollbar-track {
+        background: #eef3f7;
+        border-radius: 999px;
+      }
+
+      #amenity-dropdown::-webkit-scrollbar-thumb {
+        background: var(--primary);
+        border-radius: 999px;
+      }
+    }
+
+    /* ── Quill rich-text editor (Long description step) ─────────────────── */
+    /* Minimal styling so Quill matches the form's look */
+    #quill-longDescription {
+      min-height: 220px;
+      border: 2px solid #e5e7eb;
+      border-top: none;
+      border-radius: 0 0 10px 10px;
+      background: #fff;
+    }
+    #quill-toolbar {
+      border: 2px solid #e5e7eb;
+      border-bottom: 1px solid #e5e7eb;
+      border-radius: 10px 10px 0 0;
+      background: #f9fafb;
+    }
+    .ql-editor {
+      font-size: 0.975rem;
+      line-height: 1.65;
+      padding: 0.85rem 1rem;
+      min-height: 200px;
+    }
+    .ql-editor.ql-blank::before {
+      font-style: normal;
+      color: #9ca3af;
+      font-size: 0.975rem;
+    }
+    .ql-editor h2 { font-size: 1.4rem; font-weight: 700; margin: 0.6rem 0 0.4rem; }
+    .ql-editor h3 { font-size: 1.15rem; font-weight: 700; margin: 0.5rem 0 0.3rem; }
+  </style>
+
+  <!-- Quill 2.0 — rich text editor for the Long description step -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" />
+</head>
+
+<body>
+<div id="app" class="fixed inset-0 overflow-hidden" style="background: var(--cream);">
+
+  <!-- Top bar -->
+  <div class="absolute top-0 left-0 right-0 z-50">
+    <!-- Progress bar -->
+    <div class="h-1" style="background:#e5e7eb">
+      <div id="progress-fill" class="h-full" style="background:var(--primary);width:0%"></div>
+    </div>
+    <!-- Nav: 3-column grid keeps the middle (logo) screen-centered -->
+    <div class="px-5 pt-3 pb-2" style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center">
+      <button id="back-btn"
+        class="flex items-center gap-1 text-sm font-medium opacity-0 pointer-events-none transition-opacity justify-self-start"
+        style="color:#6b7280"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
+      <a href="/" class="text-sm font-semibold" style="color:var(--primary)">Limasawa Booking</a>
+      <span id="step-counter" class="text-sm justify-self-end" style="color:#9ca3af"></span>
+    </div>
+    <!-- Edit-mode toolbar: jump-to-section + save changes (hidden by default, shown when ?edit=ID) -->
+    <div id="edit-toolbar" class="hidden border-b" style="background:#fff;border-color:#e5e7eb">
+      <div class="flex items-center gap-2 px-5 py-2 max-w-3xl mx-auto">
+        <label for="edit-jump-select" class="text-xs font-semibold uppercase tracking-widest" style="color:#6b7280;flex-shrink:0">Jump to:</label>
+        <select id="edit-jump-select"
+          class="flex-1 px-3 py-2 text-sm rounded-md border"
+          style="border-color:#d1d5db;background:#fff;color:#1a1a1a;cursor:pointer">
+        </select>
+        <button id="edit-save-btn" type="button"
+          class="ok-btn flex items-center gap-1.5 px-4 py-2 text-sm whitespace-nowrap"
+          onclick="submitListing()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Save changes
+        </button>
       </div>
     </div>
   </div>
-</Layout>
 
-<style>
-.lp-wrap { min-height:calc(100vh - 64px);background:var(--sb-bg);padding:3rem 1.5rem; }
-.lp-inner { max-width:600px;margin:0 auto; }
-.lp-inner h1 { font-size:2rem;margin-bottom:.5rem; }
-.lp-inner > p { color:var(--sb-text-muted);margin-bottom:2rem; }
-.loading-msg { color:var(--sb-text-muted); }
-</style>
+  <!-- Steps wrapper -->
+  <div id="steps-wrapper" class="relative h-full">
 
-<script>
-  /* Multi-step listing form — to be built out matching siargaobooking flow */
-  const token = (() => {
+    <!-- ── 0: Welcome ── -->
+    <div class="step active" data-step="welcome">
+      <!-- Auth wall (shown when not logged in) -->
+      <div id="auth-wall" class="text-center max-w-xl" style="display:none;">
+        <div class="mb-6 flex justify-center">
+        </div>
+        <h1 class="text-3xl font-bold mb-3 leading-tight" style="color:#1a1a1a">Sign in to list your home</h1>
+        <p class="text-base mb-8" style="color:#6b7280">Create a free Island Host account to add your property to Limasawa&rsquo;s leading accommodation directory.</p>
+        <div style="display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap;">
+          <a href="/auth?redirect=/list-your-home" style="display:inline-flex;align-items:center;gap:0.5rem;background:var(--primary);color:#fff;font-weight:700;font-size:1rem;padding:0.85rem 2rem;border-radius:12px;text-decoration:none;transition:background 0.2s;"
+             onmouseover="this.style.background='#32B5BC'" onmouseout="this.style.background='var(--primary)'">
+            Sign in / Create account
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </a>
+        </div>
+        <p style="margin-top:1.25rem;font-size:0.825rem;color:#9ca3af;">Already have an account? <a href="/auth?redirect=/list-your-home" style="color:var(--primary);font-weight:600;">Sign in here</a></p>
+      </div>
+
+      <!-- Normal welcome (shown when logged in) -->
+      <div id="welcome-content" class="text-center max-w-xl" style="display:none;">
+        <div class="mb-6 flex justify-center">
+          <div class="w-14 h-14 rounded-2xl flex items-center justify-center" style="background:var(--primary)">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+        </div>
+        <h1 class="text-4xl font-bold mb-3 leading-tight" style="color:#1a1a1a">List your property on<br>Limasawa Booking</h1>
+        <p class="text-base mb-2" style="color:#6b7280">Join hundreds of hosts earning on Limasawa&rsquo;s leading accommodation directory. Takes about 5 minutes.</p>
+        <p class="text-sm mb-8" id="welcome-user-hint" style="color:var(--primary);font-weight:600;"></p>
+        <button class="ok-btn text-base px-8 py-4" onclick="startForm()">
+          Get started
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── 1: Tier ── -->
+    <div class="step" data-step="tier">
+      <div class="w-full" style="max-width:1000px">
+        <p class="text-xs font-semibold uppercase tracking-widest mb-2" style="color:var(--primary)">Step 1</p>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Choose your listing plan</h2>
+        <p class="text-sm mb-4" style="color:#9ca3af">You can upgrade any time from your dashboard.</p>
+        <div id="multi-listing-banner" style="display:none;background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:10px;padding:.65rem 1rem;margin-bottom:1rem;font-size:.8rem;color:#15803D;font-weight:600;display:none;align-items:center;gap:.5rem;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          50% discount applied — additional listing price
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <!-- ───────── Island Listing (Free) ───────── -->
+          <div class="tier-card" data-tier="free" onclick="selectTier(this)">
+            <div class="tier-head"><span class="tier-name">Island Listing</span></div>
+            <p class="tier-tagline">Best for first-time hosts testing the waters.</p>
+
+            <div class="tier-price-row">
+              <span class="tier-price-now">Free</span>
+              <span class="tier-price-period">forever</span>
+            </div>
+            <div class="tier-yearly-row" style="visibility:hidden">
+              <span class="yr-label">Yearly</span><span class="yr-now">—</span>
+            </div>
+
+            <ul class="tier-includes">
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Listing on the directory + map</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Up to 8 photos</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>1 booking link (WhatsApp or phone)</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Total views stats</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Direct guest contact &middot; no fees, ever</li>
+            </ul>
+          </div>
+
+          <!-- ───────── Pro Host (early-bird) ───────── -->
+          <div class="tier-card" data-tier="pro" onclick="selectTier(this)">
+            <div class="tier-head">
+              <span class="tier-name">Pro Host</span>
+              <span class="tier-popular">Most popular</span>
+            </div>
+            <p class="tier-tagline">Best for active hosts running 1&ndash;3 properties.</p>
+
+            <div class="tier-price-row" id="price-pro">
+              <span class="tier-price-now">&#8369;399</span>
+              <span class="tier-price-period">/ month</span>
+            </div>
+            <div class="tier-yearly-row" id="price-pro-year">
+              <span class="yr-label">Yearly</span>
+              <span class="yr-now">&#8369;3,990</span>
+            </div>
+
+            <ul class="tier-includes">
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Everything in Island Listing</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Up to 25 photos</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Full analytics &mdash; every click type</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>All booking + social channels</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Services tab (rentals, transfers, lessons)</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Verified badge</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Blog post privileges</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Modest ranking boost in search</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Priority email support</li>
+            </ul>
+          </div>
+
+          <!-- ───────── Featured Stay (early-bird) ───────── -->
+          <div class="tier-card featured" data-tier="featured" onclick="selectTier(this)">
+            <div class="tier-head"><span class="tier-name">Featured Stay</span></div>
+            <p class="tier-tagline">Best for premium villas competing for visibility.</p>
+
+            <div class="tier-price-row" id="price-featured">
+              <span class="tier-price-now">&#8369;999</span>
+              <span class="tier-price-period">/ month</span>
+            </div>
+            <div class="tier-yearly-row" id="price-featured-year">
+              <span class="yr-label">Yearly</span>
+              <span class="yr-now">&#8369;9,990</span>
+            </div>
+
+            <ul class="tier-includes">
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Everything in Pro Host</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Unlimited photos</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Featured badge on every card</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Top placement in search + filters</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Homepage carousel slot (limited)</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Quarterly IG / FB shoutout</li>
+              <li><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Blog post privileges</li>
+            </ul>
+          </div>
+        </div>
+        <div class="flex justify-end mt-5">
+          <button id="tier-next" class="ok-btn" disabled onclick="nextStep()">
+            Continue
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 1b: Billing ── -->
+    <div class="step" data-step="billing">
+      <div class="w-full max-w-2xl">
+        <p class="text-xs font-semibold uppercase tracking-widest mb-2" style="color:var(--primary)">Billing</p>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Choose billing period</h2>
+        <p id="billing-subtext" class="text-sm mb-5" style="color:#9ca3af">Longer terms include the built-in savings.</p>
+        <div id="billing-options" class="grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
+        <div class="flex justify-end mt-5">
+          <button id="billing-next" class="ok-btn" disabled onclick="nextStep()">
+            Continue
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 2: Host name ── -->
+    <div class="step" data-step="hostName">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">About you</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">What&rsquo;s your name?</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">This is the name guests will see on your listing.</p>
+        <input id="input-hostName" class="form-input" type="text" placeholder="Your full name" autocomplete="name" />
+        <div class="flex items-center gap-4 mt-6">
+          <button class="ok-btn" onclick="advanceText('hostName')">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <span class="text-xs" style="color:#9ca3af">press <kbd class="px-1.5 py-0.5 rounded text-xs border" style="border-color:#e5e7eb">Enter</kbd></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 3: Host phone ── -->
+    <div class="step" data-step="hostPhone">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.6 19.79 19.79 0 0 1 1.61 5.06 2 2 0 0 1 3.6 2.87h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 10.4a16 16 0 0 0 5.69 5.69l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Contact</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Your WhatsApp number?</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">Guests and our team will use this to reach you.</p>
+        <input id="input-hostPhone" class="form-input" type="tel" placeholder="+63 900 000 0000" autocomplete="tel" />
+        <div class="flex items-center gap-4 mt-6">
+          <button class="ok-btn" onclick="advanceText('hostPhone')">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <span class="text-xs" style="color:#9ca3af">press <kbd class="px-1.5 py-0.5 rounded text-xs border" style="border-color:#e5e7eb">Enter</kbd></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 3b: Host photo ── -->
+    <div class="step" data-step="hostPhoto">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Profile photo</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Add your profile photo</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">Optional. Guests trust listings with a real host photo.</p>
+
+        <div class="drop-zone" id="host-photo-drop" onclick="document.getElementById('host-photo-input').click()">
+          <input type="file" id="host-photo-input" accept="image/jpeg,image/png,image/webp" onchange="onHostPhotoSelect(this.files)" onclick="event.stopPropagation()" />
+          <div id="host-photo-empty">
+            <div class="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:#9ca3af"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+            </div>
+            <p class="text-sm font-medium" style="color:#6b7280">Click to upload a photo</p>
+            <p class="text-xs mt-1" style="color:#9ca3af">JPG, PNG or WebP · Max 8 MB</p>
+          </div>
+          <div id="host-photo-preview" class="hidden">
+            <img id="host-photo-img" src="" alt="Host photo" class="host-photo-preview" />
+            <p id="host-photo-name" class="text-xs mt-2" style="color:#9ca3af"></p>
+          </div>
+          <div id="host-photo-uploading" class="hidden py-4">
+            <div class="upload-spinner mx-auto"></div>
+            <p class="text-xs mt-2" style="color:#9ca3af">Uploading…</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4 mt-6">
+          <button class="ok-btn" onclick="confirmHostPhoto()">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="skip-link" onclick="skipStep()">Skip</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 4: Property name ── -->
+    <div class="step" data-step="propertyName">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Your property</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">What is your property called?</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">The name that appears on your listing.</p>
+        <input id="input-propertyName" class="form-input" type="text" placeholder="e.g. Sunset Villa Limasawa" />
+        <div class="flex items-center gap-4 mt-6">
+          <button class="ok-btn" onclick="advanceText('propertyName')">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <span class="text-xs" style="color:#9ca3af">press <kbd class="px-1.5 py-0.5 rounded text-xs border" style="border-color:#e5e7eb">Enter</kbd></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 5: Category ── -->
+    <div class="step" data-step="accommodationCategory">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/><path d="M3 9V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Type</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">What type of accommodation?</h2>
+        <p class="text-sm mb-5" style="color:#9ca3af">Pick the category that best describes your property.</p>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2" id="category-grid">
+          {categories.map(cat => (
+            <div class="choice-chip" data-value={cat} onclick="selectChoice(this,'accommodationCategory',true)">{cat}</div>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 6: Place type ── -->
+    <div class="step" data-step="placeType">
+      <div class="w-full max-w-lg">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Space</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">What will guests have?</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">Choose what type of space guests get access to.</p>
+        <div class="flex flex-col gap-3">
+          {[
+            { label: 'Entire place', value: 'Entire Place' },
+            { label: 'Private room', value: 'A private room' },
+            { label: 'Shared room',  value: 'A shared room'  },
+          ].map(opt => (
+            <div class="choice-chip flex items-center gap-3" data-value={opt.value} onclick="selectChoice(this,'placeType',true)">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style="background:var(--primary-light)">
+                {opt.value === 'Entire Place'    && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>}
+                {opt.value === 'A private room'  && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M10 8V5a2 2 0 1 1 4 0v3"/></svg>}
+                {opt.value === 'A shared room'   && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>}
+              </div>
+              <span>{opt.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 7: Municipality ── -->
+    <div class="step" data-step="municipality">
+      <div class="w-full max-w-lg">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Location</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Which municipality?</h2>
+        <p class="text-sm mb-5" style="color:#9ca3af">Where is your property located?</p>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {MUNICIPALITIES.map(m => (
+            <div class="choice-chip" data-value={m.name} data-loc-id={m.id} onclick="selectMunicipality(this)">{m.name}</div>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 8: Barangay ── -->
+    <div class="step" data-step="barangay">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20A14.5 14.5 0 0 0 12 2"/><path d="M2 12h20"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Location</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Which barangay?</h2>
+        <p id="barangay-subtext" class="text-sm mb-5" style="color:#9ca3af">Search or pick your barangay.</p>
+
+        <!-- Search box -->
+        <div class="relative">
+          <div class="flex items-center gap-2 rounded-xl border-2 px-3 py-2.5 transition-colors" style="border-color:#e5e7eb;background:white" id="barangay-search-box">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#9ca3af;flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input
+              id="barangay-search"
+              type="text"
+              placeholder="Search barangay..."
+              class="flex-1 bg-transparent outline-none text-sm"
+              style="color:#1a1a1a"
+              oninput="onBarangaySearch(this.value)"
+              onkeydown="onBarangayKeydown(event)"
+              autocomplete="off"
+            />
+            <button id="barangay-clear" type="button" class="hidden" onclick="clearBarangay()" style="color:#9ca3af;line-height:1">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <!-- Dropdown -->
+          <div id="barangay-dropdown"
+            class="absolute left-0 right-0 mt-1 rounded-xl border shadow-lg overflow-y-auto z-50 hidden"
+            style="background:white;border-color:#e5e7eb;top:100%;max-height:240px">
+          </div>
+        </div>
+
+        <!-- Selected barangay display -->
+        <div id="barangay-selected" class="hidden mt-3 flex items-center gap-2 text-sm font-medium" style="color:var(--primary)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <span id="barangay-selected-name"></span>
+        </div>
+
+        <div class="flex items-center gap-4 mt-6">
+          <button id="barangay-ok" class="ok-btn" onclick="confirmBarangay()">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="skip-link" onclick="skipBarangay()">Skip</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 8b: Map location ── -->
+    <div class="step" data-step="mapLocation">
+      <div class="w-full max-w-2xl overflow-y-auto" style="max-height:calc(100vh - 8rem)">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Pin location</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Where exactly is it?</h2>
+        <p class="text-sm mb-4" style="color:#9ca3af">Search for your business or landmark. If it doesn&rsquo;t appear, just click the map to drop the pin manually — drag to fine-tune. Moving the pin won&rsquo;t change your address field.</p>
+
+        <!-- Landmark text field -->
+        <div class="mb-3">
+          <label class="text-xs font-semibold uppercase tracking-wide block mb-1" style="color:#9ca3af">Landmark / address</label>
+          <input id="input-address1" class="form-input" type="text" placeholder="e.g. Kermit Surf Resort, Cloud 9 area" />
+        </div>
+
+        <!-- Map search -->
+        <div class="relative mb-3" style="z-index:2000">
+          <div class="flex items-center gap-2 rounded-xl border-2 px-3 py-2.5" style="border-color:#e5e7eb;background:white" id="map-search-box">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#9ca3af;flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="map-search" type="text" placeholder="Search on map (optional)..." class="flex-1 bg-transparent outline-none text-sm" style="color:#1a1a1a" oninput="onMapSearch(this.value)" autocomplete="off" />
+          </div>
+          <div id="map-search-results" class="absolute left-0 right-0 mt-1 rounded-xl border shadow-lg hidden overflow-hidden" style="background:white;border-color:#e5e7eb;top:100%;z-index:2000"></div>
+        </div>
+
+        <!-- Leaflet map -->
+        <div id="map-container"></div>
+        <p id="map-coords" class="text-xs mt-2" style="color:#9ca3af"></p>
+
+        <div class="flex items-center gap-4 mt-5">
+          <button class="ok-btn" onclick="confirmMapLocation()">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="skip-link" onclick="skipStep()">Skip</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 9: Guests ── -->
+    <div class="step" data-step="guests">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Capacity</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">How many guests?</h2>
+        <p class="text-sm mb-8" style="color:#9ca3af">Maximum number of guests allowed.</p>
+        <div class="flex items-center gap-4">
+          <button class="counter-btn" onclick="adjustCounter('guests',-1)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <span class="counter-val text-4xl font-bold" id="val-guests" style="color:#1a1a1a">1</span>
+          <button class="counter-btn" onclick="adjustCounter('guests',1)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+        <div class="mt-8">
+          <button class="ok-btn" onclick="nextStep()">
+            Continue <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 10: Capacity (beds / bathrooms) ── -->
+    <div class="step" data-step="capacity">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Rooms</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-8" style="color:#1a1a1a">Rooms and beds</h2>
+        <div class="space-y-6">
+          {[
+            { key:'bedrooms', label:'Bedrooms', icon:'bedroom' },
+            { key:'beds',     label:'Beds',     icon:'bed'     },
+            { key:'bathrooms',label:'Bathrooms',icon:'bath'    },
+          ].map(({key,label}) => (
+            <div class="flex items-center justify-between">
+              <span class="text-base font-medium" style="color:#374151">{label}</span>
+              <div class="flex items-center gap-4">
+                <button class="counter-btn" onclick={`adjustCounter('${key}',-1)`}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </button>
+                <span class="counter-val" id={`val-${key}`} style="color:#1a1a1a">0</span>
+                <button class="counter-btn" onclick={`adjustCounter('${key}',1)`}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div class="mt-8">
+          <button class="ok-btn" onclick="nextStep()">
+            Continue <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 11: Daily rate ── -->
+    <div class="step" data-step="dailyRate">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/><path d="M12 18V6"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Pricing</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Nightly rate?</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">In Philippine Pesos (PHP).</p>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl font-bold" style="color:#9ca3af">&#8369;</span>
+          <input id="input-dailyRate" class="form-input" type="number" min="0" placeholder="1500" style="font-size:1.5rem" />
+        </div>
+        <div class="flex items-center gap-4 mt-6">
+          <button class="ok-btn" onclick="advanceText('dailyRate')">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <span class="text-xs" style="color:#9ca3af">press <kbd class="px-1.5 py-0.5 rounded text-xs border" style="border-color:#e5e7eb">Enter</kbd></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 12: Monthly rate (optional) ── -->
+    <div class="step" data-step="monthlyRate">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Pricing</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Monthly rate? <span class="text-lg font-normal" style="color:#9ca3af">optional</span></h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">For long-stay guests. Leave blank if you don&rsquo;t offer monthly pricing.</p>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl font-bold" style="color:#9ca3af">&#8369;</span>
+          <input id="input-monthlyRate" class="form-input" type="number" min="0" placeholder="25000" style="font-size:1.5rem" />
+        </div>
+        <div class="flex items-center gap-4 mt-6">
+          <button class="ok-btn" onclick="advanceText('monthlyRate',true)">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="skip-link" onclick="skipStep()">Skip</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 13: Description ── -->
+    <div class="step" data-step="description">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><line x1="17" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="17" y1="18" x2="3" y2="18"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Description</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Describe your property</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">One clear sentence that tells guests what makes your place special.</p>
+        <textarea id="input-description" rows="3"
+          class="form-input resize-none" style="border-bottom:none;border:2px solid #e5e7eb;border-radius:10px;padding:0.75rem 1rem;font-size:1rem;line-height:1.6"
+          placeholder="e.g. Entire beachfront villa with infinity pool and jungle views in General Luna"></textarea>
+        <p class="text-xs mt-1" style="color:#9ca3af">Press Ctrl+Enter to continue</p>
+        <div class="flex items-center gap-4 mt-4">
+          <button class="ok-btn" onclick="advanceText('description')">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 13b: Long description ── -->
+    <div class="step" data-step="longDescription">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Full description</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Tell guests about your place</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">Describe the vibe, surroundings, house rules, check-in process — anything that helps guests feel at home. This appears as the full listing description.</p>
+        <!-- Quill toolbar — rendered to a stable element so we control button order -->
+        <div id="quill-toolbar">
+          <span class="ql-formats">
+            <select class="ql-header">
+              <option value="2">Heading</option>
+              <option value="3">Subheading</option>
+              <option selected>Normal</option>
+            </select>
+          </span>
+          <span class="ql-formats">
+            <button class="ql-bold" aria-label="Bold"></button>
+            <button class="ql-italic" aria-label="Italic"></button>
+          </span>
+          <span class="ql-formats">
+            <button class="ql-list" value="bullet" aria-label="Bullet list"></button>
+            <button class="ql-list" value="ordered" aria-label="Numbered list"></button>
+          </span>
+          <span class="ql-formats">
+            <button class="ql-clean" aria-label="Clear formatting"></button>
+          </span>
+        </div>
+        <div id="quill-longDescription"
+          data-placeholder="e.g. Welcome to Sunset Villa! We're a 5-minute walk from Cloud 9, surrounded by coconut trees and sea breeze. The villa sleeps up to 6 guests across 2 bedrooms…"></div>
+        <p class="text-xs mt-1" style="color:#9ca3af">Press Ctrl+Enter to continue</p>
+        <div class="flex items-center gap-4 mt-4">
+          <button class="ok-btn" onclick="advanceLongDescription()">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="skip-link" onclick="skipStep()">Skip</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 14: Booking link ── -->
+    <div class="step" data-step="bookingLink">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Booking</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Direct booking link</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">Where guests can book or contact you. Can be a Messenger link, website, or any URL.</p>
+        <input id="input-bookingLink" class="form-input" type="url" placeholder="https://" />
+        <div class="flex items-center gap-4 mt-6">
+          <button class="ok-btn" onclick="advanceText('bookingLink',true)">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="skip-link" onclick="skipStep()">Skip</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 15: Airbnb (local+) ── -->
+    <div class="step" data-step="airbnbLink" data-tier-min="pro">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Booking</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Airbnb listing URL</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">Paste your Airbnb listing URL if you have one.</p>
+        <input id="input-airbnbLink" class="form-input" type="url" placeholder="https://airbnb.com/rooms/..." />
+        <div class="flex items-center gap-4 mt-6">
+          <button class="ok-btn" onclick="advanceText('airbnbLink',true)">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="skip-link" onclick="skipStep()">Skip</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 16: Booking.com (local+) ── -->
+    <div class="step" data-step="bookingComLink" data-tier-min="pro">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Booking</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Booking.com URL</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">Paste your Booking.com listing URL if you have one.</p>
+        <input id="input-bookingComLink" class="form-input" type="url" placeholder="https://booking.com/hotel/..." />
+        <div class="flex items-center gap-4 mt-6">
+          <button class="ok-btn" onclick="advanceText('bookingComLink',true)">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="skip-link" onclick="skipStep()">Skip</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 17: Social links (local+) ── -->
+    <div class="step" data-step="socialLinks" data-tier-min="pro">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Social</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Social media &amp; website</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">All optional. Add what you have.</p>
+        <div class="space-y-4">
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide block mb-1" style="color:#9ca3af">Website</label>
+            <input id="input-websiteLink" class="form-input" type="url" placeholder="https://yoursite.com" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide block mb-1" style="color:#9ca3af">Facebook page URL</label>
+            <input id="input-facebookLink" class="form-input" type="url" placeholder="https://facebook.com/..." />
+          </div>
+          <div>
+            <label class="text-xs font-semibold uppercase tracking-wide block mb-1" style="color:#9ca3af">Instagram URL</label>
+            <input id="input-instagramLink" class="form-input" type="url" placeholder="https://instagram.com/..." />
+          </div>
+        </div>
+        <div class="flex items-center gap-4 mt-6">
+          <button class="ok-btn" onclick="saveSocialLinks()">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="skip-link" onclick="skipStep()">Skip</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 18: Services (local+) ── -->
+    <div class="step" data-step="services" data-tier-min="pro">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Services</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Do you offer any services?</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">Scooter rental, surf lessons, airport transfer — list anything guests can book.</p>
+
+        <div class="flex gap-3 mb-6">
+          <button id="services-yes-btn" class="choice-btn flex-1" onclick="setServicesToggle(true)">Yes, I do</button>
+          <button id="services-no-btn"  class="choice-btn flex-1" onclick="setServicesToggle(false)">No, skip</button>
+        </div>
+
+        <div id="services-editor" style="display:none">
+          <div id="services-list" class="space-y-3 mb-4"></div>
+          <button class="skip-link flex items-center gap-1.5" onclick="addService()" style="color:var(--primary);font-weight:600">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add another service
+          </button>
+          <div class="mt-6">
+            <button class="ok-btn" onclick="saveServices()">
+              OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 19: Amenities ── -->
+    <div class="step" data-step="amenities">
+      <div class="w-full max-w-2xl overflow-y-auto" style="max-height:calc(100vh - 8rem)">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Amenities</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">What do you offer?</h2>
+        <p class="text-sm mb-5" style="color:#9ca3af">Pick the essentials, then search or add more below.</p>
+
+        <!-- FAQ quick-picks -->
+        <p class="text-xs font-semibold uppercase tracking-widest mb-3" style="color:#9ca3af">Key amenities</p>
+        <div class="flex flex-wrap gap-2 mb-6" id="faq-amenities-grid">
+          <!-- rendered by JS -->
+        </div>
+
+        <!-- Search + add more -->
+        <p class="text-xs font-semibold uppercase tracking-widest mb-3" style="color:#9ca3af">Add more</p>
+        <div class="relative">
+          <div class="flex items-center gap-2 rounded-xl border-2 px-3 py-2.5 transition-colors" style="border-color:#e5e7eb;background:white" id="amenity-search-box">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#9ca3af;shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input
+              id="amenity-search"
+              type="text"
+              placeholder="Search or type an amenity..."
+              class="flex-1 bg-transparent outline-none text-sm"
+              style="color:#1a1a1a"
+              oninput="onAmenitySearch(this.value)"
+              onkeydown="onAmenityKeydown(event)"
+              autocomplete="off"
+            />
+          </div>
+          <!-- Dropdown -->
+          <div id="amenity-dropdown"
+            class="absolute left-0 right-0 mt-1 rounded-xl border shadow-lg overflow-hidden z-50 hidden"
+            style="background:white;border-color:#e5e7eb;top:100%">
+          </div>
+        </div>
+
+        <!-- Added tags -->
+        <div id="added-amenities" class="flex flex-wrap gap-2 mt-3"></div>
+
+        <div class="mt-6 flex items-center gap-4">
+          <button class="ok-btn" onclick="nextStep()">
+            Continue <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+          <span id="amenity-count" class="text-sm" style="color:#9ca3af"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 18a: Generator / backup power ── -->
+    <div class="step" data-step="generator">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Power</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Backup power?</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">Power outages are common in Limasawa. Guests love knowing if you have a generator.</p>
+
+        <div class="generator-toggle mb-6">
+          <button type="button" class="gen-opt" data-gen="yes" onclick="selectGenerator(this)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-1" style="color:var(--primary)"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            Yes, we have a generator
+          </button>
+          <button type="button" class="gen-opt" data-gen="no" onclick="selectGenerator(this)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-1" style="color:#9ca3af"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            No backup power
+          </button>
+        </div>
+
+        <!-- Schedule textarea — shown only when Yes is selected -->
+        <div id="generator-schedule-wrap" class="hidden">
+          <label class="text-xs font-semibold uppercase tracking-wide block mb-2" style="color:#9ca3af">Generator schedule & details</label>
+          <textarea id="input-generatorSchedule" rows="4"
+            class="form-input resize-none"
+            style="border-bottom:none;border:2px solid #e5e7eb;border-radius:10px;padding:0.75rem 1rem;font-size:0.975rem;line-height:1.65"
+            placeholder="e.g. Generator runs 6 AM–12 AM daily. During NPC outages (usually 6–9 PM), power switches automatically within 30 seconds."></textarea>
+        </div>
+
+        <div class="flex items-center gap-4 mt-6">
+          <button class="ok-btn" onclick="confirmGenerator()">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="skip-link" onclick="skipStep()">Skip</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 18b: Gallery ── -->
+    <div class="step" data-step="gallery">
+      <div class="w-full max-w-2xl overflow-y-auto" style="max-height:calc(100vh - 8rem)">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Photos</span>
+          </div>
+          <span id="gallery-limit-badge" class="text-xs font-semibold px-3 py-1 rounded-full" style="background:var(--primary-light);color:var(--primary)"></span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Property photos</h2>
+        <p class="text-sm mb-5" style="color:#9ca3af">First photo becomes the cover image. Good photos get more bookings.</p>
+
+        <!-- Drop zone (hidden when at limit) -->
+        <div class="drop-zone" id="gallery-drop"
+          ondragover="event.preventDefault();this.classList.add('drag-over')"
+          ondragleave="this.classList.remove('drag-over')"
+          ondrop="onGalleryDrop(event)"
+          onclick="document.getElementById('gallery-input').click()"
+        >
+          <input type="file" id="gallery-input" accept="image/jpeg,image/png,image/webp" multiple onchange="onGallerySelect(this.files)" onclick="event.stopPropagation()" />
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2" style="color:#9ca3af"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <p class="text-sm font-medium" style="color:#6b7280">Click or drag photos here</p>
+          <p class="text-xs mt-1" style="color:#9ca3af">JPG, PNG or WebP · Max 8 MB each</p>
+        </div>
+
+        <!-- Preview grid -->
+        <div class="gallery-grid" id="gallery-grid"></div>
+
+        <div class="flex items-center gap-4 mt-6">
+          <button class="ok-btn" onclick="nextStep()">
+            Continue <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+          <span id="gallery-count" class="text-sm" style="color:#9ca3af"></span>
+          <button class="skip-link ml-auto" onclick="skipStep()">Skip</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 19: Payment ── -->
+    <div class="step" data-step="payment">
+      <div class="w-full max-w-3xl overflow-y-auto" style="max-height:calc(100vh - 8rem)">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Manual payment</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Pay for your listing</h2>
+        <p class="text-sm mb-5" style="color:#9ca3af">Send payment using GCash, Maya, or BPI, then upload your receipt. Your listing goes live after admin approval.</p>
+
+        <div class="rounded-xl p-4 mb-4" style="background:#fff;border:1px solid #e5e7eb">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide mb-1" style="color:#9ca3af">Amount due</p>
+              <p id="payment-summary" class="text-2xl font-extrabold" style="color:#1a1a1a">—</p>
+              <p id="payment-discount-note" class="text-xs mt-1" style="color:#15803D"></p>
+            </div>
+            <button type="button" class="skip-link" onclick="goToStep('billing')">Change billing</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <button type="button" class="payment-method-card text-left" data-method="gcash" onclick="selectPaymentMethod(this)">
+            <p class="font-bold mb-1" style="color:#1a1a1a">GCash</p>
+            <p class="text-xs" style="color:#6b7280">09260367249<br>Nico Lanugon</p>
+          </button>
+          <button type="button" class="payment-method-card text-left" data-method="maya" onclick="selectPaymentMethod(this)">
+            <p class="font-bold mb-1" style="color:#1a1a1a">Maya</p>
+            <p class="text-xs" style="color:#6b7280">09260367249<br>Nico Lanugon</p>
+          </button>
+          <button type="button" class="payment-method-card text-left" data-method="bank_transfer" onclick="selectPaymentMethod(this)">
+            <p class="font-bold mb-1" style="color:#1a1a1a">BPI transfer</p>
+            <p class="text-xs" style="color:#6b7280">5739059781<br>Nico Lanugon</p>
+          </button>
+        </div>
+
+        <div id="payment-qr-gcash" class="payment-qr">
+          <img src="/payments/gcash-number.webp" alt="GCash QR for Nico Lanugon" />
+        </div>
+        <div id="payment-qr-maya" class="payment-qr">
+          <img src="/payments/maya-number.webp" alt="Maya QR for Nico Lanugon" />
+        </div>
+        <div id="payment-qr-bank_transfer" class="payment-qr">
+          <img src="/payments/bpi-number.webp" alt="BPI InstaPay QR for Nico Lanugon" />
+          <div class="rounded-lg p-3 mt-3 text-xs" style="background:#f9fafb;color:#374151;border:1px solid #e5e7eb">
+            <div class="flex justify-between gap-4"><span>Account name</span><strong>Nico Lanugon</strong></div>
+            <div class="flex justify-between gap-4 mt-1"><span>Account number</span><strong>5739059781</strong></div>
+            <p class="mt-1.5" style="color:#6b7280">Scan via InstaPay, or transfer manually using the details above.</p>
+          </div>
+        </div>
+
+        <!-- Coupon code — shown when payment is required -->
+        <div id="payment-coupon-wrap" class="mt-5" style="max-width:360px;">
+          <label class="text-xs font-semibold uppercase tracking-wide block mb-1" style="color:#9ca3af">
+            Coupon code <span style="font-weight:400;text-transform:none;font-size:.75rem;">(optional)</span>
+          </label>
+          <div class="flex gap-2">
+            <input id="input-paymentCoupon" class="form-input" type="text" placeholder="e.g. WELCOME20"
+              autocomplete="off" style="flex:1;text-transform:uppercase;" oninput="onCouponInput()" />
+            <button type="button" id="btn-coupon-apply" class="ok-btn" style="padding:.55rem 1rem;font-size:.85rem"
+              onclick="applyListingCoupon()">Apply</button>
+            <button type="button" id="btn-coupon-clear" class="skip-link" style="display:none;padding:.55rem .5rem;font-size:.85rem"
+              onclick="clearListingCoupon()">Clear</button>
+          </div>
+          <p id="payment-coupon-status" class="text-xs mt-1.5" style="min-height:1em"></p>
+        </div>
+
+        <!-- Reference number — shown after method is selected -->
+        <div id="payment-reference-wrap" style="display:none;" class="mt-5">
+          <label class="text-xs font-semibold uppercase tracking-wide block mb-1" style="color:#9ca3af">
+            Reference / transaction number <span style="font-weight:400;text-transform:none;font-size:.75rem;">(optional but helps us verify faster)</span>
+          </label>
+          <input id="input-paymentReference" class="form-input" type="text" placeholder="e.g. 2024123456789"
+            style="max-width:360px;"
+            oninput="data.paymentReference = this.value.trim()" />
+        </div>
+
+        <div class="mt-5">
+          <label class="text-xs font-semibold uppercase tracking-wide block mb-2" style="color:#9ca3af">Upload payment receipt</label>
+          <div class="drop-zone" id="payment-receipt-drop" onclick="document.getElementById('payment-receipt-input').click()">
+            <input type="file" id="payment-receipt-input" accept="image/jpeg,image/png,image/webp" onchange="onPaymentReceiptSelect(this.files)" onclick="event.stopPropagation()" />
+            <div id="payment-receipt-empty">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2" style="color:#9ca3af"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <p class="text-sm font-medium" style="color:#6b7280">Click to upload receipt screenshot</p>
+              <p class="text-xs mt-1" style="color:#9ca3af">JPG, PNG or WebP · Max 8 MB</p>
+            </div>
+            <div id="payment-receipt-preview" class="hidden">
+              <img id="payment-receipt-img" src="" alt="Payment receipt preview" style="max-height:170px;object-fit:contain;margin:0 auto;border-radius:10px;" />
+              <p id="payment-receipt-name" class="text-xs mt-2" style="color:#9ca3af"></p>
+            </div>
+            <div id="payment-receipt-uploading" class="hidden py-4">
+              <div class="upload-spinner mx-auto"></div>
+              <p class="text-xs mt-2" style="color:#9ca3af">Uploading…</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4 mt-6">
+          <button id="payment-next" class="ok-btn" disabled onclick="confirmPayment()">
+            Continue <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+          <span id="payment-help" class="text-xs" style="color:#9ca3af">Select a method and upload receipt.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 19: Review ── -->
+    <div class="step" data-step="review">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Review</span>
+        </div>
+        <h2 class="text-2xl font-bold mb-1" style="color:#1a1a1a">Almost there — review your listing</h2>
+        <p class="text-sm mb-5" style="color:#9ca3af">Everything look good? Submit and we&rsquo;ll review within 24 hours.</p>
+        <div id="review-content" class="rounded-xl p-4 mb-5 overflow-y-auto" style="background:white;max-height:40vh;border:1px solid #e5e7eb"></div>
+        <div class="flex gap-3">
+          <button id="submit-btn" class="ok-btn flex-1 justify-center py-3.5" onclick="submitListing()">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            Submit listing
+          </button>
+        </div>
+        <p class="text-xs mt-3" style="color:#9ca3af">Your listing will be reviewed before going live. We may contact you on WhatsApp.</p>
+      </div>
+    </div>
+
+    <!-- ── 20: Success ── -->
+    <div class="step" data-step="success">
+      <div class="text-center max-w-md">
+        <div class="mb-5 flex justify-center">
+          <div class="w-16 h-16 rounded-full flex items-center justify-center" style="background:var(--primary-light)">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+        </div>
+        <h2 class="text-3xl font-bold mb-2" style="color:#1a1a1a">Listing submitted!</h2>
+        <p class="text-base mb-8" style="color:#6b7280">Your listing is now pending review. We&rsquo;ll reach out on WhatsApp within 24 hours once it&rsquo;s approved and live.</p>
+        <a href="/" class="ok-btn inline-flex">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          Back to listings
+        </a>
+      </div>
+    </div>
+
+  </div><!-- /steps-wrapper -->
+</div><!-- /app -->
+
+<script define:vars={{ MUNICIPALITIES, categories, allAmenityTerms, GOOGLE_MAPS_KEY, WP_REST }}>
+  // ── FAQ amenities (maps ACF sub-field key → display label) ─────────────
+  const FAQ_AMENITIES = [
+    { key: 'faq_wifi',                                    label: 'WiFi'                    },
+    { key: 'faq_air_conditioning',                        label: 'Air conditioning'         },
+    { key: 'faq_kitchen',                                 label: 'Kitchen'                 },
+    { key: 'faq_free_parking_on_premises',                label: 'Free parking'            },
+    { key: 'faq_beach_access',                            label: 'Beach access'            },
+    { key: 'faq_pets_allowed',                            label: 'Pets allowed'            },
+    { key: 'faq_dedicated_workspace',                     label: 'Dedicated workspace'     },
+    { key: 'faq_generator',                               label: 'Generator'               },
+    { key: 'faq_hot_cold_shower',                         label: 'Hot & cold shower'       },
+    { key: 'faq_exterior_security_cameras_on_property',   label: 'Security cameras'        },
+  ]
+
+  // ── State ──────────────────────────────────────────────────────────────
+  const TIER_ORDER = ['free','pro','featured']
+  const TIER_LABELS = { free:'Island Listing', pro:'Pro Host', featured:'Featured Stay' }
+  const BILLING_LABELS = { monthly:'Monthly', yearly:'Yearly' }
+  // Yearly = 10× monthly (2 months free).
+  const TIER_PRICES = {
+    free:     { monthly: 0 },
+    pro:      { monthly: 399, yearly: 3990 },
+    featured: { monthly: 999, yearly: 9990 },
+  }
+
+  // Build a quick lookup: municipalityId → barangay list
+  const BARANGAYS_BY_MUNI = {}
+  MUNICIPALITIES.forEach(m => { BARANGAYS_BY_MUNI[m.id] = m.barangays })
+
+  const data = {
+    tier:'', hostName:'', hostPhone:'', propertyName:'',
+    billingPeriod: 'monthly',
+    paymentAmount: 0, paymentCurrency: 'PHP',
+    paymentStatus: 'not_required', paymentProvider: 'manual', paymentMethod: '',
+    paymentReference: '', paymentReceiptId: 0, paymentReceiptUrl: '',
+    couponCode: '', couponDiscount: 0, couponNewTotal: 0,
+    accommodationCategory:'', placeType:'',
+    municipalityId: 0, municipalityName: '',
+    barangayId: 0, barangayName: '',
+    guests:1, bedrooms:0, beds:0, bathrooms:0,
+    dailyRate:'', monthlyRate:'', description:'',
+    bookingLink:'', airbnbLink:'', bookingComLink:'',
+    websiteLink:'', facebookLink:'', instagramLink:'',
+    addServices: false,
+    services: [],       // [{ name, description }]
+    faqAmenities: {},   // { faq_wifi: true, faq_kitchen: true, … }
+    extraAmenities: [], // free-text / taxonomy additions
+    hostPhotoId: 0, hostPhotoUrl: '',
+    galleryIds: [], galleryUrls: [],
+    address1: '',
+    mapLocation: { lat: null, lng: null, address: '' },
+    longDescription: '',
+    hasGenerator: null,   // true | false | null (unanswered)
+    generatorSchedule: '',
+  }
+
+  // Photo limits per tier
+  const PHOTO_LIMITS = { free: 5, local: 15, prime: Infinity, featured: Infinity }
+
+  // All step IDs in order
+  const ALL_STEPS = [
+    'welcome','tier','billing','hostName','hostPhone','hostPhoto','propertyName',
+    'accommodationCategory','placeType','municipality','barangay','mapLocation',
+    'guests','capacity','dailyRate','monthlyRate',
+    'description','longDescription',
+    'bookingLink','airbnbLink','bookingComLink','socialLinks','services',
+    'amenities','generator','gallery','payment','review','success',
+  ]
+  // Steps that require local+ tier
+  const TIER_MIN = { airbnbLink:'pro', bookingComLink:'pro', socialLinks:'pro', services:'pro' }
+
+  let stepIndex = 0  // index into ALL_STEPS
+
+  // ── Helpers ────────────────────────────────────────────────────────────
+  function currentStepId() { return ALL_STEPS[stepIndex] }
+
+  function visibleSteps() {
+    const tierIdx = TIER_ORDER.indexOf(data.tier)
+    return ALL_STEPS.filter(id => {
+      // Edit mode: skip welcome, tier, billing, payment, success steps
+      if (data._editMode) {
+        if (['welcome','tier','billing','payment','success'].includes(id)) return false
+      }
+      if ((id === 'billing' || id === 'payment') && data.tier === 'free') return false
+      const min = TIER_MIN[id]
+      if (!min) return true
+      return tierIdx >= TIER_ORDER.indexOf(min)
+    })
+  }
+
+  // Computable steps for progress (excluding welcome + success)
+  function progressSteps() {
+    return visibleSteps().filter(id => id !== 'welcome' && id !== 'success')
+  }
+
+  function updateProgress() {
+    const steps = progressSteps()
+    const idx = steps.indexOf(currentStepId())
+    if (idx < 0) { document.getElementById('progress-fill').style.width = '0%'; return }
+    const pct = Math.round(((idx + 1) / steps.length) * 100)
+    document.getElementById('progress-fill').style.width = pct + '%'
+    // In edit mode, hide step counter (the section dropdown shows where you are)
+    if (data._editMode) {
+      document.getElementById('step-counter').textContent = ''
+      // Sync the dropdown's selected option to the current step
+      const sel = document.getElementById('edit-jump-select')
+      if (sel) sel.value = currentStepId()
+      return
+    }
+    document.getElementById('step-counter').textContent =
+      currentStepId() === 'review' ? 'Review' : `${idx + 1} / ${steps.length}`
+  }
+
+  function showBackBtn(show) {
+    const btn = document.getElementById('back-btn')
+    btn.style.opacity = show ? '1' : '0'
+    btn.style.pointerEvents = show ? 'auto' : 'none'
+  }
+
+  // ── Navigation ─────────────────────────────────────────────────────────
+  function goToStep(id) {
+    const toEl = document.querySelector(`[data-step="${id}"]`)
+    if (!toEl) return
+    // Deactivate ALL currently active steps
+    document.querySelectorAll('.step.active').forEach(el => {
+      el.classList.add('exiting')
+      el.classList.remove('active')
+    })
+    setTimeout(() => {
+      document.querySelectorAll('.step.exiting').forEach(el => el.classList.remove('exiting'))
+      toEl.classList.add('active')
+      const inp = toEl.querySelector('input,textarea')
+      if (inp) setTimeout(() => inp.focus(), 60)
+    }, 270)
+    stepIndex = ALL_STEPS.indexOf(id)
+    updateProgress()
+    showBackBtn(id !== 'welcome' && id !== 'success')
+    // Multi-listing discount check when reaching tier step
+    if (id === 'tier') checkMultiListingDiscount()
+    if (id === 'billing') renderBillingOptions()
+    if (id === 'payment') renderPaymentStep()
+  }
+
+  function nextStep() {
+    const vis = visibleSteps()
+    const cur = currentStepId()
+    const idx = vis.indexOf(cur)
+    if (idx < vis.length - 1) goToStep(vis[idx + 1])
+  }
+
+  function prevStep() {
+    const vis = visibleSteps()
+    const cur = currentStepId()
+    const idx = vis.indexOf(cur)
+    if (idx > 0) goToStep(vis[idx - 1])
+  }
+
+  function skipStep() { nextStep() }
+
+  // ── Input helpers ──────────────────────────────────────────────────────
+  function advanceText(field, optional = false) {
+    const el = document.getElementById('input-' + field)
+    const val = el ? el.value.trim() : ''
+    if (!optional && !val) { el && el.focus(); shakeInput(el); return }
+    data[field] = val
+    nextStep()
+  }
+
+  function shakeInput(el) {
+    if (!el) return
+    el.style.borderColor = '#ef4444'
+    el.classList.add('shake')
+    setTimeout(() => { el.style.borderColor = ''; el.classList.remove('shake') }, 600)
+  }
+
+  function selectTier(card) {
+    document.querySelectorAll('.tier-card').forEach(c => c.classList.remove('selected'))
+    card.classList.add('selected')
+    data.tier = card.dataset.tier
+    data.billingPeriod = data.tier === 'free' ? 'monthly' : (data.billingPeriod || 'monthly')
+    updatePaymentAmount()
+    document.getElementById('tier-next').disabled = false
+  }
+
+  function formatPeso(amount) {
+    return `₱${Number(amount || 0).toLocaleString()}`
+  }
+
+  // Pre-coupon price (base + multi-listing 50% if applicable). The coupon is
+  // applied on top of this in finalPrice() below.
+  function basePrice(tier, period) {
+    const base = TIER_PRICES[tier]?.[period] ?? 0
+    return data._multiListingDiscount && base > 0 ? Math.floor(base * 0.5) : base
+  }
+
+  // Final price after coupon. Used for display and submit.
+  function effectivePrice(tier, period) {
+    const base = basePrice(tier, period)
+    if (data.couponCode && data.couponNewTotal > 0 && base > 0) {
+      return Math.max(0, Math.floor(data.couponNewTotal))
+    }
+    return base
+  }
+
+  function updatePaymentAmount() {
+    data.paymentAmount = effectivePrice(data.tier, data.billingPeriod)
+    data.paymentStatus = data.paymentAmount > 0 ? 'pending_verification' : 'not_required'
+    data.paymentCurrency = 'PHP'
+    data.paymentProvider = data.paymentAmount > 0 ? 'manual' : ''
+    // Live-update the review summary if rendered
+    const summary = document.getElementById('payment-summary')
+    if (summary) summary.textContent = `${formatPeso(data.paymentAmount)} · ${TIER_LABELS[data.tier]} · ${BILLING_LABELS[data.billingPeriod]}`
+  }
+
+  // Coupon: live-validate against /coupon/validate
+  function onCouponInput() {
+    // Typing invalidates any previously-applied coupon
+    const status = document.getElementById('payment-coupon-status')
+    if (data.couponCode) {
+      data.couponCode = ''
+      data.couponDiscount = 0
+      data.couponNewTotal = 0
+      updatePaymentAmount()
+    }
+    const clearBtn = document.getElementById('btn-coupon-clear')
+    if (clearBtn) clearBtn.style.display = 'none'
+    const input = document.getElementById('input-paymentCoupon')
+    if (input) input.disabled = false
+    if (status) { status.textContent = ''; status.style.color = '' }
+  }
+
+  async function applyListingCoupon() {
+    const input = document.getElementById('input-paymentCoupon')
+    const status = document.getElementById('payment-coupon-status')
+    const clearBtn = document.getElementById('btn-coupon-clear')
+    const code = (input?.value || '').trim()
+    if (!code) {
+      status.textContent = 'Enter a coupon code first.'
+      status.style.color = '#dc2626'
+      return
+    }
+    const base = basePrice(data.tier, data.billingPeriod)
+    if (base <= 0) {
+      status.textContent = 'Pick a paid plan first.'
+      status.style.color = '#dc2626'
+      return
+    }
     try {
-      const t = localStorage.getItem('sb_token')
-      if (!t) return null
-      const p = JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))
-      return p && p.exp > Date.now() / 1000 ? t : null
-    } catch { return null }
+      const url = `${WP_REST}/coupon/validate?code=${encodeURIComponent(code)}&tier=${encodeURIComponent(data.tier)}&billing=${encodeURIComponent(data.billingPeriod)}&amount=${encodeURIComponent(base)}`
+      const res = await fetch(url)
+      const result = await res.json()
+      if (!result || !result.valid) {
+        data.couponCode = ''; data.couponDiscount = 0; data.couponNewTotal = 0
+        status.textContent = (result && result.message) || 'Coupon could not be applied.'
+        status.style.color = '#dc2626'
+        if (clearBtn) clearBtn.style.display = 'none'
+        if (input) input.disabled = false
+      } else {
+        data.couponCode     = result.code
+        data.couponDiscount = result.discount
+        data.couponNewTotal = result.new_total
+        const off = result.type === 'percentage' ? `${result.value}% off` : `₱${Number(result.value).toLocaleString()} off`
+        status.textContent = `${result.code} applied — ${off}, you save ₱${Number(result.discount).toLocaleString()}.`
+        status.style.color = '#15803D'
+        if (clearBtn) clearBtn.style.display = ''
+        if (input) input.disabled = true
+      }
+      updatePaymentAmount()
+    } catch (e) {
+      status.textContent = 'Network error. Please try again.'
+      status.style.color = '#dc2626'
+    }
+  }
+  function clearListingCoupon() {
+    data.couponCode = ''; data.couponDiscount = 0; data.couponNewTotal = 0
+    const input = document.getElementById('input-paymentCoupon')
+    const status = document.getElementById('payment-coupon-status')
+    const clearBtn = document.getElementById('btn-coupon-clear')
+    if (input) { input.disabled = false; input.value = '' }
+    if (status) { status.textContent = ''; status.style.color = '' }
+    if (clearBtn) clearBtn.style.display = 'none'
+    updatePaymentAmount()
+  }
+
+  function renderBillingOptions() {
+    updatePaymentAmount()
+    const wrap = document.getElementById('billing-options')
+    const next = document.getElementById('billing-next')
+    const sub = document.getElementById('billing-subtext')
+    if (!wrap || data.tier === 'free') return
+    const options = [
+      { key: 'monthly', note: 'Pay month to month' },
+      { key: 'yearly',  note: 'Save 2 months' },
+    ]
+    sub.textContent = `${TIER_LABELS[data.tier]} billing. Additional listings get 50% off.`
+    wrap.innerHTML = options.map(({ key, note }) => {
+      const base  = TIER_PRICES[data.tier][key]
+      const price = effectivePrice(data.tier, key)
+      const multiListing = data._multiListingDiscount && base > 0
+      const strike = multiListing
+        ? `<span style="text-decoration:line-through;opacity:.5;font-size:.75em;display:block;color:#9ca3af">${formatPeso(base)}</span>`
+        : ''
+      const badge = multiListing
+        ? `<span class="text-xs" style="color:#15803D">50% off (additional listing)</span>`
+        : ''
+      return `<button type="button" class="billing-card text-left ${data.billingPeriod === key ? 'selected' : ''}" data-period="${key}" onclick="selectBillingPeriod(this)">
+        <span class="text-sm font-bold block" style="color:#1a1a1a">${BILLING_LABELS[key]}</span>
+        ${strike}
+        <span class="text-2xl font-extrabold block mt-1" style="color:#1a1a1a">${formatPeso(price)}</span>
+        <span class="text-xs block mt-1" style="color:#6b7280">${note}</span>
+        ${badge}
+      </button>`
+    }).join('')
+    next.disabled = !data.billingPeriod
+  }
+
+  function selectBillingPeriod(card) {
+    document.querySelectorAll('.billing-card').forEach(c => c.classList.remove('selected'))
+    card.classList.add('selected')
+    data.billingPeriod = card.dataset.period
+    updatePaymentAmount()
+    document.getElementById('billing-next').disabled = false
+  }
+
+  function selectChoice(chip, field, autoAdvance = false) {
+    // Deselect siblings in same step
+    chip.closest('.step').querySelectorAll('.choice-chip').forEach(c => c.classList.remove('selected'))
+    chip.classList.add('selected')
+    data[field] = chip.dataset.value
+    if (autoAdvance) setTimeout(() => nextStep(), 220)
+  }
+
+  function adjustCounter(field, delta) {
+    const min = field === 'guests' ? 1 : 0
+    const max = 50
+    data[field] = Math.max(min, Math.min(max, (data[field] || 0) + delta))
+    const el = document.getElementById('val-' + field)
+    if (el) el.textContent = data[field]
+  }
+
+  // ── Media upload ───────────────────────────────────────────────────────
+
+  const UPLOAD_URL = `${WP_REST}/upload-media`
+
+  // folder_id is shared across all uploads in this session
+  // so all images for the same listing land in the same HappyFiles folder
+  let _sessionFolderId = 0
+
+  async function uploadMedia(file, imageType = 'gallery') {
+    const fd = new FormData()
+    fd.append('file', file)
+    if (data.propertyName) fd.append('property_name', data.propertyName)
+    fd.append('image_type', imageType)
+    if (_sessionFolderId) fd.append('folder_id', String(_sessionFolderId))
+    const res = await fetch(UPLOAD_URL, { method: 'POST', body: fd })
+    const json = await res.json()
+    if (!json.success) throw new Error(json.message || 'Upload failed')
+    // Store folder_id for subsequent uploads in this session
+    if (json.folder_id) _sessionFolderId = json.folder_id
+    return { id: json.attachment_id, url: json.url }
+  }
+
+  // ── Host photo ─────────────────────────────────────────────────────────
+
+  async function onHostPhotoSelect(files) {
+    const file = files[0]
+    if (!file) return
+    if (file.size > 8 * 1024 * 1024) { alert('Max file size is 8 MB'); return }
+
+    // Show local preview immediately
+    const reader = new FileReader()
+    reader.onload = e => {
+      document.getElementById('host-photo-img').src = e.target.result
+      document.getElementById('host-photo-name').textContent = file.name
+      document.getElementById('host-photo-empty').classList.add('hidden')
+      document.getElementById('host-photo-preview').classList.add('hidden')
+      document.getElementById('host-photo-uploading').classList.remove('hidden')
+      document.getElementById('host-photo-drop').classList.add('has-media')
+    }
+    reader.readAsDataURL(file)
+
+    try {
+      const { id, url } = await uploadMedia(file, 'host_photo')
+      data.hostPhotoId  = id
+      data.hostPhotoUrl = url
+      document.getElementById('host-photo-uploading').classList.add('hidden')
+      document.getElementById('host-photo-preview').classList.remove('hidden')
+    } catch (err) {
+      alert('Upload failed: ' + err.message)
+      document.getElementById('host-photo-uploading').classList.add('hidden')
+      document.getElementById('host-photo-empty').classList.remove('hidden')
+      document.getElementById('host-photo-drop').classList.remove('has-media')
+      data.hostPhotoId = 0
+    }
+  }
+
+  function confirmHostPhoto() { nextStep() }
+
+  // ── Payment receipt ───────────────────────────────────────────────────
+  function renderPaymentStep() {
+    updatePaymentAmount()
+    const summary = document.getElementById('payment-summary')
+    const note = document.getElementById('payment-discount-note')
+    if (summary) summary.textContent = `${formatPeso(data.paymentAmount)} · ${TIER_LABELS[data.tier]} · ${BILLING_LABELS[data.billingPeriod]}`
+    if (note) note.textContent = data._multiListingDiscount ? '50% succeeding-listing discount applied.' : ''
+    validatePaymentStep()
+  }
+
+  function selectPaymentMethod(card) {
+    document.querySelectorAll('.payment-method-card').forEach(c => c.classList.remove('selected'))
+    document.querySelectorAll('.payment-qr').forEach(c => c.classList.remove('active'))
+    card.classList.add('selected')
+    data.paymentMethod = card.dataset.method
+    const qr = document.getElementById(`payment-qr-${data.paymentMethod}`)
+    if (qr) qr.classList.add('active')
+    // Show reference number field
+    const refWrap = document.getElementById('payment-reference-wrap')
+    if (refWrap) refWrap.style.display = 'block'
+    validatePaymentStep()
+  }
+
+  function validatePaymentStep() {
+    const btn = document.getElementById('payment-next')
+    const help = document.getElementById('payment-help')
+    if (!btn) return
+    const ready = data.paymentAmount <= 0 || (data.paymentMethod && data.paymentReceiptId)
+    btn.disabled = !ready
+    if (help) {
+      help.textContent = ready
+        ? 'Receipt uploaded. Continue to review.'
+        : 'Select a payment method and upload your receipt.'
+    }
+  }
+
+  async function onPaymentReceiptSelect(files) {
+    const file = files[0]
+    if (!file) return
+    if (file.size > 8 * 1024 * 1024) { alert('Max file size is 8 MB'); return }
+
+    const reader = new FileReader()
+    reader.onload = e => {
+      document.getElementById('payment-receipt-img').src = e.target.result
+      document.getElementById('payment-receipt-name').textContent = file.name
+      document.getElementById('payment-receipt-empty').classList.add('hidden')
+      document.getElementById('payment-receipt-preview').classList.add('hidden')
+      document.getElementById('payment-receipt-uploading').classList.remove('hidden')
+      document.getElementById('payment-receipt-drop').classList.add('has-media')
+    }
+    reader.readAsDataURL(file)
+
+    try {
+      const { id, url } = await uploadMedia(file, 'payment_receipt')
+      data.paymentReceiptId = id
+      data.paymentReceiptUrl = url
+      document.getElementById('payment-receipt-uploading').classList.add('hidden')
+      document.getElementById('payment-receipt-preview').classList.remove('hidden')
+      validatePaymentStep()
+    } catch (err) {
+      alert('Receipt upload failed: ' + err.message)
+      document.getElementById('payment-receipt-uploading').classList.add('hidden')
+      document.getElementById('payment-receipt-empty').classList.remove('hidden')
+      document.getElementById('payment-receipt-drop').classList.remove('has-media')
+      data.paymentReceiptId = 0
+      data.paymentReceiptUrl = ''
+      validatePaymentStep()
+    }
+  }
+
+  function confirmPayment() {
+    if (data.paymentAmount > 0 && (!data.paymentMethod || !data.paymentReceiptId)) {
+      alert('Please select a payment method and upload your receipt.')
+      return
+    }
+    nextStep()
+  }
+
+  // ── Gallery ────────────────────────────────────────────────────────────
+
+  function galleryLimit() {
+    const l = PHOTO_LIMITS[data.tier] ?? 5
+    return l === Infinity ? Infinity : l
+  }
+
+  function updateGalleryUI() {
+    const limit  = galleryLimit()
+    const count  = data.galleryIds.length
+    const badge  = document.getElementById('gallery-limit-badge')
+    const cntEl  = document.getElementById('gallery-count')
+    const dropEl = document.getElementById('gallery-drop')
+
+    if (badge) {
+      badge.textContent = limit === Infinity
+        ? 'Unlimited photos'
+        : `Up to ${limit} photo${limit !== 1 ? 's' : ''} on your plan`
+    }
+    if (cntEl) cntEl.textContent = count ? `${count} photo${count !== 1 ? 's' : ''} added` : ''
+    if (dropEl) {
+      dropEl.style.display = (limit !== Infinity && count >= limit) ? 'none' : ''
+    }
+  }
+
+  function renderGalleryThumb(url, idx, uploading = false) {
+    const grid = document.getElementById('gallery-grid')
+    const div  = document.createElement('div')
+    div.className = 'gallery-thumb' + (uploading ? ' gallery-thumb-uploading' : '')
+    div.id = 'gallery-thumb-' + idx
+    if (uploading) {
+      div.innerHTML = '<div class="upload-spinner"></div>'
+    } else {
+      div.innerHTML = `<img src="${url}" alt="Photo ${idx + 1}" loading="lazy" />`
+        + `<button type="button" class="gallery-thumb-remove" onclick="removeGalleryPhoto(${idx})" aria-label="Remove">`
+        + `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
+        + `</button>`
+    }
+    grid.appendChild(div)
+  }
+
+  function rebuildGalleryGrid() {
+    const grid = document.getElementById('gallery-grid')
+    if (!grid) return
+    grid.innerHTML = ''
+    data.galleryUrls.forEach((url, i) => renderGalleryThumb(url, i))
+    updateGalleryUI()
+  }
+
+  async function processGalleryFiles(files) {
+    const limit  = galleryLimit()
+    const slots  = limit === Infinity ? files.length : Math.min(files.length, limit - data.galleryIds.length)
+    if (slots <= 0) return
+
+    for (let i = 0; i < slots; i++) {
+      const file = files[i]
+      if (!file || file.size > 8 * 1024 * 1024) continue
+
+      // Temp index for this upload
+      const idx = data.galleryIds.length
+      data.galleryIds.push(null)   // placeholder
+      data.galleryUrls.push(null)
+
+      // Show local preview + spinner while uploading
+      const reader = new FileReader()
+      reader.onload = e => {
+        const thumb = document.getElementById('gallery-thumb-' + idx)
+        if (thumb) {
+          thumb.classList.remove('gallery-thumb-uploading')
+          thumb.innerHTML = `<img src="${e.target.result}" alt="" loading="lazy" />`
+            + `<button type="button" class="gallery-thumb-remove" onclick="removeGalleryPhoto(${idx})" aria-label="Remove">`
+            + `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`
+        }
+      }
+      reader.readAsDataURL(file)
+      renderGalleryThumb('', idx, true)
+
+      try {
+        const { id, url } = await uploadMedia(file)
+        data.galleryIds[idx]  = id
+        data.galleryUrls[idx] = url
+      } catch (err) {
+        // Remove placeholder on failure
+        data.galleryIds.splice(idx, 1)
+        data.galleryUrls.splice(idx, 1)
+        const thumb = document.getElementById('gallery-thumb-' + idx)
+        if (thumb) thumb.remove()
+        rebuildGalleryGrid()
+      }
+      updateGalleryUI()
+    }
+  }
+
+  function onGallerySelect(files) { processGalleryFiles(Array.from(files)) }
+  function onGalleryDrop(e) {
+    e.preventDefault()
+    e.currentTarget.classList.remove('drag-over')
+    processGalleryFiles(Array.from(e.dataTransfer.files))
+  }
+
+  function removeGalleryPhoto(idx) {
+    data.galleryIds.splice(idx, 1)
+    data.galleryUrls.splice(idx, 1)
+    rebuildGalleryGrid()
+  }
+
+  // Initialise gallery step UI when it becomes active
+  const galleryObs = new MutationObserver(() => {
+    if (document.querySelector('[data-step="gallery"].active')) updateGalleryUI()
+  })
+
+  // ── Municipality + Barangay ────────────────────────────────────────────
+
+  function selectMunicipality(chip) {
+    chip.closest('.step').querySelectorAll('.choice-chip').forEach(c => c.classList.remove('selected'))
+    chip.classList.add('selected')
+    data.municipalityId   = Number(chip.dataset.locId)
+    data.municipalityName = chip.dataset.value
+    // Reset any previously chosen barangay when municipality changes
+    data.barangayId   = 0
+    data.barangayName = ''
+    setTimeout(() => {
+      goToStep('barangay')
+      // Update subtext and reset search box after step transition
+      setTimeout(() => {
+        const sub = document.getElementById('barangay-subtext')
+        if (sub) sub.textContent = `Search or pick a barangay in ${data.municipalityName}.`
+        resetBarangayUI()
+      }, 300)
+    }, 220)
+  }
+
+  function resetBarangayUI() {
+    const inp = document.getElementById('barangay-search')
+    if (inp) inp.value = ''
+    const box = document.getElementById('barangay-search-box')
+    if (box) box.style.borderColor = '#e5e7eb'
+    const drop = document.getElementById('barangay-dropdown')
+    if (drop) { drop.innerHTML = ''; drop.classList.add('hidden') }
+    const sel = document.getElementById('barangay-selected')
+    if (sel) sel.classList.add('hidden')
+    const clear = document.getElementById('barangay-clear')
+    if (clear) clear.classList.add('hidden')
+  }
+
+  function onBarangaySearch(query) {
+    const drop = document.getElementById('barangay-dropdown')
+    const box  = document.getElementById('barangay-search-box')
+    const barangays = BARANGAYS_BY_MUNI[data.municipalityId] || []
+
+    if (!query.trim()) {
+      drop.classList.add('hidden')
+      box.style.borderColor = '#e5e7eb'
+      // Clear selection if user blanks out the field
+      data.barangayId   = 0
+      data.barangayName = ''
+      const sel = document.getElementById('barangay-selected')
+      if (sel) sel.classList.add('hidden')
+      return
+    }
+
+    box.style.borderColor = 'var(--primary)'
+    const q = query.trim().toLowerCase()
+    const matches = barangays.filter(b => b.name.toLowerCase().includes(q))
+
+    if (matches.length === 0) {
+      drop.innerHTML = `<div class="px-4 py-3 text-sm" style="color:#9ca3af">No barangay found</div>`
+      drop.classList.remove('hidden')
+      return
+    }
+
+    drop.innerHTML = matches.map(b =>
+      `<div class="px-4 py-2.5 text-sm cursor-pointer hover:bg-gray-50 transition-colors" style="color:#1a1a1a"
+        onclick="pickBarangay(${b.id}, '${b.name.replace(/'/g, "\\'")}')">${b.name}</div>`
+    ).join('')
+    drop.classList.remove('hidden')
+  }
+
+  function onBarangayKeydown(e) {
+    if (e.key === 'Escape') {
+      document.getElementById('barangay-dropdown').classList.add('hidden')
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      // Pick the first match if any
+      const first = document.querySelector('#barangay-dropdown div[onclick]')
+      if (first) first.click()
+    }
+  }
+
+  function pickBarangay(id, name) {
+    data.barangayId   = id
+    data.barangayName = name
+
+    // Update search input
+    const inp = document.getElementById('barangay-search')
+    if (inp) inp.value = name
+
+    // Show selected indicator
+    const sel  = document.getElementById('barangay-selected')
+    const span = document.getElementById('barangay-selected-name')
+    if (sel && span) { span.textContent = name; sel.classList.remove('hidden') }
+
+    // Show clear button
+    const clear = document.getElementById('barangay-clear')
+    if (clear) clear.classList.remove('hidden')
+
+    // Close dropdown
+    const drop = document.getElementById('barangay-dropdown')
+    if (drop) drop.classList.add('hidden')
+    const box = document.getElementById('barangay-search-box')
+    if (box) box.style.borderColor = 'var(--primary)'
+  }
+
+  function clearBarangay() {
+    data.barangayId   = 0
+    data.barangayName = ''
+    const inp = document.getElementById('barangay-search')
+    if (inp) { inp.value = ''; inp.focus() }
+    const sel = document.getElementById('barangay-selected')
+    if (sel) sel.classList.add('hidden')
+    const clear = document.getElementById('barangay-clear')
+    if (clear) clear.classList.add('hidden')
+    const box = document.getElementById('barangay-search-box')
+    if (box) box.style.borderColor = '#e5e7eb'
+  }
+
+  function confirmBarangay() {
+    // Barangay is optional — advance regardless
+    nextStep()
+  }
+
+  function skipBarangay() {
+    data.barangayId   = 0
+    data.barangayName = ''
+    nextStep()
+  }
+
+  // Close barangay dropdown when clicking outside
+  document.addEventListener('click', e => {
+    const box  = document.getElementById('barangay-search-box')
+    const drop = document.getElementById('barangay-dropdown')
+    if (box && drop && !box.contains(e.target) && !drop.contains(e.target)) {
+      drop.classList.add('hidden')
+    }
+  })
+
+  // ── Amenities ──────────────────────────────────────────────────────────
+
+  function renderFaqPills() {
+    const grid = document.getElementById('faq-amenities-grid')
+    if (!grid || grid.children.length) return // already rendered
+    grid.innerHTML = FAQ_AMENITIES.map(({ key, label }) => {
+      const sel = data.faqAmenities[key] ? 'amenity-chip selected' : 'amenity-chip'
+      return `<button type="button" class="${sel}" data-faq-key="${key}" onclick="toggleFaqAmenity('${key}')">${label}</button>`
+    }).join('')
+  }
+
+  function toggleFaqAmenity(key) {
+    data.faqAmenities[key] = !data.faqAmenities[key]
+    const btn = document.querySelector(`[data-faq-key="${key}"]`)
+    if (btn) btn.classList.toggle('selected', !!data.faqAmenities[key])
+    updateAmenityCount()
+  }
+
+  function updateAmenityCount() {
+    const faqCount = Object.values(data.faqAmenities).filter(Boolean).length
+    const total = faqCount + data.extraAmenities.length
+    const cnt = document.getElementById('amenity-count')
+    if (cnt) cnt.textContent = total ? `${total} selected` : ''
+  }
+
+  // Search against allAmenityTerms
+  function onAmenitySearch(query) {
+    const dropdown = document.getElementById('amenity-dropdown')
+    const box = document.getElementById('amenity-search-box')
+    if (!query.trim()) {
+      dropdown.classList.add('hidden')
+      dropdown.innerHTML = ''
+      box.style.borderColor = '#e5e7eb'
+      return
+    }
+    box.style.borderColor = 'var(--primary)'
+    const q = query.trim().toLowerCase()
+    const matches = allAmenityTerms
+      .filter(t => t.toLowerCase().includes(q))
+      .filter(t => !data.extraAmenities.includes(t))
+      .slice(0, 14)
+
+    // Check if query is a novel entry (not in taxonomy)
+    const exactMatch = allAmenityTerms.some(t => t.toLowerCase() === q)
+    const alreadyAdded = data.extraAmenities.some(t => t.toLowerCase() === q)
+
+    let html = matches.map(t =>
+      `<div class="px-4 py-2.5 text-sm cursor-pointer hover:bg-gray-50 transition-colors" style="color:#1a1a1a" onclick="addAmenity('${t.replace(/'/g, "\\'")}')">${t}</div>`
+    ).join('')
+
+    if (!exactMatch && !alreadyAdded) {
+      html += `<div class="px-4 py-2.5 text-sm cursor-pointer border-t flex items-center gap-2 hover:bg-gray-50" style="color:var(--primary);border-color:#e5e7eb" onclick="addAmenity('${query.trim().replace(/'/g, "\\'")}')">`
+        + `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`
+        + `Add &ldquo;${query.trim()}&rdquo;`
+        + `</div>`
+    }
+
+    if (html) {
+      dropdown.innerHTML = html
+      dropdown.classList.remove('hidden')
+    } else {
+      dropdown.classList.add('hidden')
+    }
+  }
+
+  function onAmenityKeydown(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const val = e.target.value.trim()
+      if (val) addAmenity(val)
+    }
+    if (e.key === 'Escape') {
+      document.getElementById('amenity-dropdown').classList.add('hidden')
+    }
+  }
+
+  function addAmenity(name) {
+    const trimmed = name.trim()
+    if (!trimmed || data.extraAmenities.includes(trimmed)) return
+    data.extraAmenities.push(trimmed)
+
+    // Render tag
+    const container = document.getElementById('added-amenities')
+    const tag = document.createElement('div')
+    tag.className = 'amenity-chip selected flex items-center gap-1.5'
+    tag.dataset.extra = trimmed
+    tag.innerHTML = `${trimmed}<button type="button" onclick="removeAddedAmenity('${trimmed.replace(/'/g, "\\'")}')" style="line-height:1;color:inherit;opacity:0.7" aria-label="Remove">`
+      + `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
+      + `</button>`
+    container.appendChild(tag)
+
+    // Clear search
+    const input = document.getElementById('amenity-search')
+    if (input) input.value = ''
+    document.getElementById('amenity-dropdown').classList.add('hidden')
+    document.getElementById('amenity-search-box').style.borderColor = '#e5e7eb'
+
+    updateAmenityCount()
+  }
+
+  function removeAddedAmenity(name) {
+    data.extraAmenities = data.extraAmenities.filter(a => a !== name)
+    const container = document.getElementById('added-amenities')
+    const tag = container.querySelector(`[data-extra="${name}"]`)
+    if (tag) tag.remove()
+    updateAmenityCount()
+  }
+
+  // ── Map / pin location ──────────────────────────────────────────────────
+
+  let _map = null
+  let _marker = null
+  let _mapSearchTimer = null
+  const LIMASAWA_CENTER = [9.9333, 125.0667]
+
+  function initMap() {
+    if (_map) return  // already initialised
+    if (!window.L) return  // Leaflet not loaded yet
+
+    _map = L.map('map-container').setView(LIMASAWA_CENTER, 13)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19,
+    }).addTo(_map)
+
+    // Custom teal marker icon
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:28px;height:28px;background:var(--primary);border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 28],
+    })
+
+    _marker = L.marker(LIMASAWA_CENTER, { draggable: true, icon }).addTo(_map)
+
+    _marker.on('dragend', () => {
+      const pos = _marker.getLatLng()
+      data.mapLocation.lat = pos.lat
+      data.mapLocation.lng = pos.lng
+      // DON'T override address text — user dragged the pin manually
+      updateMapCoords()
+      document.getElementById('map-container').classList.add('active-map')
+    })
+
+    _map.on('click', e => {
+      _marker.setLatLng(e.latlng)
+      data.mapLocation.lat = e.latlng.lat
+      data.mapLocation.lng = e.latlng.lng
+      updateMapCoords()
+      document.getElementById('map-container').classList.add('active-map')
+    })
+  }
+
+  function updateMapCoords() {
+    const el = document.getElementById('map-coords')
+    if (el && data.mapLocation.lat) {
+      el.textContent = `Pin: ${data.mapLocation.lat.toFixed(6)}, ${data.mapLocation.lng.toFixed(6)}`
+    }
+  }
+
+  async function _searchGooglePlaces(query) {
+    // Google Places Text Search (New) — same engine as WP backend ACF map
+    const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': GOOGLE_MAPS_KEY,
+        'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location',
+      },
+      body: JSON.stringify({
+        textQuery: query,
+        locationBias: {
+          circle: {
+            center: { latitude: 9.855, longitude: 126.054 },
+            radius: 50000,
+          },
+        },
+        maxResultCount: 6,
+        languageCode: 'en',
+      }),
+    })
+    const json = await res.json()
+    if (json.error) {
+      // Surface Google's actual error message so we can fix key/restrictions
+      const err = new Error(json.error.message || 'Places API error')
+      err.code   = json.error.code
+      err.status = json.error.status
+      throw err
+    }
+    return (json.places || []).map(p => ({
+      name:   p.displayName?.text  || query,
+      detail: p.formattedAddress   || '',
+      lat:    p.location?.latitude,
+      lon:    p.location?.longitude,
+    }))
+  }
+
+  // Fallback: OpenStreetMap Nominatim (no API key, no referrer restrictions)
+  async function _searchNominatim(query) {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ' Limasawa Philippines')}&limit=6&countrycodes=ph`
+    const res = await fetch(url, { headers: { 'Accept-Language': 'en' } })
+    if (!res.ok) return []
+    const arr = await res.json()
+    return (arr || []).map(p => ({
+      name:   p.display_name?.split(',')[0] || query,
+      detail: p.display_name || '',
+      lat:    parseFloat(p.lat),
+      lon:    parseFloat(p.lon),
+    }))
+  }
+
+  function onMapSearch(query) {
+    clearTimeout(_mapSearchTimer)
+    const results = document.getElementById('map-search-results')
+    if (!query.trim()) { results.classList.add('hidden'); return }
+
+    _mapSearchTimer = setTimeout(async () => {
+      results.innerHTML = `<div class="map-search-result" style="color:#9ca3af">Searching…</div>`
+      results.classList.remove('hidden')
+      let hits = []
+      let googleErr = null
+      try {
+        hits = await _searchGooglePlaces(query)
+      } catch (err) {
+        googleErr = err
+        console.warn('[map] Google Places failed, falling back to OSM:', err.code, err.status, err.message)
+      }
+      // Fallback to OSM if Google returned 0 results or errored out
+      if (!hits.length) {
+        try { hits = await _searchNominatim(query) } catch (e) { console.warn('[map] OSM fallback failed:', e) }
+      }
+      if (!hits.length) {
+        const msg = googleErr
+          ? `Search unavailable (${googleErr.status || googleErr.code || 'error'}). Click the map to place your pin.`
+          : 'No results — click the map to place your pin manually.'
+        results.innerHTML = `<div class="map-search-result" style="color:#9ca3af">${msg}</div>`
+        return
+      }
+      results.innerHTML = hits.map(h =>
+        `<div class="map-search-result" onclick="pickMapResult(${h.lat},${h.lon},'${(h.name + (h.detail ? ', ' + h.detail : '')).replace(/'/g,"\\'")}')">
+          <strong>${h.name}</strong>
+          ${h.detail ? `<small>${h.detail}</small>` : ''}
+        </div>`
+      ).join('')
+    }, 400)
+  }
+
+  function pickMapResult(lat, lng, address) {
+    const latlng = [parseFloat(lat), parseFloat(lng)]
+    _map.setView(latlng, 16)
+    _marker.setLatLng(latlng)
+    data.mapLocation.lat     = latlng[0]
+    data.mapLocation.lng     = latlng[1]
+    data.mapLocation.address = address
+    document.getElementById('map-search-results').classList.add('hidden')
+    document.getElementById('map-search').value = ''
+    document.getElementById('map-container').classList.add('active-map')
+    updateMapCoords()
+  }
+
+  function confirmMapLocation() {
+    data.address1 = (document.getElementById('input-address1') || {}).value?.trim() || ''
+    nextStep()
+  }
+
+  // Load Leaflet lazily when map step activates
+  function loadLeaflet(cb) {
+    if (window.L) { cb(); return }
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+    document.head.appendChild(link)
+    const script = document.createElement('script')
+    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+    script.onload = cb
+    document.head.appendChild(script)
+  }
+
+  const mapStepObs = new MutationObserver(() => {
+    if (document.querySelector('[data-step="mapLocation"].active')) {
+      loadLeaflet(() => { setTimeout(() => {
+        initMap()
+        if (_map) {
+          _map.invalidateSize()
+          // Edit mode: if we have a saved pin, recentre the map + marker on it
+          // so the user immediately sees where they previously dropped it.
+          const savedLat = data.mapLocation && data.mapLocation.lat
+          const savedLng = data.mapLocation && data.mapLocation.lng
+          if (savedLat && savedLng && _marker) {
+            const ll = [Number(savedLat), Number(savedLng)]
+            _marker.setLatLng(ll)
+            _map.setView(ll, 16)
+            updateMapCoords()
+            const c = document.getElementById('map-container')
+            if (c) c.classList.add('active-map')
+          }
+        }
+      }, 100) })
+    }
+  })
+
+  // ── Quill rich-text editor (long description) ────────────────────────────
+  let _quill = null
+  function loadQuill(cb) {
+    if (window.Quill) { cb(); return }
+    const script = document.createElement('script')
+    script.src = 'https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js'
+    script.onload = cb
+    document.head.appendChild(script)
+  }
+  function initQuill() {
+    if (_quill) return
+    const mount = document.getElementById('quill-longDescription')
+    if (!mount) return
+    _quill = new window.Quill(mount, {
+      theme: 'snow',
+      placeholder: mount.dataset.placeholder || '',
+      modules: {
+        toolbar: '#quill-toolbar',
+        // Ctrl/Cmd+Enter is handled by the page-level keydown listener (advanceLongDescription).
+      },
+    })
+    // Restore prior value if user hits Back to this step
+    if (data.longDescription) _quill.root.innerHTML = data.longDescription
+  }
+  const quillStepObs = new MutationObserver(() => {
+    if (document.querySelector('[data-step="longDescription"].active')) {
+      loadQuill(() => { initQuill() })
+    }
+  })
+
+  // Close map search results when clicking outside
+  document.addEventListener('click', e => {
+    const box = document.getElementById('map-search-box')
+    const res = document.getElementById('map-search-results')
+    if (box && res && !box.contains(e.target) && !res.contains(e.target)) res.classList.add('hidden')
+  })
+
+  // ── Long description ────────────────────────────────────────────────────
+
+  function advanceLongDescription() {
+    // Pull HTML from Quill (rich text). Fall back to '' if the editor never mounted.
+    let html = ''
+    if (_quill) {
+      // Quill leaves an empty paragraph in the DOM when blank — treat that as empty.
+      const isEmpty = _quill.getText().trim() === ''
+      html = isEmpty ? '' : _quill.root.innerHTML.trim()
+    }
+    data.longDescription = html
+    nextStep()
+  }
+
+  // ── Generator ───────────────────────────────────────────────────────────
+
+  function selectGenerator(btn) {
+    document.querySelectorAll('.gen-opt').forEach(b => b.classList.remove('selected'))
+    btn.classList.add('selected')
+    const isYes = btn.dataset.gen === 'yes'
+    data.hasGenerator = isYes
+    const wrap = document.getElementById('generator-schedule-wrap')
+    if (wrap) {
+      wrap.classList.toggle('hidden', !isYes)
+      if (isYes) {
+        setTimeout(() => document.getElementById('input-generatorSchedule')?.focus(), 60)
+      }
+    }
+  }
+
+  function confirmGenerator() {
+    data.generatorSchedule = data.hasGenerator
+      ? (document.getElementById('input-generatorSchedule') || {}).value?.trim() || ''
+      : ''
+    nextStep()
+  }
+
+  function saveSocialLinks() {
+    data.websiteLink  = (document.getElementById('input-websiteLink')  || {}).value || ''
+    data.facebookLink = (document.getElementById('input-facebookLink') || {}).value || ''
+    data.instagramLink= (document.getElementById('input-instagramLink')|| {}).value || ''
+    nextStep()
+  }
+
+  // ── Services ───────────────────────────────────────────────────────────
+  function setServicesToggle(hasServices) {
+    data.addServices = hasServices
+    document.getElementById('services-yes-btn').classList.toggle('selected', hasServices)
+    document.getElementById('services-no-btn').classList.toggle('selected', !hasServices)
+    if (hasServices) {
+      document.getElementById('services-editor').style.display = 'block'
+      if (data.services.length === 0) addService()
+      renderServicesList()
+    } else {
+      document.getElementById('services-editor').style.display = 'none'
+      data.services = []
+    }
+    if (!hasServices) nextStep()
+  }
+
+  function renderServicesList() {
+    const el = document.getElementById('services-list')
+    if (!data.services.length) { el.innerHTML = ''; return }
+    el.innerHTML = data.services.map((s, i) => `
+      <div class="service-row" style="background:#fff;border:1.5px solid #e5e7eb;border-radius:12px;padding:1rem;position:relative;">
+        <button onclick="removeService(${i})" style="position:absolute;top:.6rem;right:.6rem;background:none;border:none;cursor:pointer;color:#9ca3af;line-height:1;" title="Remove">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <div class="mb-2">
+          <label class="text-xs font-semibold uppercase tracking-wide block mb-1" style="color:#9ca3af">Service name</label>
+          <input class="form-input" type="text" placeholder="e.g. Scooter rental" value="${s.name || ''}"
+            oninput="updateService(${i},'name',this.value)" />
+        </div>
+        <div>
+          <label class="text-xs font-semibold uppercase tracking-wide block mb-1" style="color:#9ca3af">Short description <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+          <input class="form-input" type="text" placeholder="e.g. ₱500/day, available on request" value="${s.description || ''}"
+            oninput="updateService(${i},'description',this.value)" />
+        </div>
+      </div>`).join('')
+  }
+
+  function addService() {
+    data.services.push({ name: '', description: '' })
+    renderServicesList()
+    // focus the new name input
+    const inputs = document.querySelectorAll('#services-list .form-input')
+    if (inputs.length) inputs[inputs.length - 2]?.focus()
+  }
+
+  function removeService(i) {
+    data.services.splice(i, 1)
+    renderServicesList()
+  }
+
+  function updateService(i, field, val) {
+    if (data.services[i]) data.services[i][field] = val
+  }
+
+  function saveServices() {
+    // filter out empty entries
+    data.services = data.services.filter(s => s.name.trim())
+    if (data.addServices && data.services.length === 0) {
+      // user said yes but added nothing — treat as skip
+      data.addServices = false
+    }
+    nextStep()
+  }
+
+  // ── Multi-listing discount ─────────────────────────────────────────────
+  async function checkMultiListingDiscount() {
+    const token = localStorage.getItem('sb_token')
+    if (!token) return
+    try {
+      const res = await fetch(`${WP_REST}/my-listings`, { headers: { Authorization: `Bearer ${token}` } })
+      const json = await res.json()
+      const count = (json.listings || []).length
+      if (count > 0) {
+        // Has existing listings — show discount banner + update prices
+        data._multiListingDiscount = true
+        const banner = document.getElementById('multi-listing-banner')
+        if (banner) banner.style.display = 'flex'
+        // Multi-listing 50% off — inject a strikethrough next to the discounted
+        // price using the same .tier-price-now / .yr-now spans (we add the
+        // strike inline since the base markup no longer carries one).
+        // Math.floor so a base of 399 renders as ₱199 (not ₱200) and 999 as
+        // ₱499. Cleaner-looking prices for the half-off display.
+        const tiers = ['pro','featured']
+        for (const tier of tiers) {
+          const base = TIER_PRICES[tier]?.monthly ?? 0
+          const disc = Math.floor(base * 0.5)
+          const wrap = document.getElementById(`price-${tier}`)
+          if (wrap) {
+            const nowEl = wrap.querySelector('.tier-price-now')
+            if (nowEl) {
+              nowEl.innerHTML = `<span class="tier-strike-inline">&#8369;${base.toLocaleString()}</span>&#8369;${disc.toLocaleString()}`
+            }
+          }
+          const baseYr = TIER_PRICES[tier]?.yearly ?? 0
+          const yrWrap = document.getElementById(`price-${tier}-year`)
+          if (yrWrap) {
+            const yrNow = yrWrap.querySelector('.yr-now')
+            if (yrNow) {
+              yrNow.innerHTML = `<span class="yr-strike-inline">&#8369;${baseYr.toLocaleString()}</span>&#8369;${Math.floor(baseYr * 0.5).toLocaleString()}`
+            }
+          }
+        }
+        updatePaymentAmount()
+      }
+    } catch { /* silent — just skip discount check */ }
+  }
+
+  // ── Entry point ────────────────────────────────────────────────────────
+  function startForm() { goToStep('tier') }
+
+  // ── Review ─────────────────────────────────────────────────────────────
+  function buildReview() {
+    const rows = [
+      ['Plan',        TIER_LABELS[data.tier] || '—'],
+      ['Billing',     data.tier === 'free' ? 'Free' : `${BILLING_LABELS[data.billingPeriod]} · ${formatPeso(data.paymentAmount)}`],
+      ...(data.couponCode && data.couponDiscount > 0
+          ? [['Coupon', `${data.couponCode} · −₱${Number(data.couponDiscount).toLocaleString()}`]]
+          : []),
+      ['Payment',     data.paymentAmount > 0 ? `${data.paymentMethod ? data.paymentMethod.replace('_',' ') : '—'} · receipt ${data.paymentReceiptId ? 'uploaded' : 'missing'}` : 'Not required'],
+      ['Host name',   data.hostName   || '—'],
+      ['Phone',       data.hostPhone  || '—'],
+      ['Property',    data.propertyName || '—'],
+      ['Category',    data.accommodationCategory || '—'],
+      ['Space type',  data.placeType  || '—'],
+      ['Municipality',data.municipalityName || '—'],
+      ['Barangay',    data.barangayName   || '—'],
+      ['Guests',      data.guests],
+      ['Bedrooms',    data.bedrooms],
+      ['Beds',        data.beds],
+      ['Bathrooms',   data.bathrooms],
+      ['Nightly rate','₱' + (data.dailyRate || '—')],
+      ['Monthly rate', data.monthlyRate ? '₱' + data.monthlyRate : '—'],
+      ['Description', data.description || '—'],
+      ['Full desc.',  (() => {
+        if (!data.longDescription) return '—'
+        // Strip HTML tags for the review summary — keeps the preview readable
+        const txt = data.longDescription.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+        return txt.slice(0, 80) + (txt.length > 80 ? '…' : '')
+      })()],
+      ['Generator',   data.hasGenerator === true ? 'Yes' : data.hasGenerator === false ? 'No' : '—'],
+      ['Booking link',data.bookingLink || '—'],
+      ['Airbnb',      data.airbnbLink  || '—'],
+      ['Booking.com', data.bookingComLink || '—'],
+      ['Website',     data.websiteLink || '—'],
+      ['Facebook',    data.facebookLink|| '—'],
+      ['Instagram',   data.instagramLink || '—'],
+      ['Address',     data.address1 || '—'],
+      ['Map pin',     data.mapLocation.lat ? `${data.mapLocation.lat.toFixed(5)}, ${data.mapLocation.lng.toFixed(5)}` : '—'],
+      ['Host photo',  data.hostPhotoId ? 'Uploaded' : '—'],
+      ['Gallery',     data.galleryIds.filter(Boolean).length ? `${data.galleryIds.filter(Boolean).length} photo(s)` : '—'],
+      ['Amenities',   (() => {
+        const faqSelected = FAQ_AMENITIES.filter(f => data.faqAmenities[f.key]).map(f => f.label)
+        const all = [...faqSelected, ...data.extraAmenities]
+        return all.length ? all.join(', ') : '—'
+      })()],
+    ]
+    const el = document.getElementById('review-content')
+    if (!el) return
+    el.innerHTML = rows.map(([label, val]) =>
+      `<div class="review-row"><span class="review-label">${label}</span><span class="review-value">${val}</span></div>`
+    ).join('')
+  }
+
+  // ── Submit ─────────────────────────────────────────────────────────────
+  async function submitListing() {
+    const btn = document.getElementById('submit-btn')
+    const isEdit = !!data._editMode
+    btn.disabled = true
+    btn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> ' + (isEdit ? 'Saving...' : 'Submitting...')
+    try {
+      // Strip internal underscore-prefixed fields before sending
+      const payload = Object.fromEntries(Object.entries(data).filter(([k]) => !k.startsWith('_')))
+      // If a coupon is applied, send the PRE-coupon base amount so the backend
+      // (snippet #38) can re-validate the coupon and recompute the discount —
+      // server is the source of truth, no client-side price tampering.
+      if (data.couponCode && data.couponNewTotal > 0) {
+        payload.paymentAmount = basePrice(data.tier, data.billingPeriod)
+      }
+      const url = isEdit ? `${WP_REST}/update-listing/${data._editMode}` : `${WP_REST}/submit-listing`
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(data._authToken ? { 'Authorization': `Bearer ${data._authToken}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      })
+      const json = await res.json()
+      if (json.success) {
+        if (isEdit) {
+          // Bounce back to dashboard with a success flag the dashboard can pick up
+          window.location.href = '/dashboard?listing_saved=' + encodeURIComponent(json.slug || data._editMode)
+          return
+        }
+        goToStep('success')
+        fireConfetti()
+      } else {
+        alert('Something went wrong: ' + (json.message || 'Unknown error'))
+        btn.disabled = false
+        btn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> ' + (isEdit ? 'Save changes' : 'Submit listing')
+      }
+    } catch {
+      alert('Network error. Please try again.')
+      btn.disabled = false
+      btn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> ' + (isEdit ? 'Save changes' : 'Submit listing')
+    }
+  }
+
+  // ── Keyboard ───────────────────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    const id = currentStepId()
+    if (e.key === 'Enter') {
+      // Multi-line steps: plain Enter must keep its native behaviour (newline / Quill list-item).
+      // Only Ctrl/Cmd+Enter advances on these.
+      if (id === 'description' || id === 'longDescription') { if (!e.ctrlKey) return }
+      e.preventDefault()
+      const textSteps = ['hostName','hostPhone','propertyName','dailyRate','monthlyRate','bookingLink','airbnbLink','bookingComLink']
+      const optionalSteps = ['monthlyRate','bookingLink','airbnbLink','bookingComLink']
+      if (id === 'barangay') confirmBarangay()
+      else if (id === 'mapLocation') confirmMapLocation()
+      else if (id === 'longDescription') { if (!e.ctrlKey) return; advanceLongDescription() }
+      else if (textSteps.includes(id)) advanceText(id, optionalSteps.includes(id))
+      else if (id === 'description') { if (!e.ctrlKey) return; advanceText('description') }
+      else if (id === 'socialLinks') saveSocialLinks()
+      else if (id === 'generator') confirmGenerator()
+      else if (id === 'payment') confirmPayment()
+      else if (['guests','capacity','amenities','gallery'].includes(id)) nextStep()
+    }
+    if (e.key === 'Backspace' && !e.target.matches('input,textarea')) {
+      const nonBack = ['welcome','success','tier']
+      if (!nonBack.includes(id)) prevStep()
+    }
+  })
+
+  // ── Back button ────────────────────────────────────────────────────────
+  document.getElementById('back-btn').addEventListener('click', () => {
+    // In edit mode, the Back button goes to the dashboard (linear nav doesn't
+    // make sense when you can jump to any section via the dropdown).
+    if (data._editMode) { window.location.href = '/dashboard'; return }
+    const nonBack = ['welcome','success']
+    if (!nonBack.includes(currentStepId())) prevStep()
+  })
+
+  // Push current data values into all visible form inputs (used in edit mode
+  // so users see what's already saved instead of empty fields).
+  function prefillInputsFromData() {
+    const map = {
+      'input-hostName':          data.hostName,
+      'input-hostPhone':         data.hostPhone,
+      'input-propertyName':      data.propertyName,
+      'input-address1':          data.address1,
+      'input-dailyRate':         data.dailyRate,
+      'input-monthlyRate':       data.monthlyRate,
+      'input-description':       data.description,
+      'input-bookingLink':       data.bookingLink,
+      'input-airbnbLink':        data.airbnbLink,
+      'input-bookingComLink':    data.bookingComLink,
+      'input-websiteLink':       data.websiteLink,
+      'input-facebookLink':      data.facebookLink,
+      'input-instagramLink':     data.instagramLink,
+      'input-generatorSchedule': data.generatorSchedule,
+    }
+    Object.entries(map).forEach(([id, val]) => {
+      const el = document.getElementById(id)
+      if (el && val !== undefined && val !== null) el.value = val
+    })
+  }
+
+  // Edit-mode hydration: reflect every saved value in the matching UI control.
+  // Called once after the listing payload is merged into `data`. Each block is
+  // defensive (no-ops cleanly when the value is empty) so the same call can run
+  // for partial listings without breaking later steps.
+  function hydrateEditModeUI() {
+    // 1. accommodationCategory chip
+    if (data.accommodationCategory) {
+      document.querySelectorAll('[data-step="accommodationCategory"] .choice-chip').forEach(c => {
+        c.classList.toggle('selected', c.dataset.value === data.accommodationCategory)
+      })
+    }
+
+    // 2. placeType chip
+    if (data.placeType) {
+      document.querySelectorAll('[data-step="placeType"] .choice-chip').forEach(c => {
+        c.classList.toggle('selected', c.dataset.value === data.placeType)
+      })
+    }
+
+    // 3. Municipality chip + populate barangay options for that muni
+    if (data.municipalityId || data.municipalityName) {
+      let muniChip = null
+      document.querySelectorAll('[data-step="municipality"] .choice-chip').forEach(c => {
+        const matches = (data.municipalityId && Number(c.dataset.locId) === Number(data.municipalityId))
+          || (data.municipalityName && c.dataset.value === data.municipalityName)
+        c.classList.toggle('selected', matches)
+        if (matches) muniChip = c
+      })
+      // Run the existing handler so its side-effects (loading barangays) fire
+      if (muniChip && typeof selectMunicipality === 'function') {
+        try { selectMunicipality(muniChip) } catch (_) {}
+      }
+    }
+
+    // 4. Barangay — show pre-filled name + selected indicator
+    if (data.barangayName) {
+      const inp     = document.getElementById('barangay-search')
+      const selWrap = document.getElementById('barangay-selected')
+      const selName = document.getElementById('barangay-selected-name')
+      const clear   = document.getElementById('barangay-clear')
+      if (inp)     inp.value = data.barangayName
+      if (selWrap) selWrap.classList.remove('hidden')
+      if (selName) selName.textContent = data.barangayName
+      if (clear)   clear.classList.remove('hidden')
+    }
+
+    // 5. Map pin — drop marker at saved location once Leaflet is ready
+    //    (the actual placement happens in mapStepObs / initMap when the step
+    //    becomes active; we just make sure data.mapLocation has lat/lng.)
+
+    // 6. Services Yes/No + render existing services
+    if (data.addServices === true || (Array.isArray(data.services) && data.services.length > 0)) {
+      data.addServices = true
+      const yesBtn = document.getElementById('services-yes-btn')
+      const noBtn  = document.getElementById('services-no-btn')
+      if (yesBtn) yesBtn.classList.add('selected')
+      if (noBtn)  noBtn.classList.remove('selected')
+      const editor = document.getElementById('services-editor')
+      if (editor) editor.style.display = 'block'
+      renderServicesList()
+    } else if (data.addServices === false) {
+      const yesBtn = document.getElementById('services-yes-btn')
+      const noBtn  = document.getElementById('services-no-btn')
+      if (yesBtn) yesBtn.classList.remove('selected')
+      if (noBtn)  noBtn.classList.add('selected')
+    }
+
+    // 7. Generator Yes/No + schedule textarea visibility
+    if (data.hasGenerator === true || data.hasGenerator === false) {
+      const yesBtn = document.querySelector('.gen-opt[data-gen="yes"]')
+      const noBtn  = document.querySelector('.gen-opt[data-gen="no"]')
+      const wrap   = document.getElementById('generator-schedule-wrap')
+      if (yesBtn) yesBtn.classList.toggle('selected', !!data.hasGenerator)
+      if (noBtn)  noBtn.classList.toggle('selected', !data.hasGenerator)
+      if (wrap)   wrap.classList.toggle('hidden', !data.hasGenerator)
+    }
+
+    // 8. Extra amenities — render the chips. (FAQ pills self-render from
+    //    data.faqAmenities the first time the amenities step becomes active.)
+    if (Array.isArray(data.extraAmenities) && data.extraAmenities.length) {
+      const container = document.getElementById('added-amenities')
+      if (container) {
+        container.innerHTML = ''
+        data.extraAmenities.forEach(name => {
+          const tag = document.createElement('div')
+          tag.className = 'amenity-chip selected flex items-center gap-1.5'
+          tag.dataset.extra = name
+          const safeName = String(name).replace(/'/g, "\\'")
+          tag.innerHTML = `${name}<button type="button" onclick="removeAddedAmenity('${safeName}')" style="line-height:1;color:inherit;opacity:0.7" aria-label="Remove">`
+            + `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
+            + `</button>`
+          container.appendChild(tag)
+        })
+        if (typeof updateAmenityCount === 'function') updateAmenityCount()
+      }
+    }
+
+    // 9. Gallery — render saved thumbs (galleryUrls comes from REST as URLs only;
+    //    galleryIds are the WP attachment IDs we'll keep intact on resubmit).
+    if (Array.isArray(data.galleryUrls) && data.galleryUrls.length) {
+      // Filter out any null/empty entries defensively
+      data.galleryUrls = data.galleryUrls.filter(u => u)
+      data.galleryIds  = (data.galleryIds || []).filter(id => id)
+      if (typeof rebuildGalleryGrid === 'function') rebuildGalleryGrid()
+    }
+
+    // 10. Quill long-description (rich text). The Quill instance only mounts
+    //     when the longDescription step becomes active, so we stash the HTML
+    //     and apply it inside its observer below.
+  }
+
+  // ── Wire review step ───────────────────────────────────────────────────
+  const reviewObs = new MutationObserver(() => {
+    if (document.querySelector('[data-step="review"].active')) buildReview()
+  })
+  reviewObs.observe(document.querySelector('[data-step="review"]'), { attributes: true, attributeFilter: ['class'] })
+
+  // ── Wire amenities step ────────────────────────────────────────────────
+  const amenitiesObs = new MutationObserver(() => {
+    if (document.querySelector('[data-step="amenities"].active')) renderFaqPills()
+  })
+  amenitiesObs.observe(document.querySelector('[data-step="amenities"]'), { attributes: true, attributeFilter: ['class'] })
+
+  // ── Wire gallery step ──────────────────────────────────────────────────
+  galleryObs.observe(document.querySelector('[data-step="gallery"]'), { attributes: true, attributeFilter: ['class'] })
+
+  // ── Wire map step ──────────────────────────────────────────────────────
+  mapStepObs.observe(document.querySelector('[data-step="mapLocation"]'), { attributes: true, attributeFilter: ['class'] })
+  quillStepObs.observe(document.querySelector('[data-step="longDescription"]'), { attributes: true, attributeFilter: ['class'] })
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', e => {
+    const box = document.getElementById('amenity-search-box')
+    const dropdown = document.getElementById('amenity-dropdown')
+    if (box && dropdown && !box.contains(e.target) && !dropdown.contains(e.target)) {
+      dropdown.classList.add('hidden')
+      box.style.borderColor = '#e5e7eb'
+    }
+  })
+
+  // ── Init counter displays ──────────────────────────────────────────────
+  ;['guests','bedrooms','beds','bathrooms'].forEach(k => {
+    const el = document.getElementById('val-' + k)
+    if (el) el.textContent = data[k]
+  })
+
+  // ── Auth wall + edit-mode bootstrap ────────────────────────────────────
+  ;(async function() {
+    function parseJWT(t) {
+      try { return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))) } catch { return null }
+    }
+    const token = localStorage.getItem('sb_token')
+    const payload = token ? parseJWT(token) : null
+    const valid = payload && payload.exp > Date.now()/1000
+    if(!valid) {
+      document.getElementById('auth-wall').style.display = 'block'
+      document.getElementById('welcome-content').style.display = 'none'
+      return
+    }
+
+    document.getElementById('welcome-content').style.display = 'block'
+    document.getElementById('auth-wall').style.display = 'none'
+    const name = payload.data?.user?.username || ''
+    if(name) {
+      const hint = document.getElementById('welcome-user-hint')
+      if(hint) hint.textContent = `Signed in as ${name}`
+    }
+    if(payload.data?.user?.username) data.hostName = payload.data.user.username
+    data._authToken = token
+
+    // Edit mode: ?edit=ID — fetch existing listing and prefill, then jump in
+    const editId = parseInt(new URLSearchParams(location.search).get('edit') || '0')
+    if (!editId) return
+
+    // Show a lightweight loading state inside the welcome step
+    const welcome = document.getElementById('welcome-content')
+    if (welcome) {
+      welcome.innerHTML = `<div style="text-align:center;padding:3rem 1.5rem">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin" style="margin:0 auto 1rem;display:block"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+        <p style="color:#6b7280;font-size:.95rem">Loading your listing for editing…</p>
+      </div>`
+    }
+
+    try {
+      const res = await fetch(`${WP_REST}/listing-edit/${editId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.message || `Server returned ${res.status}`)
+      }
+      const existing = await res.json()
+      // Merge into data, preserving _authToken and adding edit flags
+      Object.keys(existing).forEach(k => {
+        if (existing[k] !== null && existing[k] !== undefined) data[k] = existing[k]
+      })
+      data._editMode = editId
+      data._editSlug = existing.slug || ''
+      // Update review-step copy + button text
+      const reviewHeading = document.querySelector('[data-step="review"] h2')
+      const reviewSub     = document.querySelector('[data-step="review"] p.text-sm')
+      const reviewFoot    = document.querySelector('[data-step="review"] p.text-xs')
+      const submitBtn     = document.getElementById('submit-btn')
+      if (reviewHeading) reviewHeading.textContent = 'Review your changes'
+      if (reviewSub)     reviewSub.textContent     = 'Your edits go live immediately — no re-approval needed.'
+      if (reviewFoot)    reviewFoot.textContent    = 'Tip: any changes to gallery photos refresh the live page within a minute.'
+      if (submitBtn) {
+        submitBtn.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Save changes'
+      }
+      // Reveal edit toolbar: jump-to-section + save button
+      const toolbar = document.getElementById('edit-toolbar')
+      const jumpSel = document.getElementById('edit-jump-select')
+      if (toolbar) toolbar.classList.remove('hidden')
+      // Add top padding to steps wrapper to prevent toolbar overlap
+      const wrapper = document.getElementById('steps-wrapper')
+      if (wrapper) wrapper.style.paddingTop = '52px'
+      // Repurpose the top-left "Back" button as "Dashboard" so the click handler
+      // (which checks data._editMode and navigates to /dashboard) makes sense.
+      const backBtn = document.getElementById('back-btn')
+      if (backBtn) {
+        backBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg> Dashboard'
+        backBtn.style.opacity = '1'
+        backBtn.style.pointerEvents = 'auto'
+      }
+      // Push existing values into all visible form inputs
+      prefillInputsFromData()
+      // Hydrate every step's UI controls from the saved data (chips, toggles,
+      // gallery thumbs, amenity tags, etc.) so users see what they already
+      // entered instead of empty fields.
+      hydrateEditModeUI()
+      const STEP_LABELS = {
+        hostName:'Host name', hostPhone:'Host phone', hostPhoto:'Host photo',
+        propertyName:'Property name', accommodationCategory:'Property type',
+        placeType:'Place type', municipality:'Municipality', barangay:'Barangay',
+        mapLocation:'Map location', guests:'Number of guests', capacity:'Bedrooms / beds / baths',
+        dailyRate:'Daily rate', monthlyRate:'Monthly rate',
+        description:'Short description', longDescription:'Full description',
+        bookingLink:'Direct booking link', airbnbLink:'Airbnb link', bookingComLink:'Booking.com link',
+        socialLinks:'Website & social', services:'Services',
+        amenities:'Amenities', generator:'Generator',
+        gallery:'Photos', review:'Review & save',
+      }
+      if (jumpSel) {
+        const opts = visibleSteps()
+          .filter(id => STEP_LABELS[id])
+          .map(id => `<option value="${id}">${STEP_LABELS[id]}</option>`)
+          .join('')
+        jumpSel.innerHTML = opts
+        jumpSel.addEventListener('change', () => {
+          const target = jumpSel.value
+          if (target) goToStep(target)
+        })
+      }
+      // Start at Host name (the very first form step). The dropdown reflects
+      // the current step and updates whenever the user navigates between steps.
+      goToStep('hostName')
+      if (jumpSel) jumpSel.value = 'hostName'
+    } catch (e) {
+      welcome.innerHTML = `<div style="text-align:center;padding:3rem 1.5rem">
+        <p style="color:#dc2626;font-weight:600;margin-bottom:.5rem">Could not load this listing</p>
+        <p style="color:#6b7280;font-size:.875rem;margin-bottom:1.5rem">${(e && e.message) || 'Please try again.'}</p>
+        <a href="/dashboard" style="display:inline-block;background:var(--primary);color:#fff;padding:.6rem 1.4rem;border-radius:9px;text-decoration:none;font-weight:600;font-size:.875rem">Back to dashboard</a>
+      </div>`
+    }
   })()
 
-  const container = document.getElementById('lp-step-container')!
+  // ── Expose to global scope (needed for inline onclick= handlers) ───────
+  Object.assign(window, {
+    startForm, goToStep, nextStep, prevStep, skipStep,
+    selectTier, selectBillingPeriod, selectChoice, adjustCounter,
+    onHostPhotoSelect, confirmHostPhoto,
+    selectPaymentMethod, onPaymentReceiptSelect, confirmPayment,
+    onGallerySelect, onGalleryDrop, removeGalleryPhoto,
+    selectMunicipality, onBarangaySearch, onBarangayKeydown, pickBarangay, clearBarangay, confirmBarangay, skipBarangay,
+    onMapSearch, pickMapResult, confirmMapLocation,
+    advanceLongDescription,
+    selectGenerator, confirmGenerator,
+    toggleFaqAmenity, onAmenitySearch, onAmenityKeydown, addAmenity, removeAddedAmenity,
+    saveSocialLinks, setServicesToggle, addService, removeService, updateService, saveServices,
+    submitListing, advanceText,
+    applyListingCoupon, clearListingCoupon, onCouponInput,
+  })
+</script>
 
-  if (!token) {
-    container.innerHTML = `<div class="sb-card" style="text-align:center;padding:2.5rem">
-      <p style="color:var(--sb-text-muted);margin-bottom:1.5rem">You need to be signed in to list a property.</p>
-      <a href="/auth?redirect=/list-your-property" class="btn-primary">Sign in or Register</a>
-    </div>`
-  } else {
-    container.innerHTML = `<div class="sb-card" style="text-align:center;padding:2.5rem">
-      <p style="color:var(--sb-text-muted)">Listing form coming soon.</p>
-    </div>`
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script is:inline>
+  function fireConfetti() {
+    const opts = { spread: 60, startVelocity: 55, ticks: 200, zIndex: 9999 }
+
+    // left cannon
+    confetti({ ...opts, particleCount: 120, angle: 60, origin: { x: 0, y: 0.65 } })
+    // right cannon
+    confetti({ ...opts, particleCount: 120, angle: 120, origin: { x: 1, y: 0.65 } })
+
+    // second burst after a short delay for extra wow
+    setTimeout(() => {
+      confetti({ ...opts, particleCount: 80, angle: 70, origin: { x: 0, y: 0.7 }, startVelocity: 40 })
+      confetti({ ...opts, particleCount: 80, angle: 110, origin: { x: 1, y: 0.7 }, startVelocity: 40 })
+    }, 300)
   }
 </script>
+
+</body>
+</html>
