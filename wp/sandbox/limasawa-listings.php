@@ -119,6 +119,8 @@ if (defined('ABSPATH')) {
                 'amenNames' => $amen['names'],
                 'lat'       => $lat,
                 'lng'       => $lng,
+                'ratingAvg'   => (float) get_post_meta($post_id, 'sb_rating_avg', true),
+                'ratingCount' => (int) get_post_meta($post_id, 'sb_rating_count', true),
             ];
 
             if (!$full) {
