@@ -181,9 +181,8 @@ if (defined('ABSPATH')) {
             'callback'            => 'sb_auth_login',
         ]);
         register_rest_route($ns, '/me', [
-            'methods'             => 'GET',
-            'permission_callback' => '__return_true',
-            'callback'            => 'sb_auth_me',
+            ['methods' => 'GET',  'permission_callback' => '__return_true', 'callback' => 'sb_auth_me'],
+            ['methods' => 'POST', 'permission_callback' => '__return_true', 'callback' => 'sb_auth_update_me'],
         ]);
     });
 
@@ -258,6 +257,48 @@ if (defined('ABSPATH')) {
                 return new WP_REST_Response(['error' => 'UNAUTHORIZED'], 401);
             }
             return new WP_REST_Response(['status' => 'ok', 'user' => sb_user_payload($user)], 200);
+        }
+    }
+
+    // POST /me — update the signed-in user's profile (account tab + photo flow).
+    if (!function_exists('sb_auth_update_me')) {
+        function sb_auth_update_me(WP_REST_Request $req) {
+            $user = sb_jwt_current_user($req);
+            if (!$user) {
+                return new WP_REST_Response(['error' => 'UNAUTHORIZED'], 401);
+            }
+            $uid = (int) $user->ID;
+
+            $name    = $req->get_param('name');
+            $email   = $req->get_param('email');
+            $contact = $req->get_param('contact');
+            $photoId = $req->get_param('profilePhotoId');
+
+            $userdata = ['ID' => $uid];
+            if ($name !== null && trim((string) $name) !== '') {
+                $userdata['display_name'] = sanitize_text_field($name);
+            }
+            if ($email !== null && $email !== '') {
+                $email = sanitize_email($email);
+                if (!is_email($email)) {
+                    return new WP_REST_Response(['error' => 'INVALID_EMAIL'], 400);
+                }
+                if ($email !== $user->user_email && (email_exists($email) || username_exists($email))) {
+                    return new WP_REST_Response(['error' => 'EMAIL_EXISTS'], 409);
+                }
+                $userdata['user_email'] = $email;
+            }
+            if (count($userdata) > 1) {
+                wp_update_user($userdata);
+            }
+            if ($contact !== null) {
+                update_user_meta($uid, 'sb_contact', sanitize_text_field($contact));
+            }
+            if ($photoId !== null) {
+                update_user_meta($uid, 'sb_profile_picture_id', (int) $photoId);
+            }
+
+            return new WP_REST_Response(['status' => 'ok', 'user' => sb_user_payload(get_user_by('id', $uid))], 200);
         }
     }
 
