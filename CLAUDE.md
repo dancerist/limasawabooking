@@ -21,6 +21,12 @@
 | File | Purpose |
 |---|---|
 | `limasawa-auth.php` | Roles (guest/host) + JWT helpers + auth REST API (`/auth/register`, `/auth/login`, `/me`) + CORS. Live & verified 2026-05-30. |
+| `limasawa-listings.php` | Listings REST API: `GET /listings` (paginated cards, filters `cat`/`loc`/`amenity`/`guests`/`q`), `GET /listings/{slug}` (single + `detail`), `GET /map-pins`. Reads native ACF `accommodation` CPT; response keys match `src/lib/api.ts`. Live & verified 2026-05-31. |
+
+### Data model (native ACF — read, don't hand-roll)
+- **CPT:** `accommodation` (25 published as of 2026-05-31). Field group `group_668c1326c9162` (38 fields, prefix `accommodation_*`).
+- **Taxonomies:** `accommodation-category`, `accommodation-amenity`, `accommodation-exclusion`, `location` (in the listings formatter, location term[0]=municipality, term[1]=barangay).
+- Key fields: `accommodation_daily_rent`, `accommodation_monthly_rent`, `accommodation_bedrooms/beds/bathrooms`, `accommodation_number_of_guests`, `what_type_of_place_will_guests_have`, `accommodation_gallery` (gallery), `accommodation_location` (google_map → lat/lng), `accommodation_host_picture` (image), `accommodation_badges` (checkbox), `faq_amenities` (group), `services` (repeater gated by `add_services`).
 
 ## MCP / Tooling
 - `novamira-admin-limasawabooking-com` — MCP connected to admin subdomain
@@ -50,10 +56,11 @@
 | `src/layouts/Layout.astro` | Base HTML shell, `window.__sb` saved-listings singleton |
 | `src/styles/global.css` | Design tokens + utility classes |
 
-## Status (as of 2026-05-30)
+## Status (as of 2026-05-31)
 - Scaffold complete — all core pages created
 - **Auth layer LIVE**: guest/host roles, JWT, `/auth/register`, `/auth/login`, `/me` — verified end-to-end over HTTP. Code in `wp/sandbox/limasawa-auth.php`.
-- Listings REST endpoints (`/listings`, `/map-pins`, etc.) NOT yet built (use siargaobooking as reference)
+- **Listings REST API LIVE**: `/listings`, `/listings/{slug}`, `/map-pins` — verified over HTTP against 25 published accommodations. Code in `wp/sandbox/limasawa-listings.php`. Response shape matches `src/lib/api.ts`.
 - Frontend `auth.astro` not yet wired to the new endpoints
+- `src/lib/api.ts` `getAccommodations` consumes `/listings`; needs single-listing + map-pins fetchers added, and stays/index pages wired to render real data (homepage is still the coming-soon holding page)
 - list-your-property form: skeleton only
 - Deployed to Vercel, domain pending Cloudflare DNS update
