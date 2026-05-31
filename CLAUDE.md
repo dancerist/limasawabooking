@@ -22,6 +22,7 @@
 |---|---|
 | `limasawa-auth.php` | Roles (guest/host) + JWT helpers + auth REST API (`/auth/register`, `/auth/login`, `/me`) + CORS. Live & verified 2026-05-30. |
 | `limasawa-listings.php` | Listings REST API: `GET /listings` (paginated cards, filters `cat`/`loc`/`amenity`/`guests`/`q`), `GET /listings/{slug}` (single + `detail`), `GET /map-pins`. Reads native ACF `accommodation` CPT; response keys match `src/lib/api.ts`. Live & verified 2026-05-31. |
+| `limasawa-submit.php` | Listing-submission API for the "List your property" form: `POST /submit-listing` (JWT host → pending accommodation, maps payload → ACF + taxonomies + media + tier/payment meta), `POST /upload-media` (image → WP attachment), `GET /coupon/validate` (codes in `sb_coupons` option). Tiers free/pro/featured. Manual e-wallet payment (no gateway). Live & verified 2026-06-01. |
 
 ### Data model (native ACF — read, don't hand-roll)
 - **CPT:** `accommodation` (25 published as of 2026-05-31). Field group `group_668c1326c9162` (38 fields, prefix `accommodation_*`).
@@ -47,7 +48,7 @@
 | `stay/[slug].astro` | Single listing template (ported from siargao) — photo gallery, facts, amenities, reviews shell, JSON-LD `LodgingBusiness`. `getStaticPaths` via `getAccommodations` |
 | `auth.astro` | Login / register (JWT) |
 | `dashboard/index.astro` | Host dashboard — listings panel |
-| `list-your-property.astro` | Multi-step listing submission (skeleton) |
+| `list-your-property.astro` | Conversational multi-step listing form (ported from siargao list-your-home): tier→billing→host→property→category→location→capacity→rates→description→links→services→amenities→generator→gallery→payment→review→success. Leaflet+Nominatim address step; uploads via `/upload-media`; submits via `/submit-listing`; coupon via `/coupon/validate`. Live 2026-06-01. |
 | `404.astro` | 404 page |
 
 ### Components & support files
@@ -69,6 +70,6 @@
 - **Reviews/ratings: NOT built on the backend.** The ported single template + `/stays` rating filter call `/reviews`, `/my-claims` (and read `ratingAvg`/`ratingCount`) which limasawa has no endpoints/fields for — they degrade silently (no reviews shown, no rating pill, rating filter returns nothing). Build the reviews backend to light these up.
 - **`auth.astro` LIVE & wired** to `/auth/login` + `/auth/register` ({email,password} → `authToken` in `localStorage.sb_token`), with backend error codes mapped to friendly messages. Verified against live backend.
 - `window.__sb` (Layout.astro) calls `/save-listing` + `/my-saved` — those backend endpoints do NOT exist yet (heart/save works in localStorage, server sync no-ops). **Next: build these two endpoints** (use `sb_jwt_current_user()` + a `sb_saved` user-meta array) so saved listings persist per account.
-- list-your-property form: skeleton only
+- **`list-your-property` LIVE**: full conversational form ported from siargao + `limasawa-submit.php` backend (verified end-to-end: coupon math, media upload, submit→pending with correct ACF/taxonomy mapping). Submissions land as `pending` accommodations (admin approves → publish). TODO: add payment QR images at `public/payments/{gcash,maya,bpi}-number.webp` (currently 404 on the payment step); demo coupons `WELCOME10`/`SAVE500` seeded in `sb_coupons` option; Google Places autocomplete needs Places API enabled on the key (Nominatim geocode works without it); `faq_hot_&_cold_shower` ACF subfield name has an `&` so that one amenity toggle won't map (9/10 faq amenities map fine).
 - Homepage mockup target (search + tours/rentals/transport/food/travel-guide verticals) needs new backend content types (only `accommodation` exists today) — out of scope until those CPTs exist
 - **SITE IS LIVE** at https://limasawabooking.com (Cloudflare proxies the apex → Vercel; serving the real homepage + listings as of 2026-05-31). Deploy via `vercel --prod --yes` (project not git-auto-deploying). Note: Vercel reports a nameserver mismatch (wants ns*.vercel-dns.com, domain stays on Cloudflare NS) but Cloudflare proxy A/CNAME records make it resolve fine — leave as-is.
