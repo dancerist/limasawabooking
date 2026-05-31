@@ -253,4 +253,215 @@ if (defined('ABSPATH')) {
             return new WP_REST_Response(['slugs' => $slugs, 'listings' => $cards], 200);
         }
     }
+
+    /* =========================================================================
+     * Analytics — tracking + host-stats (Phase 3)
+     * ====================================================================== */
+    if (!function_exists('sb_track_channels')) {
+        function sb_track_channels() {
+            return ['whatsapp', 'phone', 'location', 'airbnb', 'bookingcom', 'website', 'facebook', 'instagram', 'booking'];
+        }
+    }
+    if (!function_exists('sb_track_source_bucket')) {
+        function sb_track_source_bucket($ref) {
+            $ref = strtolower((string) $ref);
+            if ($ref === '') return 'direct';
+            if (strpos($ref, 'limasawabooking.com') !== false) return 'direct';
+            if (strpos($ref, 'google') !== false) return 'google';
+            if (strpos($ref, 'facebook') !== false || strpos($ref, 'fb.') !== false) return 'facebook';
+            if (strpos($ref, 'instagram') !== false) return 'instagram';
+            if (strpos($ref, 'bing') !== false || strpos($ref, 'duckduckgo') !== false || strpos($ref, 'yahoo') !== false) return 'search';
+            return 'other';
+        }
+    }
+    if (!function_exists('sb_track_is_bot')) {
+        function sb_track_is_bot() {
+            $ua = strtolower($_SERVER['HTTP_USER_AGENT'] ?? '');
+            if ($ua === '') return true;
+            foreach (['bot', 'crawl', 'spider', 'slurp', 'bingpreview', 'facebookexternalhit', 'headless'] as $b) {
+                if (strpos($ua, $b) !== false) return true;
+            }
+            return false;
+        }
+    }
+    if (!function_exists('sb_track_post_by_slug')) {
+        function sb_track_post_by_slug($slug) {
+            $slug = sanitize_title((string) $slug);
+            if ($slug === '') return 0;
+            $posts = get_posts(['name' => $slug, 'post_type' => 'accommodation', 'post_status' => 'publish', 'posts_per_page' => 1, 'fields' => 'ids']);
+            return empty($posts) ? 0 : (int) $posts[0];
+        }
+    }
+    if (!function_exists('sb_track_apply')) {
+        function sb_track_apply($post_id, $kind, $channel, $source) {
+            $daily = get_post_meta($post_id, 'sb_stats_daily', true);
+            if (!is_array($daily)) $daily = [];
+            $today = current_time('Y-m-d');
+            if (!isset($daily[$today]) || !is_array($daily[$today])) {
+                $daily[$today] = ['views' => 0, 'clicks' => [], 'sources' => []];
+            }
+            if ($kind === 'view') {
+                $daily[$today]['views'] = (int) ($daily[$today]['views'] ?? 0) + 1;
+                if ($source) {
+                    $daily[$today]['sources'][$source] = (int) ($daily[$today]['sources'][$source] ?? 0) + 1;
+                }
+            } else {
+                $daily[$today]['clicks'][$channel] = (int) ($daily[$today]['clicks'][$channel] ?? 0) + 1;
+            }
+            if (count($daily) > 400) {
+                ksort($daily);
+                $daily = array_slice($daily, -400, null, true);
+            }
+            update_post_meta($post_id, 'sb_stats_daily', $daily);
+        }
+    }
+
+    add_action('rest_api_init', function () {
+        $ns = 'limasawa/v1';
+        register_rest_route($ns, '/track/view', ['methods' => 'POST', 'permission_callback' => '__return_true', 'callback' => 'sb_track_view']);
+        register_rest_route($ns, '/track/click', ['methods' => 'POST', 'permission_callback' => '__return_true', 'callback' => 'sb_track_click']);
+        register_rest_route($ns, '/host-stats', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => 'sb_host_stats']);
+        register_rest_route($ns, '/listing-stats', ['methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => 'sb_listing_stats']);
+    });
+
+    if (!function_exists('sb_track_view')) {
+        function sb_track_view(WP_REST_Request $req) {
+            if (sb_track_is_bot()) return new WP_REST_Response(['ok' => true, 'skipped' => 'bot'], 200);
+            $pid = sb_track_post_by_slug($req->get_param('slug'));
+            if (!$pid) return new WP_REST_Response(['ok' => true, 'skipped' => 'no_listing'], 200);
+            $ip  = $_SERVER['REMOTE_ADDR'] ?? 'x';
+            $key = 'sb_v_' . md5($ip . '|' . $pid);
+            if (get_transient($key)) return new WP_REST_Response(['ok' => true, 'skipped' => 'dedup'], 200);
+            set_transient($key, 1, 30 * MINUTE_IN_SECONDS);
+            $utm = (string) $req->get_param('utmSource');
+            $ref = (string) $req->get_param('referrer');
+            $src = sb_track_source_bucket($utm !== '' ? $utm : ($ref !== '' ? $ref : ($_SERVER['HTTP_REFERER'] ?? '')));
+            sb_track_apply($pid, 'view', '', $src);
+            return new WP_REST_Response(['ok' => true], 200);
+        }
+    }
+    if (!function_exists('sb_track_click')) {
+        function sb_track_click(WP_REST_Request $req) {
+            if (sb_track_is_bot()) return new WP_REST_Response(['ok' => true, 'skipped' => 'bot'], 200);
+            $pid = sb_track_post_by_slug($req->get_param('slug'));
+            if (!$pid) return new WP_REST_Response(['ok' => true, 'skipped' => 'no_listing'], 200);
+            $type = sanitize_key((string) $req->get_param('type'));
+            if (!in_array($type, sb_track_channels(), true)) {
+                return new WP_REST_Response(['ok' => false, 'error' => 'BAD_TYPE'], 400);
+            }
+            sb_track_apply($pid, 'click', $type, '');
+            return new WP_REST_Response(['ok' => true], 200);
+        }
+    }
+
+    if (!function_exists('sb_stats_window')) {
+        function sb_stats_window($post_id, $start_ts, $days) {
+            $daily = get_post_meta($post_id, 'sb_stats_daily', true);
+            if (!is_array($daily)) $daily = [];
+            $acc = ['views' => 0, 'clicks' => 0, 'bookings' => 0, 'map' => 0,
+                    'breakdown' => array_fill_keys(sb_track_channels(), 0), 'sources' => [], 'series' => []];
+            $booking_ch = ['airbnb', 'bookingcom', 'booking', 'website'];
+            for ($i = 0; $i < $days; $i++) {
+                $d   = date('Y-m-d', $start_ts + $i * DAY_IN_SECONDS);
+                $row = isset($daily[$d]) && is_array($daily[$d]) ? $daily[$d] : ['views' => 0, 'clicks' => [], 'sources' => []];
+                $v   = (int) ($row['views'] ?? 0);
+                $clicks = is_array($row['clicks'] ?? null) ? $row['clicks'] : [];
+                $cTotal = 0; $book = 0; $map = 0;
+                foreach (sb_track_channels() as $ch) {
+                    $cn = (int) ($clicks[$ch] ?? 0);
+                    $cTotal += $cn;
+                    $acc['breakdown'][$ch] += $cn;
+                    if (in_array($ch, $booking_ch, true)) $book += $cn;
+                    if ($ch === 'location') $map += $cn;
+                }
+                $acc['views'] += $v; $acc['clicks'] += $cTotal; $acc['bookings'] += $book; $acc['map'] += $map;
+                if (!empty($row['sources']) && is_array($row['sources'])) {
+                    foreach ($row['sources'] as $sk => $sv) {
+                        $acc['sources'][$sk] = (int) ($acc['sources'][$sk] ?? 0) + (int) $sv;
+                    }
+                }
+                $acc['series'][] = ['date' => $d, 'views' => $v, 'clicks' => $cTotal, 'bookings' => $book, 'map' => $map];
+            }
+            return $acc;
+        }
+    }
+
+    if (!function_exists('sb_host_stats')) {
+        function sb_host_stats(WP_REST_Request $req) {
+            $user = sb_dash_user($req);
+            if (!$user) return new WP_REST_Response(['success' => false, 'error' => 'UNAUTHORIZED'], 401);
+            $period = (int) $req->get_param('period_days');
+            if ($period <= 0) $period = 7;
+            $period = min(365, $period);
+
+            $ids = get_posts(['post_type' => 'accommodation', 'post_status' => ['publish', 'pending', 'draft'], 'author' => (int) $user->ID, 'posts_per_page' => 200, 'fields' => 'ids']);
+            $now        = current_time('timestamp');
+            $cur_start  = strtotime('today', $now) - ($period - 1) * DAY_IN_SECONDS;
+            $prev_start = $cur_start - $period * DAY_IN_SECONDS;
+
+            $current   = ['views' => 0, 'clicks' => 0, 'bookings' => 0, 'map' => 0];
+            $previous  = ['views' => 0, 'clicks' => 0, 'bookings' => 0, 'map' => 0];
+            $breakdown = array_fill_keys(sb_track_channels(), 0);
+            $sources   = [];
+            $series    = [];
+            $top       = [];
+            $ratings   = [];
+            $order     = ['free' => 0, 'pro' => 1, 'featured' => 2];
+            $maxTier   = 'free';
+
+            foreach ($ids as $pid) {
+                $c = sb_stats_window($pid, $cur_start, $period);
+                $p = sb_stats_window($pid, $prev_start, $period);
+                foreach (['views', 'clicks', 'bookings', 'map'] as $k) { $current[$k] += $c[$k]; $previous[$k] += $p[$k]; }
+                foreach ($breakdown as $ch => $_) { $breakdown[$ch] += $c['breakdown'][$ch]; }
+                foreach ($c['sources'] as $sk => $sv) { $sources[$sk] = (int) ($sources[$sk] ?? 0) + $sv; }
+                foreach ($c['series'] as $i => $day) {
+                    if (!isset($series[$i])) $series[$i] = ['date' => $day['date'], 'views' => 0, 'clicks' => 0, 'bookings' => 0, 'map' => 0];
+                    $series[$i]['views'] += $day['views']; $series[$i]['clicks'] += $day['clicks'];
+                    $series[$i]['bookings'] += $day['bookings']; $series[$i]['map'] += $day['map'];
+                }
+                $avg = (float) get_post_meta($pid, 'sb_rating_avg', true);
+                if ($avg > 0) $ratings[] = $avg;
+                $t = get_post_meta($pid, 'listing_tier', true) ?: 'free';
+                if (($order[$t] ?? 0) > ($order[$maxTier] ?? 0)) $maxTier = $t;
+                $top[] = [
+                    'slug'      => get_post_field('post_name', $pid),
+                    'title'     => html_entity_decode(get_the_title($pid), ENT_QUOTES),
+                    'thumb'     => get_the_post_thumbnail_url($pid, 'thumbnail') ?: '',
+                    'views'     => $c['views'],
+                    'clicks'    => $c['clicks'],
+                    'sparkline' => array_map(function ($d) { return $d['views']; }, $c['series']),
+                ];
+            }
+            $rating = $ratings ? round(array_sum($ratings) / count($ratings), 2) : 0;
+            $current['rating'] = $rating; $previous['rating'] = $rating;
+            usort($top, function ($a, $b) { return $b['views'] <=> $a['views']; });
+            $top = array_slice($top, 0, 5);
+
+            return new WP_REST_Response([
+                'success'      => true,
+                'tier'         => $maxTier,
+                'current'      => $current,
+                'previous'     => $previous,
+                'series'       => array_values($series),
+                'breakdown'    => $breakdown,
+                'sources'      => $sources,
+                'top_listings' => $top,
+            ], 200);
+        }
+    }
+
+    if (!function_exists('sb_listing_stats')) {
+        function sb_listing_stats(WP_REST_Request $req) {
+            $user = sb_dash_user($req);
+            if (!$user) return new WP_REST_Response(['success' => false, 'error' => 'UNAUTHORIZED'], 401);
+            $slug  = sanitize_title((string) $req->get_param('slug'));
+            $posts = $slug ? get_posts(['name' => $slug, 'post_type' => 'accommodation', 'post_status' => ['publish', 'pending', 'draft'], 'posts_per_page' => 1, 'fields' => 'ids']) : [];
+            $pid   = empty($posts) ? 0 : (int) $posts[0];
+            if (!$pid) return new WP_REST_Response(['success' => false, 'error' => 'NOT_FOUND'], 404);
+            $post = get_post($pid);
+            if (!$post || (int) $post->post_author !== (int) $user->ID) return new WP_REST_Response(['success' => false, 'error' => 'FORBIDDEN'], 403);
+            return new WP_REST_Response(array_merge(['success' => true, 'tier' => get_post_meta($pid, 'listing_tier', true) ?: 'free'], sb_listing_counters($pid)), 200);
+        }
+    }
 }
