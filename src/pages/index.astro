@@ -1,73 +1,89 @@
 ---
 import Layout from '../layouts/Layout.astro'
+import { getListings } from '../lib/api'
+
+// Featured strip, fetched at build time. Featured-tier listings float to the top.
+const { listings } = await getListings({ perPage: 12 })
+const featured = [...listings]
+  .sort((a, b) => (b.tier === 'featured' ? 1 : 0) - (a.tier === 'featured' ? 1 : 0))
+  .slice(0, 6)
+
+const peso = (n: number) => '₱' + Number(n).toLocaleString('en-PH')
 ---
 
-<Layout
-  title="Limasawa Booking — Coming Soon"
-  description="Find and book accommodation in Limasawa, Philippines. Launching soon."
-  showNav={false}
-  showFooter={false}
->
-  <div class="holding">
-    <div class="holding-card">
-      <div class="holding-logo">Limasawa<strong>Booking</strong></div>
-      <h1>Coming Soon</h1>
-      <p>We're building something for Limasawa Island. Check back soon.</p>
-      <div class="holding-divider"></div>
-      <span class="holding-tag">🇵🇭 Limasawa, Southern Leyte</span>
-    </div>
-  </div>
+<Layout title="Find Stays in Limasawa, Philippines">
+  <main>
+    <section class="hero">
+      <div class="hero-inner">
+        <h1>Find your place in <span>Limasawa</span></h1>
+        <p>Discover resorts, homestays, and island getaways in one of the Philippines' most historic islands.</p>
+        <div class="hero-cta">
+          <a href="/stays" class="btn-primary">Browse all stays</a>
+          <a href="/list-your-property" class="btn-outline">List your property</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-listings">
+      <div class="section-inner">
+        <div class="section-head">
+          <h2>Featured Stays</h2>
+          <a href="/stays" class="see-all">See all →</a>
+        </div>
+
+        {featured.length === 0 ? (
+          <p class="section-sub">Listings are being added — check back soon.</p>
+        ) : (
+          <div class="home-grid">
+            {featured.map((l) => (
+              <a href={`/stay/${l.slug}`} class="stay-card">
+                {l.thumb ? (
+                  <img src={l.thumb} alt={l.title} loading="lazy" />
+                ) : (
+                  <div class="stay-card-img-placeholder"></div>
+                )}
+                {l.verified && <span class="stay-badge">✓ Verified</span>}
+                <div class="stay-card-body">
+                  <h3>{l.title}</h3>
+                  {l.muniName && <p class="stay-loc">{l.muniName}</p>}
+                  <strong>{l.price > 0 ? `${peso(l.price)} / night` : 'Inquire for price'}</strong>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  </main>
 </Layout>
 
 <style>
-.holding {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  background: linear-gradient(135deg, #0d1e2b 0%, #1a3a4a 50%, #0d3040 100%);
-}
-.holding-card {
-  text-align: center;
-  max-width: 480px;
-}
-.holding-logo {
-  font-family: 'DM Sans', sans-serif;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #fff;
-  margin-bottom: 2.5rem;
-  letter-spacing: -0.02em;
-}
-.holding-logo strong {
-  color: var(--sb-primary);
-}
-h1 {
-  font-family: 'DM Sans', sans-serif;
-  font-size: clamp(2.5rem, 8vw, 4rem);
-  font-weight: 800;
-  color: #fff;
-  margin: 0 0 1rem;
-  letter-spacing: -0.03em;
-}
-p {
-  font-size: 1.1rem;
-  color: #8aaabf;
-  line-height: 1.7;
-  margin: 0;
-}
-.holding-divider {
-  width: 48px;
-  height: 3px;
-  background: var(--sb-primary);
-  border-radius: 2px;
-  margin: 2rem auto;
-  opacity: 0.6;
-}
-.holding-tag {
-  font-size: 0.875rem;
-  color: #5a7d96;
-  letter-spacing: 0.04em;
-}
+  .hero { background: linear-gradient(135deg, var(--sb-primary-light) 0%, #fff 60%); padding: 5rem 1.5rem 4rem; text-align: center; }
+  .hero-inner { max-width: 640px; margin: 0 auto; }
+  .hero h1 { font-size: clamp(2rem, 5vw, 3rem); color: var(--sb-text); margin-bottom: 1rem; }
+  .hero h1 span { color: var(--sb-primary); }
+  .hero p { font-size: 1.1rem; color: var(--sb-text-muted); margin-bottom: 2rem; line-height: 1.7; }
+  .hero-cta { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+  .section-listings { padding: 4rem 1.5rem; }
+  .section-inner { max-width: 1280px; margin: 0 auto; }
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 1.5rem; }
+  .section-head h2 { font-size: 1.75rem; margin: 0; }
+  .see-all { color: var(--sb-primary-deeper); font-weight: 600; text-decoration: none; font-size: 0.95rem; }
+  .see-all:hover { text-decoration: underline; }
+  .section-sub { color: var(--sb-text-muted); }
+  .home-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+  @media (max-width: 900px) { .home-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .home-grid { grid-template-columns: 1fr; } }
+</style>
+
+<style is:global>
+  .stay-card { position: relative; display: block; text-decoration: none; color: var(--sb-text); background: #fff; border: 1px solid var(--sb-border); border-radius: var(--sb-radius-lg); overflow: hidden; transition: box-shadow .2s, transform .15s; }
+  .stay-card:hover { box-shadow: var(--sb-shadow-lg); transform: translateY(-2px); }
+  .stay-card img { width: 100%; height: 180px; object-fit: cover; display: block; }
+  .stay-card-img-placeholder { width: 100%; height: 180px; background: var(--sb-secondary-pale); }
+  .stay-badge { position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,.92); color: var(--sb-primary-deeper); font-size: .7rem; font-weight: 700; padding: .2rem .5rem; border-radius: 999px; box-shadow: var(--sb-shadow); }
+  .stay-card-body { padding: 1rem; }
+  .stay-card-body h3 { font-size: 1rem; margin: 0 0 .25rem; }
+  .stay-loc { font-size: .85rem; color: var(--sb-text-muted); margin: 0 0 .5rem; }
+  .stay-card-body strong { font-size: .95rem; color: var(--sb-primary-deeper); }
 </style>

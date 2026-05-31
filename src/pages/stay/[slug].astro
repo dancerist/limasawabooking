@@ -1,0 +1,231 @@
+---
+import Layout from '../../layouts/Layout.astro'
+import { getListings, getListing, type ListingDetail } from '../../lib/api'
+
+export async function getStaticPaths() {
+  const { listings } = await getListings({ perPage: 48 })
+  const entries = await Promise.all(
+    listings.map(async (l) => {
+      const detail = await getListing(l.slug)
+      return detail ? { params: { slug: l.slug }, props: { listing: detail } } : null
+    })
+  )
+  return entries.filter((e): e is { params: { slug: string }; props: { listing: ListingDetail } } => e !== null)
+}
+
+const { listing } = Astro.props as { listing: ListingDetail }
+const peso = (n: number) => '₱' + Number(n).toLocaleString('en-PH')
+
+const facts = [
+  listing.placeType,
+  listing.bedrooms ? `${listing.bedrooms} bedroom${listing.bedrooms > 1 ? 's' : ''}` : '',
+  listing.beds ? `${listing.beds} bed${listing.beds > 1 ? 's' : ''}` : '',
+  listing.baths ? `${listing.baths} bath${listing.baths > 1 ? 's' : ''}` : '',
+  listing.guests ? `${listing.guests} guest${listing.guests > 1 ? 's' : ''}` : '',
+].filter(Boolean)
+
+// FAQ amenity slugs → human labels.
+const amenityLabels: Record<string, string> = {
+  faq_wifi: 'Wifi',
+  faq_pets_allowed: 'Pets allowed',
+  faq_dedicated_workspace: 'Workspace',
+  faq_free_parking_on_premises: 'Free parking',
+  faq_kitchen: 'Kitchen',
+  faq_beach_access: 'Beach access',
+  faq_exterior_security_cameras_on_property: 'Security cameras',
+  faq_generator: 'Generator',
+  faq_air_conditioning: 'Air conditioning',
+  'faq_hot_&_cold_shower': 'Hot & cold shower',
+}
+const amenities = Object.entries(listing.detail.faqAmenities || {})
+  .filter(([, on]) => on)
+  .map(([k]) => amenityLabels[k] ?? k)
+
+const links = Object.entries({
+  'Book direct': listing.detail.links.booking,
+  'Booking.com': listing.detail.links.bookingcom,
+  Airbnb: listing.detail.links.airbnb,
+  Website: listing.detail.links.website,
+  Facebook: listing.detail.links.facebook,
+  Instagram: listing.detail.links.instagram,
+}).filter(([, url]) => url)
+
+const locationLine = [listing.barName, listing.muniName, listing.detail.address1].filter(Boolean).join(', ')
+const mapsKey = import.meta.env.PUBLIC_GOOGLE_MAPS_KEY ?? ''
+const hasCoords = typeof listing.lat === 'number' && typeof listing.lng === 'number'
+---
+
+<Layout title={listing.title} description={listing.subHeading || listing.desc || listing.title} image={listing.thumb || undefined} type="product">
+  <main class="detail">
+    <nav class="crumbs"><a href="/stays">← Back to all stays</a></nav>
+
+    {listing.gallery.length > 0 ? (
+      <div class={`gallery gallery-${Math.min(listing.gallery.length, 5)}`}>
+        {listing.gallery.slice(0, 5).map((src, i) => (
+          <img src={src} alt={`${listing.title} photo ${i + 1}`} class={i === 0 ? 'gallery-main' : ''} loading={i === 0 ? 'eager' : 'lazy'} />
+        ))}
+      </div>
+    ) : listing.thumb ? (
+      <div class="gallery gallery-1"><img src={listing.thumb} alt={listing.title} class="gallery-main" /></div>
+    ) : null}
+
+    <div class="detail-grid">
+      <div class="detail-main">
+        <header class="detail-head">
+          <div>
+            <h1>{listing.title}</h1>
+            {locationLine && <p class="detail-loc">📍 {locationLine}</p>}
+          </div>
+          {listing.verified && <span class="verified-pill">✓ Verified</span>}
+        </header>
+
+        {listing.subHeading && <p class="detail-sub">{listing.subHeading}</p>}
+
+        {facts.length > 0 && (
+          <ul class="facts">
+            {facts.map((f) => <li>{f}</li>)}
+          </ul>
+        )}
+
+        {(listing.desc || listing.detail.content) && (
+          <section class="block">
+            <h2>About this place</h2>
+            {listing.desc && <p>{listing.desc}</p>}
+            {listing.detail.content && <div class="rich" set:html={listing.detail.content} />}
+          </section>
+        )}
+
+        {amenities.length > 0 && (
+          <section class="block">
+            <h2>What this place offers</h2>
+            <ul class="amenities">
+              {amenities.map((a) => <li>{a}</li>)}
+            </ul>
+          </section>
+        )}
+
+        {listing.detail.services.length > 0 && (
+          <section class="block">
+            <h2>Services</h2>
+            <ul class="services">
+              {listing.detail.services.map((s) => (
+                <li><strong>{s.name}</strong>{s.description && <span> — {s.description}</span>}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {hasCoords && (
+          <section class="block">
+            <h2>Where you'll be</h2>
+            <div id="detail-map" class="detail-map"></div>
+            {!mapsKey && <p class="section-sub">Map unavailable — <code>PUBLIC_GOOGLE_MAPS_KEY</code> not set.</p>}
+          </section>
+        )}
+      </div>
+
+      <aside class="detail-aside">
+        <div class="booking-card">
+          <div class="price">
+            {listing.price > 0 ? <><strong>{peso(listing.price)}</strong> <span>/ night</span></> : <strong>Inquire for price</strong>}
+          </div>
+          {listing.monthly > 0 && <p class="monthly">{peso(listing.monthly)} / month</p>}
+
+          {links.length > 0 && (
+            <div class="book-links">
+              {links.map(([label, url], i) => (
+                <a href={url} target="_blank" rel="noopener noreferrer" class={i === 0 ? 'btn-primary' : 'btn-outline'}>{label}</a>
+              ))}
+            </div>
+          )}
+
+          {(listing.detail.host.name || listing.detail.host.contact || listing.detail.host.whatsapp || listing.detail.host.email) && (
+            <div class="host">
+              <h3>Host</h3>
+              {listing.hostPic && <img src={listing.hostPic} alt={listing.detail.host.name || 'Host'} class="host-pic" />}
+              {listing.detail.host.name && <p class="host-name">{listing.detail.host.name}</p>}
+              {listing.detail.host.whatsapp && <a href={`https://wa.me/${listing.detail.host.whatsapp.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+              {listing.detail.host.contact && <p class="host-contact">{listing.detail.host.contact}</p>}
+              {listing.detail.host.email && <a href={`mailto:${listing.detail.host.email}`}>{listing.detail.host.email}</a>}
+            </div>
+          )}
+        </div>
+      </aside>
+    </div>
+  </main>
+</Layout>
+
+{hasCoords && (
+  <script is:inline define:vars={{ lat: listing.lat, lng: listing.lng, title: listing.title, mapsKey }}>
+    window.initSbDetailMap = function () {
+      if (!window.google || !window.google.maps) return
+      var canvas = document.getElementById('detail-map')
+      if (!canvas) return
+      var pos = { lat: lat, lng: lng }
+      var map = new google.maps.Map(canvas, { center: pos, zoom: 15, mapTypeControl: false, streetViewControl: false, fullscreenControl: false })
+      new google.maps.Marker({ position: pos, map: map, title: title })
+    }
+  </script>
+)}
+
+{hasCoords && mapsKey && (
+  <script is:inline async src={`https://maps.googleapis.com/maps/api/js?key=${mapsKey}&callback=initSbDetailMap&loading=async`}></script>
+)}
+
+<style>
+  .detail { max-width: 1120px; margin: 0 auto; padding: 1.5rem; }
+  .crumbs { margin-bottom: 1rem; }
+  .crumbs a { color: var(--sb-text-muted); text-decoration: none; font-size: .9rem; }
+  .crumbs a:hover { color: var(--sb-primary-deeper); }
+
+  .gallery { display: grid; gap: 8px; border-radius: var(--sb-radius-lg); overflow: hidden; margin-bottom: 2rem; }
+  .gallery img { width: 100%; height: 100%; object-fit: cover; }
+  .gallery-1 { grid-template-columns: 1fr; }
+  .gallery-1 .gallery-main { height: 420px; }
+  .gallery-2, .gallery-3, .gallery-4, .gallery-5 { grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 1fr 1fr; height: 420px; }
+  .gallery-main { grid-row: 1 / 3; grid-column: 1; }
+
+  .detail-grid { display: grid; grid-template-columns: 1fr 360px; gap: 2.5rem; align-items: start; }
+  .detail-head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+  .detail-head h1 { font-size: 1.75rem; margin: 0 0 .35rem; }
+  .detail-loc { color: var(--sb-text-muted); margin: 0; }
+  .verified-pill { flex: none; background: var(--sb-primary-light); color: var(--sb-primary-deeper); font-weight: 700; font-size: .8rem; padding: .3rem .7rem; border-radius: 999px; }
+  .detail-sub { font-size: 1.05rem; color: var(--sb-secondary); margin: 1rem 0 0; }
+
+  .facts { list-style: none; display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; padding: 1rem 0; margin: 1rem 0; border-top: 1px solid var(--sb-border); border-bottom: 1px solid var(--sb-border); color: var(--sb-secondary); font-weight: 600; }
+  .facts li { position: relative; }
+  .facts li:not(:last-child)::after { content: '·'; position: absolute; right: -0.8rem; color: var(--sb-border); }
+
+  .block { padding: 1.75rem 0; border-bottom: 1px solid var(--sb-border); }
+  .block h2 { font-size: 1.25rem; margin: 0 0 1rem; }
+  .rich :global(p) { margin: 0 0 .75rem; line-height: 1.7; }
+  .amenities { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; padding: 0; }
+  .amenities li { padding-left: 1.5rem; position: relative; }
+  .amenities li::before { content: '✓'; position: absolute; left: 0; color: var(--sb-primary-deeper); font-weight: 700; }
+  .services { list-style: none; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+  .detail-map { width: 100%; height: 320px; border-radius: var(--sb-radius); overflow: hidden; }
+  .section-sub { color: var(--sb-text-muted); }
+
+  .detail-aside { position: sticky; top: 1.5rem; }
+  .booking-card { background: #fff; border: 1px solid var(--sb-border); border-radius: var(--sb-radius-lg); padding: 1.5rem; box-shadow: var(--sb-shadow); }
+  .price strong { font-size: 1.5rem; color: var(--sb-text); }
+  .price span { color: var(--sb-text-muted); }
+  .monthly { color: var(--sb-text-muted); font-size: .9rem; margin: .25rem 0 0; }
+  .book-links { display: flex; flex-direction: column; gap: .6rem; margin: 1.25rem 0; }
+  .book-links a { text-align: center; }
+  .host { border-top: 1px solid var(--sb-border); padding-top: 1.25rem; }
+  .host h3 { font-size: 1rem; margin: 0 0 .75rem; }
+  .host-pic { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; margin-bottom: .5rem; }
+  .host-name { font-weight: 700; margin: 0 0 .35rem; }
+  .host a { display: block; color: var(--sb-primary-deeper); text-decoration: none; font-size: .9rem; margin-top: .25rem; }
+  .host-contact { color: var(--sb-text-muted); font-size: .9rem; margin: .25rem 0 0; }
+
+  @media (max-width: 900px) {
+    .detail-grid { grid-template-columns: 1fr; }
+    .detail-aside { position: static; }
+    .gallery-2, .gallery-3, .gallery-4, .gallery-5 { grid-template-columns: 1fr; grid-template-rows: none; height: auto; }
+    .gallery-main { grid-row: auto; grid-column: auto; }
+    .gallery img:not(.gallery-main) { display: none; }
+    .gallery-1 .gallery-main, .gallery img { height: 280px; }
+  }
+</style>

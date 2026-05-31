@@ -1,74 +1,149 @@
 ---
 import Layout from '../layouts/Layout.astro'
+import { getListings } from '../lib/api'
+
+// Fetched at build time (static). per_page=48 covers all current listings.
+const { listings, total } = await getListings({ perPage: 48 })
+
+// Only listings with real coordinates get a map marker.
+const pins = listings
+  .filter((l) => typeof l.lat === 'number' && typeof l.lng === 'number')
+  .map((l) => ({ slug: l.slug, title: l.title, price: l.price, lat: l.lat, lng: l.lng }))
+
+const mapsKey = import.meta.env.PUBLIC_GOOGLE_MAPS_KEY ?? ''
+
+const peso = (n: number) => '₱' + Number(n).toLocaleString('en-PH')
 ---
 
-<Layout title="Browse Stays — Limasawa Booking" showFooter={false}>
+<Layout title="Browse Stays" showFooter={false}>
   <div class="stays-shell">
-    <div class="stays-list" id="stays-list">
+    <div class="stays-list">
       <div class="stays-header">
         <h1>All Stays</h1>
+        <span class="stays-count">{total} {total === 1 ? 'place' : 'places'} in Limasawa</span>
       </div>
-      <div class="stays-grid" id="stays-grid">
-        <p class="empty-msg">Loading listings…</p>
-      </div>
+
+      {listings.length === 0 ? (
+        <p class="empty-msg">No listings available right now. Please check back soon.</p>
+      ) : (
+        <div class="stays-grid">
+          {listings.map((l) => (
+            <a href={`/stay/${l.slug}`} class="stay-card" data-slug={l.slug}>
+              {l.thumb ? (
+                <img src={l.thumb} alt={l.title} loading="lazy" />
+              ) : (
+                <div class="stay-card-img-placeholder"></div>
+              )}
+              {l.verified && <span class="stay-badge">✓ Verified</span>}
+              <div class="stay-card-body">
+                <h3>{l.title}</h3>
+                {(l.muniName || l.barName) && (
+                  <p class="stay-loc">{[l.barName, l.muniName].filter(Boolean).join(', ')}</p>
+                )}
+                {l.subHeading && <p class="stay-sub">{l.subHeading}</p>}
+                <strong>{l.price > 0 ? `${peso(l.price)} / night` : 'Inquire for price'}</strong>
+              </div>
+            </a>
+          ))}
+        </div>
+      )}
     </div>
-    <div class="stays-map" id="stays-map">
-      <p style="padding:2rem;color:var(--sb-text-muted)">Map coming soon.</p>
+
+    <div class="stays-map">
+      <div id="map" class="map-canvas"></div>
+      {!mapsKey && (
+        <div class="map-fallback">
+          <p>Map unavailable — <code>PUBLIC_GOOGLE_MAPS_KEY</code> is not set.</p>
+        </div>
+      )}
     </div>
   </div>
 </Layout>
 
-<style>
-.stays-shell { display: flex; height: calc(100vh - 64px); overflow: hidden; }
-.stays-list { flex: 0 0 480px; overflow-y: auto; padding: 1.5rem; border-right: 1px solid var(--sb-border); }
-.stays-header { margin-bottom: 1rem; }
-.stays-header h1 { font-size: 1.5rem; }
-.stays-grid { display: flex; flex-direction: column; gap: 1rem; }
-.stays-map { flex: 1; background: var(--sb-secondary-pale); }
-.empty-msg { color: var(--sb-text-muted); }
-@media (max-width: 768px) {
-  .stays-shell { flex-direction: column; height: auto; }
-  .stays-list { flex: none; border-right: none; border-bottom: 1px solid var(--sb-border); }
-  .stays-map { display: none; }
-}
-</style>
+<script is:inline define:vars={{ pins, mapsKey }}>
+  window.__sbPins = pins
+  window.initSbMap = function () {
+    if (!window.google || !window.google.maps) return
+    var canvas = document.getElementById('map')
+    if (!canvas) return
 
-<script>
-  const REST = 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
-  const grid = document.getElementById('stays-grid')!
+    // Limasawa Island center as a sensible default.
+    var center = { lat: 9.9333, lng: 125.0667 }
+    var map = new google.maps.Map(canvas, {
+      center: center,
+      zoom: 12,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+    })
 
-  async function load() {
-    try {
-      const res = await fetch(`${REST}/listings?page=1&per_page=24`)
-      if (!res.ok) throw new Error(res.statusText)
-      const data = await res.json()
-      const listings = Array.isArray(data.listings) ? data.listings : []
-      if (!listings.length) { grid.innerHTML = '<p class="empty-msg">No listings yet.</p>'; return }
-      grid.innerHTML = listings.map((l: any) => `
-        <a href="/stay/${l.slug}" class="stay-card">
-          ${l.thumb ? `<img src="${l.thumb}" alt="${l.title}" loading="lazy"/>` : '<div class="stay-card-img-placeholder"></div>'}
-          <div class="stay-card-body">
-            <h3>${l.title}</h3>
-            <p>${l.muniName || ''}</p>
-            ${l.price ? `<strong>₱${Number(l.price).toLocaleString()} / night</strong>` : ''}
-          </div>
-        </a>
-      `).join('')
-    } catch {
-      grid.innerHTML = '<p class="empty-msg">Could not load listings.</p>'
+    var bounds = new google.maps.LatLngBounds()
+    var info = new google.maps.InfoWindow()
+
+    window.__sbPins.forEach(function (p) {
+      var pos = { lat: p.lat, lng: p.lng }
+      var marker = new google.maps.Marker({ position: pos, map: map, title: p.title })
+      bounds.extend(pos)
+      marker.addListener('click', function () {
+        var price = p.price > 0 ? '₱' + Number(p.price).toLocaleString('en-PH') + ' / night' : 'Inquire for price'
+        info.setContent(
+          '<div style="min-width:160px"><strong>' + p.title + '</strong><br/>' +
+          '<span style="color:#64748B;font-size:.85rem">' + price + '</span><br/>' +
+          '<a href="/stay/' + p.slug + '" style="color:#3EC7CF;font-weight:600;font-size:.85rem">View details →</a></div>'
+        )
+        info.open(map, marker)
+      })
+    })
+
+    if (window.__sbPins.length > 1) {
+      map.fitBounds(bounds)
+    } else if (window.__sbPins.length === 1) {
+      map.setCenter(window.__sbPins[0])
+      map.setZoom(15)
     }
   }
-
-  load()
 </script>
 
+{mapsKey && (
+  <script
+    is:inline
+    async
+    src={`https://maps.googleapis.com/maps/api/js?key=${mapsKey}&callback=initSbMap&loading=async`}
+  ></script>
+)}
+
+<style>
+  .stays-shell { display: flex; height: calc(100vh - 64px); overflow: hidden; }
+  .stays-list { flex: 0 0 520px; overflow-y: auto; padding: 1.5rem; border-right: 1px solid var(--sb-border); }
+  .stays-header { margin-bottom: 1.25rem; }
+  .stays-header h1 { font-size: 1.5rem; margin: 0 0 0.2rem; }
+  .stays-count { font-size: 0.875rem; color: var(--sb-text-muted); }
+  .stays-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .stays-map { flex: 1; background: var(--sb-secondary-pale); position: relative; }
+  .map-canvas { width: 100%; height: 100%; }
+  .map-fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 2rem; text-align: center; color: var(--sb-text-muted); }
+  .map-fallback code { background: var(--sb-secondary-light); padding: 0.1rem 0.4rem; border-radius: 6px; }
+  .empty-msg { color: var(--sb-text-muted); }
+  @media (max-width: 900px) {
+    .stays-shell { flex-direction: column; height: auto; }
+    .stays-list { flex: none; border-right: none; }
+    .stays-grid { grid-template-columns: 1fr 1fr; }
+    .stays-map { height: 360px; flex: none; }
+  }
+  @media (max-width: 560px) {
+    .stays-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
 <style is:global>
-.stay-card { display:block;text-decoration:none;color:var(--sb-text);background:#fff;border:1px solid var(--sb-border);border-radius:var(--sb-radius-lg);overflow:hidden;transition:box-shadow .2s; }
-.stay-card:hover { box-shadow:var(--sb-shadow-lg); }
-.stay-card img { width:100%;height:180px;object-fit:cover; }
-.stay-card-img-placeholder { width:100%;height:180px;background:var(--sb-secondary-pale); }
-.stay-card-body { padding:1rem; }
-.stay-card-body h3 { font-size:1rem;margin:0 0 .25rem; }
-.stay-card-body p { font-size:.85rem;color:var(--sb-text-muted);margin:0 0 .5rem; }
-.stay-card-body strong { font-size:.95rem;color:var(--sb-primary); }
+  .stay-card { position: relative; display: block; text-decoration: none; color: var(--sb-text); background: #fff; border: 1px solid var(--sb-border); border-radius: var(--sb-radius-lg); overflow: hidden; transition: box-shadow .2s, transform .15s; }
+  .stay-card:hover { box-shadow: var(--sb-shadow-lg); transform: translateY(-2px); }
+  .stay-card img { width: 100%; height: 150px; object-fit: cover; display: block; }
+  .stay-card-img-placeholder { width: 100%; height: 150px; background: var(--sb-secondary-pale); }
+  .stay-badge { position: absolute; top: 10px; left: 10px; background: rgba(255,255,255,.92); color: var(--sb-primary-deeper); font-size: .7rem; font-weight: 700; padding: .2rem .5rem; border-radius: 999px; box-shadow: var(--sb-shadow); }
+  .stay-card-body { padding: .85rem; }
+  .stay-card-body h3 { font-size: .95rem; margin: 0 0 .2rem; line-height: 1.3; }
+  .stay-loc { font-size: .8rem; color: var(--sb-text-muted); margin: 0 0 .3rem; }
+  .stay-sub { font-size: .78rem; color: var(--sb-text-muted); margin: 0 0 .5rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .stay-card-body strong { font-size: .9rem; color: var(--sb-primary-deeper); }
 </style>

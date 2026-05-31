@@ -42,8 +42,9 @@
 ### Pages (`src/pages/`)
 | File | Purpose |
 |---|---|
-| `index.astro` | Homepage — hero + featured listings |
-| `stays.astro` | Browse page — card list + map shell |
+| `index.astro` | Homepage — hero + featured listings (build-time fetch, live) |
+| `stays.astro` | Browse page — build-time card grid + Google Map of pins |
+| `stay/[slug].astro` | Single listing detail — gallery, facts, amenities, host/booking links, map. `getStaticPaths` from `/listings`, renders `/listings/{slug}` detail |
 | `auth.astro` | Login / register (JWT) |
 | `dashboard/index.astro` | Host dashboard — listings panel |
 | `list-your-property.astro` | Multi-step listing submission (skeleton) |
@@ -52,15 +53,18 @@
 ### Support files
 | File | Purpose |
 |---|---|
-| `src/lib/api.ts` | REST `/listings` fetcher, reshapes to GraphQL-style shape |
+| `src/lib/api.ts` | Typed REST client: `getListings`, `getListing`, `getMapPins` (raw response shape, timeout+retry, error-safe) |
 | `src/layouts/Layout.astro` | Base HTML shell, `window.__sb` saved-listings singleton |
 | `src/styles/global.css` | Design tokens + utility classes |
+| `.env.example` | `PUBLIC_WP_REST`, `PUBLIC_GOOGLE_MAPS_KEY` (maps degrade gracefully if unset) |
 
 ## Status (as of 2026-05-31)
 - Scaffold complete — all core pages created
 - **Auth layer LIVE**: guest/host roles, JWT, `/auth/register`, `/auth/login`, `/me` — verified end-to-end over HTTP. Code in `wp/sandbox/limasawa-auth.php`.
 - **Listings REST API LIVE**: `/listings`, `/listings/{slug}`, `/map-pins` — verified over HTTP against 25 published accommodations. Code in `wp/sandbox/limasawa-listings.php`. Response shape matches `src/lib/api.ts`.
+- **Frontend wired to listings (build-time/static)**: homepage featured strip, `/stays` browse grid + Google Map, and `/stay/{slug}` detail pages all render real data. `npm run build` produces 31 pages (26 listings). Homepage swapped off the coming-soon holding page.
+- **Google Maps**: `/stays` + detail maps read `PUBLIC_GOOGLE_MAPS_KEY` — NOT yet set anywhere. Maps show a placeholder until the key is added to `.env` (local) and Vercel env vars. ACF field is a google_map, so a Maps JS API key (billing-enabled) is required.
 - Frontend `auth.astro` not yet wired to the new endpoints
-- `src/lib/api.ts` `getAccommodations` consumes `/listings`; needs single-listing + map-pins fetchers added, and stays/index pages wired to render real data (homepage is still the coming-soon holding page)
+- `window.__sb` (Layout.astro) calls `/save-listing` + `/my-saved` — those backend endpoints do NOT exist yet (saved-listings feature unbuilt)
 - list-your-property form: skeleton only
 - Deployed to Vercel, domain pending Cloudflare DNS update
