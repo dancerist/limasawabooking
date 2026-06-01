@@ -102,14 +102,20 @@ if (defined('ABSPATH')) {
      * ---------------------------------------------------------------------- */
     if (!function_exists('sb_coupon_validate')) {
         function sb_coupon_validate(WP_REST_Request $req) {
-            $code   = strtoupper(trim((string) $req->get_param('code')));
-            $amount = (float) $req->get_param('amount');
+            $code    = (string) $req->get_param('code');
+            $tier    = (string) ($req->get_param('tier') ?: 'pro');
+            $billing = (string) ($req->get_param('billing') ?: 'monthly');
+            $amount  = (float) $req->get_param('amount');
+            // Prefer the table-backed validator (limasawa-coupons.php).
+            if (function_exists('sb_validate_and_apply_coupon')) {
+                return new WP_REST_Response(sb_validate_and_apply_coupon($code, $tier, $billing, $amount), 200);
+            }
+            // Fallback: legacy sb_coupons option map.
+            $code = strtoupper(trim($code));
             $coupons = get_option('sb_coupons', []);
             if (!is_array($coupons)) $coupons = [];
-            // Normalise keys to uppercase for case-insensitive matching.
             $upper = [];
             foreach ($coupons as $k => $v) $upper[strtoupper((string) $k)] = $v;
-
             if ($code === '' || !isset($upper[$code])) {
                 return new WP_REST_Response(['valid' => false, 'message' => 'Invalid or expired coupon.'], 200);
             }
@@ -119,17 +125,8 @@ if (defined('ABSPATH')) {
             if ($amount <= 0) {
                 return new WP_REST_Response(['valid' => false, 'message' => 'Pick a paid plan first.'], 200);
             }
-            $discount = $type === 'percentage'
-                ? floor($amount * $value / 100)
-                : min($value, $amount);
-            return new WP_REST_Response([
-                'valid'     => true,
-                'code'      => $code,
-                'type'      => $type,
-                'value'     => $value,
-                'discount'  => (float) $discount,
-                'new_total' => (float) max(0, $amount - $discount),
-            ], 200);
+            $discount = $type === 'percentage' ? floor($amount * $value / 100) : min($value, $amount);
+            return new WP_REST_Response(['valid' => true, 'code' => $code, 'type' => $type, 'value' => $value, 'discount' => (float) $discount, 'new_total' => (float) max(0, $amount - $discount)], 200);
         }
     }
 
@@ -304,19 +301,28 @@ if (defined('ABSPATH')) {
     });
 
     if (!function_exists('sb_coupon_discount')) {
-        function sb_coupon_discount($code, $amount) {
+        function sb_coupon_discount($code, $amount, $tier = 'pro', $billing = 'monthly') {
+            // Prefer the table-backed validator (limasawa-coupons.php).
+            if (function_exists('sb_validate_and_apply_coupon')) {
+                $r = sb_validate_and_apply_coupon($code, $tier, $billing, $amount);
+                if (!empty($r['valid'])) {
+                    return ['code' => $r['code'], 'discount' => (float) $r['discount'], 'id' => (int) ($r['id'] ?? 0), 'bonus_months' => (int) ($r['bonus_months'] ?? 0)];
+                }
+                return ['code' => '', 'discount' => 0.0, 'id' => 0, 'bonus_months' => 0];
+            }
+            // Fallback: legacy option map.
             $code = strtoupper(trim((string) $code));
-            if ($code === '' || $amount <= 0) return ['code' => '', 'discount' => 0.0];
+            if ($code === '' || $amount <= 0) return ['code' => '', 'discount' => 0.0, 'id' => 0, 'bonus_months' => 0];
             $coupons = get_option('sb_coupons', []);
-            if (!is_array($coupons)) return ['code' => '', 'discount' => 0.0];
+            if (!is_array($coupons)) return ['code' => '', 'discount' => 0.0, 'id' => 0, 'bonus_months' => 0];
             $upper = [];
             foreach ($coupons as $k => $v) $upper[strtoupper((string) $k)] = $v;
-            if (!isset($upper[$code])) return ['code' => '', 'discount' => 0.0];
+            if (!isset($upper[$code])) return ['code' => '', 'discount' => 0.0, 'id' => 0, 'bonus_months' => 0];
             $c    = $upper[$code];
             $type = ($c['type'] ?? 'percentage') === 'fixed' ? 'fixed' : 'percentage';
             $val  = (float) ($c['value'] ?? 0);
             $disc = $type === 'percentage' ? floor($amount * $val / 100) : min($val, $amount);
-            return ['code' => $code, 'discount' => (float) $disc];
+            return ['code' => $code, 'discount' => (float) $disc, 'id' => 0, 'bonus_months' => 0];
         }
     }
 
@@ -354,7 +360,7 @@ if (defined('ABSPATH')) {
             // Paid: server computes the base price from tier config (anti-tamper),
             // re-validates the coupon, and records the payment for admin review.
             $base   = (float) ($tiers[$tier][$billing] ?? 0);
-            $coupon = sb_coupon_discount($req->get_param('coupon_code'), $base);
+            $coupon = sb_coupon_discount($req->get_param('coupon_code'), $base, $tier, $billing);
             $final  = max(0, $base - $coupon['discount']);
 
             update_post_meta($id, 'sb_payment', [
@@ -365,6 +371,8 @@ if (defined('ABSPATH')) {
                 'reference'     => sanitize_text_field($req->get_param('payment_reference')),
                 'receiptId'     => (int) $req->get_param('payment_receipt_id'),
                 'couponCode'    => $coupon['code'],
+                'couponId'      => (int) ($coupon['id'] ?? 0),
+                'bonusMonths'   => (int) ($coupon['bonus_months'] ?? 0),
                 'status'        => 'pending_review',
                 'paidAt'        => '',
                 'expiresAt'     => '',

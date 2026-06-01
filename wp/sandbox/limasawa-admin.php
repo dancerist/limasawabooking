@@ -26,6 +26,8 @@ if (defined('ABSPATH')) {
             if (!is_array($pay)) $pay = [];
             $billing = ($pay['billingPeriod'] ?? 'monthly') === 'yearly' ? 'yearly' : 'monthly';
             $days = $billing === 'yearly' ? 365 : 30;
+            $bonus = (int) ($pay['bonusMonths'] ?? 0);
+            if ($bonus > 0) $days += $bonus * 30; // coupon free-month extension
             $pay['status']    = 'paid';
             $pay['paidAt']    = current_time('mysql');
             $pay['expiresAt'] = date('Y-m-d H:i:s', current_time('timestamp') + $days * DAY_IN_SECONDS);
@@ -33,6 +35,10 @@ if (defined('ABSPATH')) {
             if (!empty($pay['tier'])) update_post_meta($id, 'listing_tier', $pay['tier']);
             if (in_array(get_post_status($id), ['pending', 'draft'], true)) {
                 wp_update_post(['ID' => $id, 'post_status' => 'publish']);
+            }
+            // Count coupon usage once, at payment confirmation.
+            if (!empty($pay['couponId']) && function_exists('sb_coupons_increment_usage')) {
+                sb_coupons_increment_usage((int) $pay['couponId']);
             }
             return ['ok' => true];
         }
