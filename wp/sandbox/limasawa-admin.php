@@ -256,6 +256,9 @@ if (defined('ABSPATH')) {
 
             echo '<div class="sb-section"><div class="sb-sh">' . sb_admin_icon('trend') . 'Site views — last 30 days</div>' . sb_admin_views_chart($views_series) . '</div>';
 
+            // Listing claims to verify (from limasawa-claims.php).
+            if (function_exists('sb_claims_render_pending_section')) sb_claims_render_pending_section();
+
             // Payments to verify
             $payments = get_posts(['post_type' => 'accommodation', 'post_status' => 'any', 'posts_per_page' => 10, 'orderby' => 'date', 'order' => 'DESC',
                 'meta_query' => [['key' => 'sb_payment', 'value' => '"status";s:14:"pending_review"', 'compare' => 'LIKE']]]);
@@ -361,7 +364,7 @@ if (defined('ABSPATH')) {
     /* ===================== Admin notices ================================= */
     add_action('admin_notices', function () {
         if (empty($_GET['sb_msg'])) return;
-        $m = ['payment_approved' => ['success', 'Payment approved — listing is live.'], 'listing_published' => ['success', 'Listing published.'], 'post_approved' => ['success', 'Post published.'], 'post_rejected' => ['info', 'Post moved to draft.']];
+        $m = ['payment_approved' => ['success', 'Payment approved — listing is live.'], 'listing_published' => ['success', 'Listing published.'], 'post_approved' => ['success', 'Post published.'], 'post_rejected' => ['info', 'Post moved to draft.'], 'claim_approved' => ['success', 'Claim approved — ownership transferred to the host.'], 'claim_rejected' => ['info', 'Claim rejected; the claimant was notified.'], 'claim_already' => ['info', 'That claim was already reviewed.'], 'claim_listing_gone' => ['error', 'The claimed listing no longer exists.']];
         $k = sanitize_key($_GET['sb_msg']);
         if (!isset($m[$k])) return;
         echo '<div class="notice notice-' . esc_attr($m[$k][0]) . ' is-dismissible"><p><strong>' . esc_html($m[$k][1]) . '</strong></p></div>';
