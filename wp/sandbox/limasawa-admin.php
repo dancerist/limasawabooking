@@ -204,4 +204,96 @@ if (defined('ABSPATH')) {
             echo esc_html($u ? $u->display_name : '—');
         }
     }, 10, 2);
+
+    /* ---- Brand accent + toolbar node ------------------------------------- */
+    add_action('admin_enqueue_scripts', function () {
+        wp_add_inline_style('common',
+            '.wp-core-ui .button-primary{background:#25CECE;border-color:#1ab4b4;text-shadow:none;}'
+          . '.wp-core-ui .button-primary:hover{background:#1ab4b4;border-color:#1ab4b4;}'
+          . '#adminmenu .toplevel_page_limasawa-cms .wp-menu-image:before{color:#7fe9e9;}'
+          . '#wpadminbar #wp-admin-bar-sb-brand>.ab-item{font-weight:700;}'
+        );
+    });
+    add_action('admin_bar_menu', function ($bar) {
+        if (!current_user_can('edit_others_posts')) return;
+        $bar->add_node(['id' => 'sb-brand', 'title' => '🌴 Limasawa', 'href' => admin_url('admin.php?page=limasawa-cms')]);
+    }, 8);
+
+    /* ---- Listings list: tier/payment filters ----------------------------- */
+    add_action('restrict_manage_posts', function ($post_type) {
+        if ($post_type !== 'accommodation') return;
+        $tier = isset($_GET['sb_tier_f']) ? sanitize_text_field($_GET['sb_tier_f']) : '';
+        $pay  = isset($_GET['sb_pay_f']) ? sanitize_text_field($_GET['sb_pay_f']) : '';
+        echo '<select name="sb_tier_f"><option value="">All tiers</option>';
+        foreach (['free', 'pro', 'featured'] as $t) echo '<option value="' . $t . '"' . selected($tier, $t, false) . '>' . ucfirst($t) . '</option>';
+        echo '</select> <select name="sb_pay_f"><option value="">All payments</option>';
+        foreach (['pending_review' => 'Pending payment', 'paid' => 'Paid', 'not_required' => 'Free'] as $k => $lbl) echo '<option value="' . esc_attr($k) . '"' . selected($pay, $k, false) . '>' . esc_html($lbl) . '</option>';
+        echo '</select>';
+    });
+    add_action('pre_get_posts', function ($q) {
+        if (!is_admin() || !$q->is_main_query() || $q->get('post_type') !== 'accommodation') return;
+        $meta = [];
+        if (!empty($_GET['sb_tier_f'])) $meta[] = ['key' => 'listing_tier', 'value' => sanitize_text_field($_GET['sb_tier_f'])];
+        if (!empty($_GET['sb_pay_f'])) {
+            $s = sanitize_text_field($_GET['sb_pay_f']);
+            $meta[] = ['key' => 'sb_payment', 'value' => '"status";s:' . strlen($s) . ':"' . $s . '"', 'compare' => 'LIKE'];
+        }
+        if ($meta) { if (count($meta) > 1) $meta['relation'] = 'AND'; $q->set('meta_query', $meta); }
+    });
+
+    /* ---- Per-listing meta box: subscription + stats + approve ------------ */
+    add_action('add_meta_boxes', function () {
+        add_meta_box('sb_listing_cms', 'Limasawa — Subscription & Stats', 'sb_admin_listing_metabox', 'accommodation', 'side', 'high');
+    });
+    if (!function_exists('sb_admin_listing_metabox')) {
+        function sb_admin_listing_metabox($post) {
+            $pay = get_post_meta($post->ID, 'sb_payment', true); if (!is_array($pay)) $pay = [];
+            $tier = get_post_meta($post->ID, 'listing_tier', true) ?: 'free';
+            $counters = function_exists('sb_listing_counters') ? sb_listing_counters($post->ID) : ['views' => 0];
+            echo '<p><strong>Tier:</strong> ' . esc_html($tier) . '<br>'
+               . '<strong>Payment:</strong> ' . esc_html($pay['status'] ?? '—');
+            if (!empty($pay['amount'])) echo ' (₱' . esc_html(number_format((float) $pay['amount'])) . ' / ' . esc_html($pay['billingPeriod'] ?? '') . ')';
+            echo '<br><strong>Expires:</strong> ' . esc_html($pay['expiresAt'] ?: '—') . '<br>'
+               . '<strong>Views (all-time):</strong> ' . esc_html($counters['views']) . '</p>';
+            if (($pay['status'] ?? '') === 'pending_review') {
+                echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">'
+                   . '<input type="hidden" name="action" value="sb_approve_payment"><input type="hidden" name="listing_id" value="' . (int) $post->ID . '">'
+                   . wp_nonce_field('sb_approve_' . $post->ID, '_wpnonce', true, false)
+                   . '<button class="button button-primary" style="width:100%">Approve payment &amp; publish</button></form>';
+            }
+        }
+    }
+
+    /* ---- Top-level "Limasawa" CMS overview page -------------------------- */
+    add_action('admin_menu', function () {
+        add_menu_page('Limasawa CMS', 'Limasawa', 'edit_others_posts', 'limasawa-cms', 'sb_admin_overview_page', 'dashicons-palmtree', 3);
+    });
+    if (!function_exists('sb_admin_overview_page')) {
+        function sb_admin_overview_page() {
+            echo '<div class="wrap"><h1>Limasawa Booking — CMS Overview</h1><div style="max-width:920px">';
+            if (function_exists('sb_admin_dashboard_widget')) sb_admin_dashboard_widget();
+            $recent = get_posts(['post_type' => 'accommodation', 'post_status' => ['pending', 'publish', 'draft'], 'posts_per_page' => 8, 'orderby' => 'date', 'order' => 'DESC']);
+            echo '<h2 style="margin-top:1.2em">Recent listings</h2><table class="widefat striped"><tbody>';
+            foreach ($recent as $p) {
+                echo '<tr><td><a href="' . esc_url(get_edit_post_link($p->ID)) . '">' . esc_html(get_the_title($p->ID)) . '</a></td>'
+                   . '<td>' . esc_html($p->post_status) . '</td><td>' . esc_html(get_the_date('M j, Y', $p->ID)) . '</td></tr>';
+            }
+            echo '</tbody></table>';
+            $pendingReviews = get_comments(['type' => 'sb_review', 'status' => 'hold', 'number' => 10]);
+            echo '<h2 style="margin-top:1.2em">Pending reviews (' . count($pendingReviews) . ')</h2>';
+            if ($pendingReviews) {
+                echo '<table class="widefat striped"><tbody>';
+                foreach ($pendingReviews as $c) {
+                    echo '<tr><td>' . esc_html(get_the_title($c->comment_post_ID)) . '</td>'
+                       . '<td>' . esc_html((int) get_comment_meta($c->comment_ID, 'sb_rating', true)) . '★</td>'
+                       . '<td>' . esc_html(wp_trim_words($c->comment_content, 14)) . '</td>'
+                       . '<td><a href="' . esc_url(admin_url('edit-comments.php')) . '">Moderate</a></td></tr>';
+                }
+                echo '</tbody></table>';
+            } else {
+                echo '<p style="color:#646970">No reviews awaiting approval.</p>';
+            }
+            echo '</div></div>';
+        }
+    }
 }
