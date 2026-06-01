@@ -1,0 +1,161 @@
+<?php
+/**
+ * Limasawa Host Blog API  —  REST namespace: limasawa/v1
+ *
+ * Backs the dashboard "Posts" panel (Pro-gated in the UI). Host blog entries
+ * are standard WP posts (post_type 'post') authored by the host. The EditorJS
+ * frontend sends BOTH rendered `content` (HTML → post_content) and the raw
+ * `contentBlocks` JSON (→ sb_content_blocks meta for re-editing), so no
+ * server-side block conversion is needed.
+ *
+ * Routes (limasawa/v1, all JWT):
+ *   GET    /my-posts            list the host's posts
+ *   POST   /create-post         {title,status,content,contentBlocks,featuredImageId}
+ *   GET    /post/{id}           load one for editing (owner)
+ *   POST   /post/{id}           update (owner)
+ *   DELETE /post/{id}           trash (owner)
+ */
+
+if (defined('ABSPATH')) {
+
+    if (!function_exists('sb_posts_user')) {
+        function sb_posts_user(WP_REST_Request $req) {
+            return function_exists('sb_jwt_current_user') ? sb_jwt_current_user($req) : null;
+        }
+    }
+
+    if (!function_exists('sb_post_status_in')) {
+        function sb_post_status_in($s) {
+            return $s === 'publish' ? 'publish' : 'draft';
+        }
+    }
+
+    add_action('rest_api_init', function () {
+        $ns = 'limasawa/v1';
+        register_rest_route($ns, '/my-posts', [
+            'methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => 'sb_my_posts',
+        ]);
+        register_rest_route($ns, '/create-post', [
+            'methods' => 'POST', 'permission_callback' => '__return_true', 'callback' => 'sb_create_post',
+        ]);
+        register_rest_route($ns, '/post/(?P<id>\\d+)', [
+            ['methods' => 'GET',    'permission_callback' => '__return_true', 'callback' => 'sb_get_post'],
+            ['methods' => 'POST',   'permission_callback' => '__return_true', 'callback' => 'sb_update_post'],
+            ['methods' => 'DELETE', 'permission_callback' => '__return_true', 'callback' => 'sb_delete_post'],
+        ]);
+    });
+
+    if (!function_exists('sb_my_posts')) {
+        function sb_my_posts(WP_REST_Request $req) {
+            $user = sb_posts_user($req);
+            if (!$user) return new WP_REST_Response(['success' => false, 'error' => 'UNAUTHORIZED'], 401);
+            $q = new WP_Query([
+                'post_type' => 'post', 'author' => (int) $user->ID,
+                'post_status' => ['publish', 'draft', 'pending'], 'posts_per_page' => 100,
+                'orderby' => 'modified', 'order' => 'DESC',
+            ]);
+            $posts = [];
+            foreach ($q->posts as $p) {
+                $posts[] = [
+                    'id'      => (int) $p->ID,
+                    'title'   => html_entity_decode(get_the_title($p->ID), ENT_QUOTES) ?: '(untitled)',
+                    'slug'    => $p->post_name,
+                    'status'  => $p->post_status,
+                    'date'    => get_the_date('M j, Y', $p->ID),
+                    'excerpt' => wp_trim_words(wp_strip_all_tags($p->post_content), 24),
+                ];
+            }
+            return new WP_REST_Response(['success' => true, 'posts' => $posts], 200);
+        }
+    }
+
+    if (!function_exists('sb_post_apply_body')) {
+        function sb_post_apply_body($post_id, WP_REST_Request $req) {
+            $blocks = $req->get_param('contentBlocks');
+            update_post_meta($post_id, 'sb_content_blocks', wp_json_encode($blocks));
+            $fid = (int) $req->get_param('featuredImageId');
+            if ($fid > 0) set_post_thumbnail($post_id, $fid);
+            else delete_post_thumbnail($post_id);
+        }
+    }
+
+    if (!function_exists('sb_create_post')) {
+        function sb_create_post(WP_REST_Request $req) {
+            $user = sb_posts_user($req);
+            if (!$user) return new WP_REST_Response(['success' => false, 'error' => 'UNAUTHORIZED'], 401);
+            $title = sanitize_text_field((string) $req->get_param('title'));
+            if ($title === '') return new WP_REST_Response(['success' => false, 'message' => 'Title is required.'], 400);
+
+            $id = wp_insert_post([
+                'post_type'    => 'post',
+                'post_status'  => sb_post_status_in($req->get_param('status')),
+                'post_title'   => $title,
+                'post_content' => wp_kses_post((string) $req->get_param('content')),
+                'post_author'  => (int) $user->ID,
+            ], true);
+            if (is_wp_error($id)) return new WP_REST_Response(['success' => false, 'message' => 'Could not create post.'], 500);
+            sb_post_apply_body($id, $req);
+            return new WP_REST_Response(['success' => true, 'id' => (int) $id, 'slug' => get_post_field('post_name', $id)], 201);
+        }
+    }
+
+    // Resolve {id} → post, enforcing the JWT user is the author.
+    if (!function_exists('sb_post_owner_guard')) {
+        function sb_post_owner_guard(WP_REST_Request $req) {
+            $user = sb_posts_user($req);
+            if (!$user) return ['err' => new WP_REST_Response(['success' => false, 'error' => 'UNAUTHORIZED'], 401)];
+            $p = get_post((int) $req->get_param('id'));
+            if (!$p || $p->post_type !== 'post') return ['err' => new WP_REST_Response(['success' => false, 'error' => 'NOT_FOUND'], 404)];
+            if ((int) $p->post_author !== (int) $user->ID) return ['err' => new WP_REST_Response(['success' => false, 'error' => 'FORBIDDEN'], 403)];
+            return ['user' => $user, 'post' => $p];
+        }
+    }
+
+    if (!function_exists('sb_get_post')) {
+        function sb_get_post(WP_REST_Request $req) {
+            $g = sb_post_owner_guard($req);
+            if (isset($g['err'])) return $g['err'];
+            $p = $g['post'];
+            $blocks = get_post_meta($p->ID, 'sb_content_blocks', true);
+            $decoded = $blocks ? json_decode($blocks, true) : null;
+            $fid = (int) get_post_thumbnail_id($p->ID);
+            return new WP_REST_Response([
+                'success'         => true,
+                'id'              => (int) $p->ID,
+                'title'           => html_entity_decode(get_the_title($p->ID), ENT_QUOTES),
+                'slug'            => $p->post_name,
+                'status'          => $p->post_status,
+                'content'         => $p->post_content,
+                'contentBlocks'   => $decoded,
+                'featuredImageId' => $fid,
+                'featuredImageUrl' => $fid ? wp_get_attachment_url($fid) : '',
+            ], 200);
+        }
+    }
+
+    if (!function_exists('sb_update_post')) {
+        function sb_update_post(WP_REST_Request $req) {
+            $g = sb_post_owner_guard($req);
+            if (isset($g['err'])) return $g['err'];
+            $id = (int) $g['post']->ID;
+            $title = sanitize_text_field((string) $req->get_param('title'));
+            wp_update_post([
+                'ID'           => $id,
+                'post_title'   => $title !== '' ? $title : $g['post']->post_title,
+                'post_content' => wp_kses_post((string) $req->get_param('content')),
+                'post_status'  => sb_post_status_in($req->get_param('status')),
+            ]);
+            sb_post_apply_body($id, $req);
+            return new WP_REST_Response(['success' => true, 'id' => $id, 'slug' => get_post_field('post_name', $id)], 200);
+        }
+    }
+
+    if (!function_exists('sb_delete_post')) {
+        function sb_delete_post(WP_REST_Request $req) {
+            $g = sb_post_owner_guard($req);
+            if (isset($g['err'])) return $g['err'];
+            wp_trash_post((int) $g['post']->ID);
+            return new WP_REST_Response(['success' => true], 200);
+        }
+    }
+}
