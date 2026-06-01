@@ -217,7 +217,7 @@ if (defined('ABSPATH')) {
 
             echo '<style>
 #sb_overview{font-size:.82rem;color:#1a2533}
-#sb_overview .sb-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;margin-bottom:16px}
+#sb_overview .sb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px;margin-bottom:16px}
 #sb_overview .sb-stat{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:11px 12px}
 #sb_overview .sb-stat .l{display:flex;align-items:center;gap:6px;font-size:.62rem;color:#64748b;text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-bottom:6px}
 #sb_overview .sb-stat .n{font-size:1.5rem;font-weight:800;line-height:1}
@@ -230,6 +230,10 @@ if (defined('ABSPATH')) {
 #sb_overview .sb-sh{display:flex;align-items:center;gap:8px;font-size:.78rem;font-weight:800;margin:0 0 10px}
 #sb_overview .sb-sh .count{background:#f1f5f9;color:#475569;font-size:.65rem;padding:2px 8px;border-radius:999px}
 #sb_overview .sb-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+#sb_overview .sb-section{overflow-x:auto}
+#sb_overview table{min-width:480px}
+@media (max-width:1100px){#sb_overview .sb-cols{grid-template-columns:1fr}}
+@media (max-width:600px){#sb_overview .sb-stat .n{font-size:1.3rem}}
 #sb_overview table{width:100%;border-collapse:collapse}
 #sb_overview th{text-align:left;font-size:.6rem;color:#94a3b8;text-transform:uppercase;font-weight:700;padding:0 8px 7px 0;border-bottom:1px solid #f1f5f9}
 #sb_overview td{padding:7px 8px 7px 0;border-bottom:1px solid #f5f8fb;font-size:.78rem}
@@ -358,7 +362,13 @@ if (defined('ABSPATH')) {
     add_action('admin_head', function () {
         $s = get_current_screen();
         if (!$s || $s->id !== 'dashboard') return;
-        echo '<style>#sb_overview_widget{grid-column:1/-1}#dashboard-widgets #sb_overview_widget.postbox{width:100%}</style>';
+        // Force the analytics widget to span the full dashboard width (WP's
+        // multi-column postbox layout otherwise caps it at ~49%).
+        echo '<style>
+        #dashboard-widgets-wrap .postbox-container{width:100%!important;float:none!important}
+        #dashboard-widgets #sb_overview_widget{margin:0 0 16px}
+        #sb_overview_widget .inside{padding:10px 12px}
+        </style>';
     });
 
     /* ===================== Admin notices ================================= */
