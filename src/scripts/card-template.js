@@ -93,6 +93,8 @@ function priceHTML(l, rateMode) {
   const showMonthlyFirst = rateMode === 'monthly' && monthly > 0
   const primary = showMonthlyFirst ? monthly : daily
   const primaryLabel = showMonthlyFirst ? ' / month' : ' / night'
+  // Multi-rate listings (room types / per-pax) show a "from" cheapest price.
+  const fromPrefix = (l.priceMode && l.priceMode !== 'flat') ? 'from ' : ''
 
   let alt = ''
   if (showMonthlyFirst && daily) {
@@ -103,7 +105,7 @@ function priceHTML(l, rateMode) {
 
   if (!primary && !alt) return ''
   return `<div class="ac-price-row"><div>
-    ${primary ? `<div class="ac-price-night">₱${primary.toLocaleString()}<span class="ac-price-sub">${primaryLabel}</span></div>` : ''}
+    ${primary ? `<div class="ac-price-night">${fromPrefix ? `<span class="ac-price-from">${fromPrefix}</span>` : ''}₱${primary.toLocaleString()}<span class="ac-price-sub">${primaryLabel}</span></div>` : ''}
     ${alt}
   </div></div>`
 }

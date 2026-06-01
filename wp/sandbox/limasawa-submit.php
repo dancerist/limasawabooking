@@ -186,6 +186,33 @@ if (defined('ABSPATH')) {
             sb_submit_field('accommodation_bathrooms', (int) ($d['bathrooms'] ?? 0), $post_id);
             sb_submit_field('accommodation_daily_rent', (float) ($d['dailyRate'] ?? 0), $post_id);
             sb_submit_field('accommodation_monthly_rent', (float) ($d['monthlyRate'] ?? 0), $post_id);
+
+            // ── Pricing mode (flat | rooms | per_pax) ──
+            $pricingMode = in_array(($d['pricingMode'] ?? 'flat'), ['flat', 'rooms', 'per_pax'], true) ? $d['pricingMode'] : 'flat';
+            sb_submit_field('pricing_mode', $pricingMode, $post_id);
+            if ($pricingMode === 'rooms' && !empty($d['roomTypes']) && is_array($d['roomTypes'])) {
+                $roomRows = [];
+                foreach ($d['roomTypes'] as $rt) {
+                    if (!is_array($rt)) continue;
+                    $nm = sanitize_text_field($rt['name'] ?? '');
+                    $rt_rate = (float) ($rt['rate'] ?? 0);
+                    if ($nm === '' && $rt_rate <= 0) continue;
+                    $roomRows[] = [
+                        'room_name'     => $nm,
+                        'room_capacity' => (int) ($rt['capacity'] ?? 0),
+                        'room_rate'     => $rt_rate,
+                        'room_note'     => sanitize_text_field($rt['note'] ?? ''),
+                    ];
+                }
+                sb_submit_field('accommodation_room_types', $roomRows, $post_id);
+                sb_submit_field('additional_bed_rate', (float) ($d['additionalBedRate'] ?? 0), $post_id);
+            } elseif ($pricingMode === 'per_pax' && !empty($d['perPax']) && is_array($d['perPax'])) {
+                $pp = $d['perPax'];
+                sb_submit_field('per_pax_base_rate', (float) ($pp['baseRate'] ?? 0), $post_id);
+                sb_submit_field('per_pax_base_pax', (int) ($pp['basePax'] ?? 0), $post_id);
+                sb_submit_field('per_pax_extra_rate', (float) ($pp['extraPerPax'] ?? 0), $post_id);
+                sb_submit_field('per_pax_max_pax', (int) ($pp['maxPax'] ?? 0), $post_id);
+            }
             sb_submit_field('address_1', sanitize_text_field($d['address1'] ?? ''), $post_id);
 
             // External links

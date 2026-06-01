@@ -61,6 +61,61 @@ if (defined('ABSPATH')) {
     }
 
     /* -------------------------------------------------------------------------
+     * Rate summary — resolves a listing's pricing_mode (flat | rooms | per_pax)
+     * into one normalised shape with a computed `priceFrom` (cheapest nightly).
+     * priceFrom feeds the card price + the price filter, so adding room/per-pax
+     * listings needs no other change anywhere in the filter/sort path.
+     * ---------------------------------------------------------------------- */
+    if (!function_exists('sb_rate_summary')) {
+        function sb_rate_summary($post_id) {
+            $mode    = sb_acf('pricing_mode', $post_id, 'flat');
+            $mode    = in_array($mode, ['flat', 'rooms', 'per_pax'], true) ? $mode : 'flat';
+            $daily   = (float) sb_acf('accommodation_daily_rent', $post_id, 0);
+            $monthly = (float) sb_acf('accommodation_monthly_rent', $post_id, 0);
+            $rooms   = [];
+            $perPax  = null;
+            $addBed  = 0.0;
+            $from    = $daily;
+
+            if ($mode === 'rooms') {
+                foreach ((array) sb_acf('accommodation_room_types', $post_id, []) as $r) {
+                    if (!is_array($r)) continue;
+                    $rooms[] = [
+                        'name'     => (string) ($r['room_name'] ?? ''),
+                        'capacity' => (int) ($r['room_capacity'] ?? 0),
+                        'rate'     => (float) ($r['room_rate'] ?? 0),
+                        'note'     => (string) ($r['room_note'] ?? ''),
+                    ];
+                }
+                $rates = array_filter(array_map(function ($x) { return $x['rate']; }, $rooms), function ($v) { return $v > 0; });
+                $from  = $rates ? min($rates) : 0.0;
+                $addBed = (float) sb_acf('additional_bed_rate', $post_id, 0);
+            } elseif ($mode === 'per_pax') {
+                $base   = (float) sb_acf('per_pax_base_rate', $post_id, 0);
+                $perPax = [
+                    'baseRate'    => $base,
+                    'basePax'     => (int) sb_acf('per_pax_base_pax', $post_id, 0),
+                    'extraPerPax' => (float) sb_acf('per_pax_extra_rate', $post_id, 0),
+                    'maxPax'      => (int) sb_acf('per_pax_max_pax', $post_id, 0),
+                ];
+                $from = $base;
+            }
+
+            return [
+                'mode'      => $mode,
+                'daily'     => $daily,
+                'monthly'   => $monthly,
+                'rooms'     => $rooms,
+                'perPax'    => $perPax,
+                'addBed'    => $addBed,
+                // For the card "price" field: flat uses daily, else cheapest.
+                'cardPrice' => $mode === 'flat' ? $daily : $from,
+                'priceFrom' => $from,
+            ];
+        }
+    }
+
+    /* -------------------------------------------------------------------------
      * Formatter — one accommodation post → the shape src/lib/api.ts expects.
      * $full=false keeps the card payload lean (cards never read detail fields);
      * $full=true adds everything a single-listing page needs.
@@ -87,6 +142,7 @@ if (defined('ABSPATH')) {
             $lng = is_array($map) && isset($map['lng']) ? (float) $map['lng'] : null;
 
             $badges = sb_acf('accommodation_badges', $post_id, []);
+            $rate   = sb_rate_summary($post_id);
 
             $out = [
                 'id'        => (int) $post_id,
@@ -96,8 +152,10 @@ if (defined('ABSPATH')) {
                 'tier'      => in_array('Featured', (array) $badges, true) ? 'featured' : 'free',
                 'thumb'     => get_the_post_thumbnail_url($post_id, 'large') ?: '',
                 'badges'    => array_values((array) $badges),
-                'price'     => (float) sb_acf('accommodation_daily_rent', $post_id, 0),
-                'monthly'   => (float) sb_acf('accommodation_monthly_rent', $post_id, 0),
+                'price'     => $rate['cardPrice'],
+                'monthly'   => $rate['monthly'],
+                'priceMode' => $rate['mode'],
+                'priceFrom' => $rate['priceFrom'],
                 'bedrooms'  => (int) sb_acf('accommodation_bedrooms', $post_id, 0),
                 'beds'      => (int) sb_acf('accommodation_beds', $post_id, 0),
                 'baths'     => (int) sb_acf('accommodation_bathrooms', $post_id, 0),
@@ -182,6 +240,11 @@ if (defined('ABSPATH')) {
                 'services'        => $services,
                 'customInfo'      => $custom,
                 'generatorSched'  => (string) sb_acf('generator_schedule', $post_id, ''),
+                'pricingMode'     => $rate['mode'],
+                'priceFrom'       => $rate['priceFrom'],
+                'roomTypes'       => $rate['rooms'],
+                'perPax'          => $rate['perPax'],
+                'additionalBedRate' => $rate['addBed'],
                 'host'            => [
                     'name'     => (string) sb_acf('accommodation_host_name', $post_id, ''),
                     'contact'  => (string) sb_acf('accommodation_host_contact_number', $post_id, ''),
@@ -408,7 +471,7 @@ if (defined('ABSPATH')) {
                     'id'       => (int) $post->ID,
                     'slug'     => $post->post_name,
                     'title'    => html_entity_decode(get_the_title($post->ID), ENT_QUOTES),
-                    'price'    => (float) sb_acf('accommodation_daily_rent', $post->ID, 0),
+                    'price'    => sb_rate_summary($post->ID)['cardPrice'],
                     'lat'      => (float) $map['lat'],
                     'lng'      => (float) $map['lng'],
                     'muniSlug' => $locs['slugs'][0] ?? '',
@@ -523,6 +586,7 @@ if (defined('ABSPATH')) {
             $au = $author ? get_userdata($author) : null;
             $claimable = $au && (bool) array_intersect(['administrator', 'editor'], (array) $au->roles);
             $hostingSince = $au ? (human_time_diff(strtotime($au->user_registered), current_time('timestamp')) . ' hosting') : '';
+            $rateSummary = sb_rate_summary($id);
 
             $out = [
                 'id' => $id, 'slug' => $post->post_name,
@@ -533,8 +597,13 @@ if (defined('ABSPATH')) {
                 'tier' => in_array('Featured', $badges, true) ? 'featured' : (get_post_meta($id, 'listing_tier', true) ?: 'free'),
                 'verified' => (bool) sb_acf('accommodation_fully_verified', $id, false),
                 'badges' => $badges,
-                'price' => (float) sb_acf('accommodation_daily_rent', $id, 0),
-                'monthly' => (float) sb_acf('accommodation_monthly_rent', $id, 0),
+                'price' => $rateSummary['cardPrice'],
+                'monthly' => $rateSummary['monthly'],
+                'pricingMode' => $rateSummary['mode'],
+                'priceFrom' => $rateSummary['priceFrom'],
+                'roomTypes' => $rateSummary['rooms'],
+                'perPax' => $rateSummary['perPax'],
+                'additionalBedRate' => $rateSummary['addBed'],
                 'bedrooms' => (int) sb_acf('accommodation_bedrooms', $id, 0),
                 'beds' => (int) sb_acf('accommodation_beds', $id, 0),
                 'baths' => (int) sb_acf('accommodation_bathrooms', $id, 0),

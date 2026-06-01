@@ -221,6 +221,7 @@ function reshapeListing(l: any) {
     slug: l.slug,
     excerpt: l.excerpt || '',
     listingTier: l.tier || 'free',
+    priceMode: l.priceMode || l.pricingMode || 'flat',
     featuredImage: l.thumb ? { node: { sourceUrl: l.thumb, altText: '' } } : null,
     accommodationData: {
       accommodationBadges: Array.isArray(l.badges) ? l.badges : [],

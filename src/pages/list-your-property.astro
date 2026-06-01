@@ -982,6 +982,105 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
       </div>
     </div>
 
+    <!-- ── Pricing mode chooser ── -->
+    <div class="step" data-step="pricingMode">
+      <div class="w-full max-w-lg">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 0 0 0 4h4a2 2 0 0 1 0 4H8"/><path d="M12 18V6"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Pricing</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">How do you price this place?</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">Pick the option that matches how you charge guests.</p>
+        <div class="flex flex-col gap-3">
+          <div class="choice-chip flex items-start gap-3" data-value="flat" onclick="selectChoice(this,'pricingMode',true)">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style="background:var(--primary-light)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div><span class="font-semibold">One rate for the whole place</span><p class="text-xs mt-0.5" style="color:#9ca3af">A single nightly (and optional monthly) price.</p></div>
+          </div>
+          <div class="choice-chip flex items-start gap-3" data-value="rooms" onclick="selectChoice(this,'pricingMode',true)">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style="background:var(--primary-light)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/></svg>
+            </div>
+            <div><span class="font-semibold">Different room types</span><p class="text-xs mt-0.5" style="color:#9ca3af">e.g. Barkada ₱3,999 · Family ₱2,500 · Couple ₱1,999.</p></div>
+          </div>
+          <div class="choice-chip flex items-start gap-3" data-value="per_pax" onclick="selectChoice(this,'pricingMode',true)">
+            <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style="background:var(--primary-light)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
+            </div>
+            <div><span class="font-semibold">Per-pax tiered rate</span><p class="text-xs mt-0.5" style="color:#9ca3af">e.g. ₱3,400 up to 4 pax, +₱350 per extra guest.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Room types repeater ── -->
+    <div class="step" data-step="roomTypes">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><rect x="3" y="4" width="18" height="6" rx="1"/><rect x="3" y="14" width="18" height="6" rx="1"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Room types</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Your room types &amp; rates</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">Add each room type with its nightly rate. The cheapest shows as your &ldquo;from&rdquo; price.</p>
+        <div id="room-types-list" class="flex flex-col gap-4"></div>
+        <button type="button" class="mt-4 inline-flex items-center gap-2 text-sm font-semibold" style="color:var(--primary)" onclick="addRoomType()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add room type
+        </button>
+        <div class="mt-6">
+          <label class="text-sm font-semibold" style="color:#374151">Additional bed rate <span class="font-normal" style="color:#9ca3af">(optional)</span></label>
+          <div class="flex items-center gap-2 mt-1">
+            <span class="text-xl font-bold" style="color:#9ca3af">&#8369;</span>
+            <input id="input-additionalBedRate" class="form-input" type="number" min="0" placeholder="300" />
+          </div>
+        </div>
+        <div class="flex items-center gap-4 mt-6">
+          <button class="ok-btn" onclick="confirmRoomTypes()">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Per-pax tiered rate ── -->
+    <div class="step" data-step="perPax">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Per-pax rate</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Set your per-pax pricing</h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">A base rate covering a number of guests, plus a per-guest add-on.</p>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="text-sm font-semibold" style="color:#374151">Base rate / night</label>
+            <div class="flex items-center gap-1 mt-1"><span class="text-lg font-bold" style="color:#9ca3af">&#8369;</span>
+              <input id="input-pp-baseRate" class="form-input" type="number" min="0" placeholder="3400" oninput="updatePerPaxPreview()" /></div>
+          </div>
+          <div>
+            <label class="text-sm font-semibold" style="color:#374151">Base pax included</label>
+            <input id="input-pp-basePax" class="form-input mt-1" type="number" min="1" placeholder="4" oninput="updatePerPaxPreview()" />
+          </div>
+          <div>
+            <label class="text-sm font-semibold" style="color:#374151">Extra per pax</label>
+            <div class="flex items-center gap-1 mt-1"><span class="text-lg font-bold" style="color:#9ca3af">&#8369;</span>
+              <input id="input-pp-extraPerPax" class="form-input" type="number" min="0" placeholder="350" oninput="updatePerPaxPreview()" /></div>
+          </div>
+          <div>
+            <label class="text-sm font-semibold" style="color:#374151">Maximum pax</label>
+            <input id="input-pp-maxPax" class="form-input mt-1" type="number" min="1" placeholder="11" oninput="updatePerPaxPreview()" />
+          </div>
+        </div>
+        <p id="pp-preview" class="text-sm mt-4" style="color:var(--primary)"></p>
+        <div class="flex items-center gap-4 mt-6">
+          <button class="ok-btn" onclick="confirmPerPax()">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- ── 11: Daily rate ── -->
     <div class="step" data-step="dailyRate">
       <div class="w-full max-w-xl">
@@ -1525,6 +1624,10 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
     barangayId: 0, barangayName: '',
     guests:1, bedrooms:0, beds:0, bathrooms:0,
     dailyRate:'', monthlyRate:'', description:'',
+    pricingMode:'flat',           // 'flat' | 'rooms' | 'per_pax'
+    roomTypes:[],                 // [{ name, capacity, rate, note }]
+    additionalBedRate:'',
+    perPax:{ baseRate:'', basePax:'', extraPerPax:'', maxPax:'' },
     bookingLink:'', airbnbLink:'', bookingComLink:'',
     websiteLink:'', facebookLink:'', instagramLink:'',
     addServices: false,
@@ -1547,7 +1650,7 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
   const ALL_STEPS = [
     'welcome','tier','billing','hostName','hostPhone','hostPhoto','propertyName',
     'accommodationCategory','placeType','municipality','barangay','mapLocation',
-    'guests','capacity','dailyRate','monthlyRate',
+    'guests','capacity','pricingMode','dailyRate','monthlyRate','roomTypes','perPax',
     'description','longDescription',
     'bookingLink','airbnbLink','bookingComLink','socialLinks','services',
     'amenities','generator','gallery','payment','review','success',
@@ -1568,6 +1671,11 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
         if (['welcome','tier','billing','payment','success'].includes(id)) return false
       }
       if ((id === 'billing' || id === 'payment') && data.tier === 'free') return false
+      // Pricing-mode gating: only show the rate steps matching the chosen mode.
+      const mode = data.pricingMode || 'flat'
+      if ((id === 'dailyRate' || id === 'monthlyRate') && mode !== 'flat') return false
+      if (id === 'roomTypes' && mode !== 'rooms') return false
+      if (id === 'perPax' && mode !== 'per_pax') return false
       const min = TIER_MIN[id]
       if (!min) return true
       return tierIdx >= TIER_ORDER.indexOf(min)
@@ -1625,6 +1733,12 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
     if (id === 'tier') checkMultiListingDiscount()
     if (id === 'billing') renderBillingOptions()
     if (id === 'payment') renderPaymentStep()
+    if (id === 'roomTypes') ensureRoomTypesUI()
+    if (id === 'perPax') hydratePerPaxUI()
+    if (id === 'pricingMode') {
+      document.querySelectorAll('[data-step="pricingMode"] .choice-chip').forEach(c =>
+        c.classList.toggle('selected', c.dataset.value === (data.pricingMode || 'flat')))
+    }
   }
 
   function nextStep() {
@@ -1822,6 +1936,98 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
     data[field] = Math.max(min, Math.min(max, (data[field] || 0) + delta))
     const el = document.getElementById('val-' + field)
     if (el) el.textContent = data[field]
+  }
+
+  // ── Room-types repeater ──────────────────────────────────────────────────
+  function roomRowHTML() {
+    return `<div class="rt-row" style="border:1px solid #e5e7eb;border-radius:12px;padding:14px">
+      <div class="flex items-center gap-2">
+        <input class="form-input rt-name" placeholder="Room name (e.g. Barkada Room)" />
+        <button type="button" title="Remove" onclick="removeRoomType(this)" style="flex:0 0 auto;width:34px;height:34px;border-radius:9px;border:1px solid #e5e7eb;background:#fff;color:#9ca3af;cursor:pointer;font-size:18px;line-height:1">&times;</button>
+      </div>
+      <div class="grid grid-cols-2 gap-2 mt-2">
+        <input class="form-input rt-capacity" type="number" min="0" placeholder="Good for (pax)" />
+        <div class="flex items-center gap-1"><span style="color:#9ca3af">&#8369;</span><input class="form-input rt-rate" type="number" min="0" placeholder="Rate / night" /></div>
+      </div>
+      <input class="form-input rt-note mt-2" placeholder="Short note (optional)" />
+    </div>`
+  }
+  function addRoomType(prefill) {
+    const list = document.getElementById('room-types-list')
+    if (!list) return
+    const wrap = document.createElement('div')
+    wrap.innerHTML = roomRowHTML()
+    const row = wrap.firstElementChild
+    list.appendChild(row)
+    if (prefill) {
+      row.querySelector('.rt-name').value     = prefill.name || ''
+      row.querySelector('.rt-capacity').value = prefill.capacity || ''
+      row.querySelector('.rt-rate').value     = prefill.rate || ''
+      row.querySelector('.rt-note').value     = prefill.note || ''
+    }
+  }
+  function removeRoomType(btn) {
+    const list = document.getElementById('room-types-list')
+    const row  = btn.closest('.rt-row')
+    if (!row || !list) return
+    if (list.querySelectorAll('.rt-row').length > 1) row.remove()
+    else row.querySelectorAll('input').forEach(i => { i.value = '' })  // keep ≥1 row
+  }
+  function ensureRoomTypesUI() {
+    const list = document.getElementById('room-types-list')
+    if (!list) return
+    list.innerHTML = ''
+    if (Array.isArray(data.roomTypes) && data.roomTypes.length) data.roomTypes.forEach(rt => addRoomType(rt))
+    else addRoomType()
+    const bed = document.getElementById('input-additionalBedRate')
+    if (bed) bed.value = data.additionalBedRate || ''
+  }
+  function readRoomTypes() {
+    return Array.from(document.querySelectorAll('#room-types-list .rt-row')).map(r => ({
+      name:     r.querySelector('.rt-name').value.trim(),
+      capacity: parseInt(r.querySelector('.rt-capacity').value, 10) || 0,
+      rate:     parseFloat(r.querySelector('.rt-rate').value) || 0,
+      note:     r.querySelector('.rt-note').value.trim(),
+    })).filter(rt => rt.name || rt.rate)
+  }
+  function confirmRoomTypes() {
+    const rooms = readRoomTypes()
+    if (!rooms.length || !rooms.some(r => r.rate > 0)) {
+      const first = document.querySelector('#room-types-list .rt-rate')
+      shakeInput(first); if (first) first.focus(); return
+    }
+    data.roomTypes = rooms
+    data.additionalBedRate = (document.getElementById('input-additionalBedRate')?.value || '').trim()
+    nextStep()
+  }
+
+  // ── Per-pax tiered rate ──────────────────────────────────────────────────
+  function ppVal(id, int) {
+    const v = document.getElementById('input-pp-' + id)?.value
+    return int ? (parseInt(v, 10) || 0) : (parseFloat(v) || 0)
+  }
+  function hydratePerPaxUI() {
+    const p = data.perPax || {}
+    const set = (id, v) => { const el = document.getElementById('input-pp-' + id); if (el) el.value = v || '' }
+    set('baseRate', p.baseRate); set('basePax', p.basePax); set('extraPerPax', p.extraPerPax); set('maxPax', p.maxPax)
+    updatePerPaxPreview()
+  }
+  function updatePerPaxPreview() {
+    const el = document.getElementById('pp-preview')
+    if (!el) return
+    const base = ppVal('baseRate'), basePax = ppVal('basePax', true), extra = ppVal('extraPerPax'), max = ppVal('maxPax', true)
+    if (!base) { el.textContent = ''; return }
+    let s = `₱${base.toLocaleString()} / night for up to ${basePax || '?'} pax`
+    if (extra) s += `, then +₱${extra.toLocaleString()} per extra guest`
+    if (max) s += ` (max ${max} pax)`
+    el.textContent = s + '.'
+  }
+  function confirmPerPax() {
+    const base = ppVal('baseRate'), basePax = ppVal('basePax', true)
+    if (!base)    { const el = document.getElementById('input-pp-baseRate'); shakeInput(el); if (el) el.focus(); return }
+    if (!basePax) { const el = document.getElementById('input-pp-basePax');  shakeInput(el); if (el) el.focus(); return }
+    data.perPax = { baseRate: base, basePax, extraPerPax: ppVal('extraPerPax'), maxPax: ppVal('maxPax', true) }
+    nextStep()
   }
 
   // ── Media upload ───────────────────────────────────────────────────────
@@ -2719,8 +2925,19 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
       ['Bedrooms',    data.bedrooms],
       ['Beds',        data.beds],
       ['Bathrooms',   data.bathrooms],
-      ['Nightly rate','₱' + (data.dailyRate || '—')],
-      ['Monthly rate', data.monthlyRate ? '₱' + data.monthlyRate : '—'],
+      ...(data.pricingMode === 'rooms'
+          ? [['Room types', (data.roomTypes || []).length
+              ? data.roomTypes.map(r => `${r.name || 'Room'}${r.capacity ? ` (${r.capacity}p)` : ''} · ₱${Number(r.rate || 0).toLocaleString()}`).join('<br>')
+              : '—'],
+             ...(data.additionalBedRate ? [['Additional bed', '₱' + data.additionalBedRate]] : [])]
+          : data.pricingMode === 'per_pax'
+          ? [['Per-pax rate', data.perPax && data.perPax.baseRate
+              ? `₱${Number(data.perPax.baseRate).toLocaleString()} / up to ${data.perPax.basePax || '?'} pax`
+                + (data.perPax.extraPerPax ? `, +₱${Number(data.perPax.extraPerPax).toLocaleString()}/pax` : '')
+                + (data.perPax.maxPax ? ` (max ${data.perPax.maxPax})` : '')
+              : '—']]
+          : [['Nightly rate','₱' + (data.dailyRate || '—')],
+             ['Monthly rate', data.monthlyRate ? '₱' + data.monthlyRate : '—']]),
       ['Description', data.description || '—'],
       ['Full desc.',  (() => {
         if (!data.longDescription) return '—'
@@ -2813,6 +3030,8 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
       else if (textSteps.includes(id)) advanceText(id, optionalSteps.includes(id))
       else if (id === 'description') { if (!e.ctrlKey) return; advanceText('description') }
       else if (id === 'socialLinks') saveSocialLinks()
+      else if (id === 'roomTypes') confirmRoomTypes()
+      else if (id === 'perPax') confirmPerPax()
       else if (id === 'generator') confirmGenerator()
       else if (id === 'payment') confirmPayment()
       else if (['guests','capacity','amenities','gallery'].includes(id)) nextStep()

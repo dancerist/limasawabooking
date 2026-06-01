@@ -3768,7 +3768,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
           `<div style="text-align:center; padding:3rem; color:#64748B;"><p>Failed to reach server. <button onclick="loadDashboard()" style="color:var(--primary);background:none;border:none;cursor:pointer;font-weight:600;">Retry</button></p></div>`
         return
       }
-      if (!meData?.success) { doLogout(); return }
+      if (!meData?.user) { doLogout(); return }
 
       const u = meData.user
       _me = u

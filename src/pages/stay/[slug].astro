@@ -328,6 +328,14 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     .service-icon-fallback { display: grid; place-items: center; border-radius: 10px; background: #F5F8FB; color: #4C5B6C; font-size: 24px; }
     .service-item strong { display: block; color: #1A2533; font-size: 18px; line-height: 1.25; }
     .service-item p { margin: 5px 0 0; color: #64748B; line-height: 1.5; }
+    /* Room-types / per-pax breakdown inside the right-hand booking card */
+    .bc-rates { margin: 14px 0 2px; border-top: 1px solid #EEF2F6; padding-top: 12px; }
+    .bc-rate-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 6px 0; }
+    .bc-rate-name { color: #1A2533; font-weight: 600; font-size: 14px; }
+    .bc-rate-name em { color: #64748B; font-weight: 400; font-style: normal; font-size: 12px; }
+    .bc-rate-row strong { color: #1A2533; font-size: 15px; white-space: nowrap; }
+    .bc-rate-add, .bc-rate-note { color: #64748B; font-size: 13px; margin-top: 8px; }
+    .price-from, .intro-price-from { color: #64748B; font-weight: 400; }
     .chip-list { display: flex; flex-wrap: wrap; gap: 10px; }
     .chip-list span { border: 1px solid #FECACA; color: #B91C1C; background: #FEF2F2; border-radius: 999px; padding: 8px 12px; font-size: 14px; }
     .map-location { color: #64748B; margin: -8px 0 16px; }
@@ -641,9 +649,10 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
       // Host moved out into its own .host-section block (see renderHostBlock).
       // Inline price line — only shown on narrow screens where the booking
       // sidebar drops below the fold (CSS toggles visibility at <=860px).
+      const fromPrefix = (d.pricingMode && d.pricingMode !== 'flat') ? 'from ' : ''
       const priceInline = d.price
         ? `<p class="intro-price-inline">
-             <strong>₱${Number(d.price).toLocaleString()}</strong><span> / night</span>
+             <span class="intro-price-from">${fromPrefix}</span><strong>₱${Number(d.price).toLocaleString()}</strong><span> / night</span>
              ${d.monthly ? `<span class="intro-price-monthly">· ₱${Number(d.monthly).toLocaleString()} / month</span>` : ''}
            </p>`
         : ''
@@ -708,6 +717,30 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
         <div class="amenity-highlight-grid">${highlights}</div>
         ${btn}
       </section>`
+    }
+
+    // Compact room-types / per-pax breakdown for the right-hand booking card.
+    // Sits under the "from ₱X / night" headline. Flat listings render nothing.
+    function renderSidebarRates(d) {
+      const mode = d.pricingMode || 'flat'
+      if (mode === 'rooms' && Array.isArray(d.roomTypes) && d.roomTypes.length) {
+        const rows = d.roomTypes.map(r => `
+          <div class="bc-rate-row">
+            <span class="bc-rate-name">${esc(r.name || 'Room')}${r.capacity ? ` <em>· ${Number(r.capacity)} pax</em>` : ''}</span>
+            <strong>₱${Number(r.rate || 0).toLocaleString()}</strong>
+          </div>`).join('')
+        const addBed = Number(d.additionalBedRate || 0)
+        return `<div class="bc-rates">${rows}${addBed > 0 ? `<div class="bc-rate-add">Additional bed · ₱${addBed.toLocaleString()}</div>` : ''}</div>`
+      }
+      if (mode === 'per_pax' && d.perPax && Number(d.perPax.baseRate) > 0) {
+        const p = d.perPax
+        const extra = Number(p.extraPerPax || 0), max = Number(p.maxPax || 0)
+        return `<div class="bc-rates">
+          <div class="bc-rate-row"><span class="bc-rate-name">Up to ${Number(p.basePax) || '?'} pax</span><strong>₱${Number(p.baseRate).toLocaleString()}</strong></div>
+          ${extra > 0 ? `<div class="bc-rate-note">+₱${extra.toLocaleString()} per extra guest${max ? ` (max ${max} pax)` : ''}</div>` : ''}
+        </div>`
+      }
+      return ''
     }
 
     function renderServices(d) {
@@ -786,9 +819,10 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
         : 'Booking is handled through the links this host provided.'
       return `
         <div class="price-block">
-          ${d.price ? `<div><strong>₱${Number(d.price).toLocaleString()}</strong><span> / night</span></div>` : ''}
+          ${d.price ? `<div>${(d.pricingMode && d.pricingMode !== 'flat') ? '<span class="price-from">from </span>' : ''}<strong>₱${Number(d.price).toLocaleString()}</strong><span> / night</span></div>` : ''}
           ${d.monthly ? `<p>₱${Number(d.monthly).toLocaleString()} / month</p>` : ''}
         </div>
+        ${renderSidebarRates(d)}
         <div class="booking-note">${noteCopy}</div>
         ${linksHtml}
         ${d.contactNumber ? renderContactBlock(d.contactNumber) : ''}

@@ -52,6 +52,7 @@ const flat = {
   title:      listing.title ?? '',
   price:      Number(d?.accommodationDailyRent ?? 0),
   monthly:    Number(d?.accommodationMonthlyRent ?? 0),
+  priceMode:  listing.priceMode ?? 'flat',
   beds:       Number(d?.accommodationBeds ?? 0),
   baths:      Number(d?.accommodationBathrooms ?? 0),
   guests:     Number(d?.accommodationNumberOfGuests ?? 0),
