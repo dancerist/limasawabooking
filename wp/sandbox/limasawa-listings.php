@@ -101,6 +101,16 @@ if (defined('ABSPATH')) {
                 $from = $base;
             }
 
+            // Generic add-on charges — available in any mode.
+            $extras = [];
+            foreach ((array) sb_acf('pricing_extras', $post_id, []) as $e) {
+                if (!is_array($e)) continue;
+                $lbl = (string) ($e['extra_label'] ?? '');
+                $amt = (float) ($e['extra_amount'] ?? 0);
+                if ($lbl === '' && $amt <= 0) continue;
+                $extras[] = ['label' => $lbl, 'amount' => $amt, 'note' => (string) ($e['extra_note'] ?? '')];
+            }
+
             return [
                 'mode'      => $mode,
                 'daily'     => $daily,
@@ -108,6 +118,7 @@ if (defined('ABSPATH')) {
                 'rooms'     => $rooms,
                 'perPax'    => $perPax,
                 'addBed'    => $addBed,
+                'extras'    => $extras,
                 // For the card "price" field: flat uses daily, else cheapest.
                 'cardPrice' => $mode === 'flat' ? $daily : $from,
                 'priceFrom' => $from,
@@ -245,6 +256,7 @@ if (defined('ABSPATH')) {
                 'roomTypes'       => $rate['rooms'],
                 'perPax'          => $rate['perPax'],
                 'additionalBedRate' => $rate['addBed'],
+                'pricingExtras'   => $rate['extras'],
                 'host'            => [
                     'name'     => (string) sb_acf('accommodation_host_name', $post_id, ''),
                     'contact'  => (string) sb_acf('accommodation_host_contact_number', $post_id, ''),
@@ -604,6 +616,7 @@ if (defined('ABSPATH')) {
                 'roomTypes' => $rateSummary['rooms'],
                 'perPax' => $rateSummary['perPax'],
                 'additionalBedRate' => $rateSummary['addBed'],
+                'pricingExtras' => $rateSummary['extras'],
                 'bedrooms' => (int) sb_acf('accommodation_bedrooms', $id, 0),
                 'beds' => (int) sb_acf('accommodation_beds', $id, 0),
                 'baths' => (int) sb_acf('accommodation_bathrooms', $id, 0),

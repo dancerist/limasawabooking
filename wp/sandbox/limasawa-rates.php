@@ -132,6 +132,39 @@ add_action('acf/init', function () {
                 'min'               => 1,
                 'conditional_logic' => [[['field' => 'field_lima_pricing_mode', 'operator' => '==', 'value' => 'per_pax']]],
             ],
+
+            // ── extra charges (any mode) ─────────────────────────────────
+            [
+                'key'          => 'field_lima_pricing_extras',
+                'label'        => 'Extra charges (add-ons)',
+                'name'         => 'pricing_extras',
+                'type'         => 'repeater',
+                'instructions' => 'Optional add-on charges shown under the price. Free-text label, e.g. Adult ₱300, Young adult ₱200, Pet fee, Extra mattress. Works with any pricing mode.',
+                'button_label' => 'Add charge',
+                'layout'       => 'table',
+                'sub_fields'   => [
+                    [
+                        'key'   => 'field_lima_extra_label',
+                        'label' => 'Label',
+                        'name'  => 'extra_label',
+                        'type'  => 'text',
+                    ],
+                    [
+                        'key'     => 'field_lima_extra_amount',
+                        'label'   => 'Amount (PHP)',
+                        'name'    => 'extra_amount',
+                        'type'    => 'number',
+                        'min'     => 0,
+                        'prepend' => '₱',
+                    ],
+                    [
+                        'key'   => 'field_lima_extra_note',
+                        'label' => 'Note',
+                        'name'  => 'extra_note',
+                        'type'  => 'text',
+                    ],
+                ],
+            ],
         ],
         'location' => [[['param' => 'post_type', 'operator' => '==', 'value' => 'accommodation']]],
         'menu_order'            => 5,

@@ -335,6 +335,7 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     .bc-rate-name em { color: #64748B; font-weight: 400; font-style: normal; font-size: 12px; }
     .bc-rate-row strong { color: #1A2533; font-size: 15px; white-space: nowrap; }
     .bc-rate-add, .bc-rate-note { color: #64748B; font-size: 13px; margin-top: 8px; }
+    .bc-rates-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748B; margin-bottom: 4px; }
     .price-from, .intro-price-from { color: #64748B; font-weight: 400; }
     .chip-list { display: flex; flex-wrap: wrap; gap: 10px; }
     .chip-list span { border: 1px solid #FECACA; color: #B91C1C; background: #FEF2F2; border-radius: 999px; padding: 8px 12px; font-size: 14px; }
@@ -723,6 +724,7 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     // Sits under the "from ₱X / night" headline. Flat listings render nothing.
     function renderSidebarRates(d) {
       const mode = d.pricingMode || 'flat'
+      let html = ''
       if (mode === 'rooms' && Array.isArray(d.roomTypes) && d.roomTypes.length) {
         const rows = d.roomTypes.map(r => `
           <div class="bc-rate-row">
@@ -730,17 +732,26 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
             <strong>₱${Number(r.rate || 0).toLocaleString()}</strong>
           </div>`).join('')
         const addBed = Number(d.additionalBedRate || 0)
-        return `<div class="bc-rates">${rows}${addBed > 0 ? `<div class="bc-rate-add">Additional bed · ₱${addBed.toLocaleString()}</div>` : ''}</div>`
-      }
-      if (mode === 'per_pax' && d.perPax && Number(d.perPax.baseRate) > 0) {
+        html += `<div class="bc-rates">${rows}${addBed > 0 ? `<div class="bc-rate-add">Additional bed · ₱${addBed.toLocaleString()}</div>` : ''}</div>`
+      } else if (mode === 'per_pax' && d.perPax && Number(d.perPax.baseRate) > 0) {
         const p = d.perPax
         const extra = Number(p.extraPerPax || 0), max = Number(p.maxPax || 0)
-        return `<div class="bc-rates">
+        html += `<div class="bc-rates">
           <div class="bc-rate-row"><span class="bc-rate-name">Up to ${Number(p.basePax) || '?'} pax</span><strong>₱${Number(p.baseRate).toLocaleString()}</strong></div>
           ${extra > 0 ? `<div class="bc-rate-note">+₱${extra.toLocaleString()} per extra guest${max ? ` (max ${max} pax)` : ''}</div>` : ''}
         </div>`
       }
-      return ''
+      // Generic extra charges — shown for any pricing mode.
+      const extras = Array.isArray(d.pricingExtras) ? d.pricingExtras : []
+      if (extras.length) {
+        const rows = extras.map(e => `
+          <div class="bc-rate-row">
+            <span class="bc-rate-name">${esc(e.label || '')}${e.note ? ` <em>· ${esc(e.note)}</em>` : ''}</span>
+            <strong>₱${Number(e.amount || 0).toLocaleString()}</strong>
+          </div>`).join('')
+        html += `<div class="bc-rates"><div class="bc-rates-title">Extra charges</div>${rows}</div>`
+      }
+      return html
     }
 
     function renderServices(d) {

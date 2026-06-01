@@ -213,6 +213,23 @@ if (defined('ABSPATH')) {
                 sb_submit_field('per_pax_extra_rate', (float) ($pp['extraPerPax'] ?? 0), $post_id);
                 sb_submit_field('per_pax_max_pax', (int) ($pp['maxPax'] ?? 0), $post_id);
             }
+
+            // Generic extra charges (any mode)
+            if (!empty($d['pricingExtras']) && is_array($d['pricingExtras'])) {
+                $exRows = [];
+                foreach ($d['pricingExtras'] as $ex) {
+                    if (!is_array($ex)) continue;
+                    $lbl = sanitize_text_field($ex['label'] ?? '');
+                    $amt = (float) ($ex['amount'] ?? 0);
+                    if ($lbl === '' && $amt <= 0) continue;
+                    $exRows[] = [
+                        'extra_label'  => $lbl,
+                        'extra_amount' => $amt,
+                        'extra_note'   => sanitize_text_field($ex['note'] ?? ''),
+                    ];
+                }
+                if ($exRows) sb_submit_field('pricing_extras', $exRows, $post_id);
+            }
             sb_submit_field('address_1', sanitize_text_field($d['address1'] ?? ''), $post_id);
 
             // External links

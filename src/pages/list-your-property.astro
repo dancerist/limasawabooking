@@ -1081,6 +1081,29 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
       </div>
     </div>
 
+    <!-- ── Extra charges (any mode, optional) ── -->
+    <div class="step" data-step="pricingExtras">
+      <div class="w-full max-w-xl">
+        <div class="flex items-center gap-2 mb-4">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Extra charges</span>
+        </div>
+        <h2 class="text-3xl font-bold mb-1" style="color:#1a1a1a">Any extra charges? <span class="text-lg font-normal" style="color:#9ca3af">optional</span></h2>
+        <p class="text-sm mb-6" style="color:#9ca3af">Add-ons shown under your price &mdash; e.g. Adult &#8369;300, Young adult &#8369;200, Pet fee. Skip if none.</p>
+        <div id="pricing-extras-list" class="flex flex-col gap-3"></div>
+        <button type="button" class="mt-4 inline-flex items-center gap-2 text-sm font-semibold" style="color:var(--primary)" onclick="addPricingExtra()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add charge
+        </button>
+        <div class="flex items-center gap-4 mt-6">
+          <button class="ok-btn" onclick="confirmPricingExtras()">
+            OK <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="skip-link" onclick="skipStep()">Skip</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ── 11: Daily rate ── -->
     <div class="step" data-step="dailyRate">
       <div class="w-full max-w-xl">
@@ -1628,6 +1651,7 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
     roomTypes:[],                 // [{ name, capacity, rate, note }]
     additionalBedRate:'',
     perPax:{ baseRate:'', basePax:'', extraPerPax:'', maxPax:'' },
+    pricingExtras:[],             // [{ label, amount, note }] — any mode
     bookingLink:'', airbnbLink:'', bookingComLink:'',
     websiteLink:'', facebookLink:'', instagramLink:'',
     addServices: false,
@@ -1650,7 +1674,7 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
   const ALL_STEPS = [
     'welcome','tier','billing','hostName','hostPhone','hostPhoto','propertyName',
     'accommodationCategory','placeType','municipality','barangay','mapLocation',
-    'guests','capacity','pricingMode','dailyRate','monthlyRate','roomTypes','perPax',
+    'guests','capacity','pricingMode','dailyRate','monthlyRate','roomTypes','perPax','pricingExtras',
     'description','longDescription',
     'bookingLink','airbnbLink','bookingComLink','socialLinks','services',
     'amenities','generator','gallery','payment','review','success',
@@ -1735,6 +1759,7 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
     if (id === 'payment') renderPaymentStep()
     if (id === 'roomTypes') ensureRoomTypesUI()
     if (id === 'perPax') hydratePerPaxUI()
+    if (id === 'pricingExtras') ensurePricingExtrasUI()
     if (id === 'pricingMode') {
       document.querySelectorAll('[data-step="pricingMode"] .choice-chip').forEach(c =>
         c.classList.toggle('selected', c.dataset.value === (data.pricingMode || 'flat')))
@@ -2027,6 +2052,45 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
     if (!base)    { const el = document.getElementById('input-pp-baseRate'); shakeInput(el); if (el) el.focus(); return }
     if (!basePax) { const el = document.getElementById('input-pp-basePax');  shakeInput(el); if (el) el.focus(); return }
     data.perPax = { baseRate: base, basePax, extraPerPax: ppVal('extraPerPax'), maxPax: ppVal('maxPax', true) }
+    nextStep()
+  }
+
+  // ── Extra charges (any mode) ─────────────────────────────────────────────
+  function extraRowHTML() {
+    return `<div class="px-row flex items-center gap-2">
+      <input class="form-input px-label" placeholder="Label (e.g. Adult, Pet fee)" />
+      <div class="flex items-center gap-1" style="flex:0 0 auto"><span style="color:#9ca3af">&#8369;</span><input class="form-input px-amount" type="number" min="0" placeholder="300" style="width:110px" /></div>
+      <button type="button" title="Remove" onclick="removePricingExtra(this)" style="flex:0 0 auto;width:34px;height:34px;border-radius:9px;border:1px solid #e5e7eb;background:#fff;color:#9ca3af;cursor:pointer;font-size:18px;line-height:1">&times;</button>
+    </div>`
+  }
+  function addPricingExtra(prefill) {
+    const list = document.getElementById('pricing-extras-list')
+    if (!list) return
+    const wrap = document.createElement('div')
+    wrap.innerHTML = extraRowHTML()
+    const row = wrap.firstElementChild
+    list.appendChild(row)
+    if (prefill) {
+      row.querySelector('.px-label').value  = prefill.label  || ''
+      row.querySelector('.px-amount').value = prefill.amount || ''
+    }
+  }
+  function removePricingExtra(btn) {
+    const row = btn.closest('.px-row')
+    if (row) row.remove()
+  }
+  function ensurePricingExtrasUI() {
+    const list = document.getElementById('pricing-extras-list')
+    if (!list) return
+    list.innerHTML = ''
+    if (Array.isArray(data.pricingExtras) && data.pricingExtras.length) data.pricingExtras.forEach(e => addPricingExtra(e))
+    else addPricingExtra()
+  }
+  function confirmPricingExtras() {
+    data.pricingExtras = Array.from(document.querySelectorAll('#pricing-extras-list .px-row')).map(r => ({
+      label:  r.querySelector('.px-label').value.trim(),
+      amount: parseFloat(r.querySelector('.px-amount').value) || 0,
+    })).filter(e => e.label && e.amount > 0)
     nextStep()
   }
 
@@ -2938,6 +3002,9 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
               : '—']]
           : [['Nightly rate','₱' + (data.dailyRate || '—')],
              ['Monthly rate', data.monthlyRate ? '₱' + data.monthlyRate : '—']]),
+      ...((data.pricingExtras || []).length
+          ? [['Extra charges', data.pricingExtras.map(e => `${e.label} · ₱${Number(e.amount || 0).toLocaleString()}`).join('<br>')]]
+          : []),
       ['Description', data.description || '—'],
       ['Full desc.',  (() => {
         if (!data.longDescription) return '—'
@@ -3032,6 +3099,7 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
       else if (id === 'socialLinks') saveSocialLinks()
       else if (id === 'roomTypes') confirmRoomTypes()
       else if (id === 'perPax') confirmPerPax()
+      else if (id === 'pricingExtras') confirmPricingExtras()
       else if (id === 'generator') confirmGenerator()
       else if (id === 'payment') confirmPayment()
       else if (['guests','capacity','amenities','gallery'].includes(id)) nextStep()
