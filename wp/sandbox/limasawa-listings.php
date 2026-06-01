@@ -438,4 +438,137 @@ if (defined('ABSPATH')) {
             ], 200);
         }
     }
+
+    /* -------------------------------------------------------------------------
+     * GET /listing/{slug}  (SINGULAR) — rich flat shape the ported siargao
+     * single-listing template (stay/[slug].astro) client-renderer expects.
+     * Distinct from /listings/{slug} (plural, the {listing:{...,detail}} shape).
+     * ---------------------------------------------------------------------- */
+    add_action('rest_api_init', function () {
+        register_rest_route('limasawa/v1', '/listing/(?P<slug>[a-zA-Z0-9-]+)', [
+            'methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => 'sb_listing_single_full',
+        ]);
+    });
+
+    if (!function_exists('sb_listing_single_full')) {
+        function sb_listing_single_full(WP_REST_Request $req) {
+            $slug = sanitize_title((string) $req->get_param('slug'));
+            $posts = $slug ? get_posts(['name' => $slug, 'post_type' => 'accommodation', 'post_status' => 'publish', 'posts_per_page' => 1]) : [];
+            if (empty($posts)) return new WP_REST_Response(['error' => 'NOT_FOUND'], 404);
+            $post = $posts[0];
+            $id = (int) $post->ID;
+
+            $cats = sb_terms($id, 'accommodation-category');
+            $amen = sb_terms($id, 'accommodation-amenity');
+            $locs = sb_terms($id, 'location');
+            $excl = sb_terms($id, 'accommodation-exclusion');
+
+            // Gallery → urls + {src,alt}.
+            $gallery_urls = [];
+            $galleryFull = [];
+            $g = sb_acf('accommodation_gallery', $id, []);
+            if (is_array($g)) {
+                foreach ($g as $img) {
+                    $u = sb_img_url($img, 'large');
+                    if ($u !== '') { $gallery_urls[] = $u; $galleryFull[] = ['src' => $u, 'alt' => is_array($img) ? ($img['alt'] ?? '') : '']; }
+                }
+            }
+
+            $map = sb_acf('accommodation_location', $id, null);
+            $lat = is_array($map) && isset($map['lat']) ? (float) $map['lat'] : null;
+            $lng = is_array($map) && isset($map['lng']) ? (float) $map['lng'] : null;
+            $badges = array_values((array) sb_acf('accommodation_badges', $id, []));
+
+            // FAQ group → the short keys the renderer reads (d.faqAmenities[item.key]).
+            $faqRaw = sb_acf('faq_amenities', $id, []);
+            $faqGet = function ($k) use ($faqRaw) { return !empty($faqRaw[$k]); };
+            $faqAmenities = [
+                'wifi'      => $faqGet('faq_wifi'),
+                'ac'        => $faqGet('faq_air_conditioning'),
+                'kitchen'   => $faqGet('faq_kitchen'),
+                'parking'   => $faqGet('faq_free_parking_on_premises'),
+                'beach'     => $faqGet('faq_beach_access'),
+                'workspace' => $faqGet('faq_dedicated_workspace'),
+                'pets'      => $faqGet('faq_pets_allowed'),
+                'generator' => $faqGet('faq_generator'),
+                'shower'    => $faqGet('faq_hot_&_cold_shower'),
+                'security'  => $faqGet('faq_exterior_security_cameras_on_property'),
+            ];
+
+            // Services repeater (gated by add_services).
+            $services = [];
+            if (sb_acf('add_services', $id, false)) {
+                foreach ((array) sb_acf('services', $id, []) as $row) {
+                    if (!is_array($row)) continue;
+                    $services[] = ['name' => (string) ($row['service_name'] ?? ''), 'description' => (string) ($row['service_description'] ?? ''), 'icon' => sb_img_url($row['service_icon'] ?? null, 'thumbnail')];
+                }
+            }
+
+            // Custom info repeater → [{title,label,images:[{src,alt}]}].
+            $customInfo = [];
+            foreach ((array) sb_acf('accommodation_custom_info', $id, []) as $row) {
+                if (!is_array($row)) continue;
+                $imgs = [];
+                if (!empty($row['custom_info_gallery']) && is_array($row['custom_info_gallery'])) {
+                    foreach ($row['custom_info_gallery'] as $img) {
+                        $u = sb_img_url($img, 'large');
+                        if ($u !== '') $imgs[] = ['src' => $u, 'alt' => is_array($img) ? ($img['alt'] ?? '') : ''];
+                    }
+                }
+                $customInfo[] = ['title' => (string) ($row['custom_info_title'] ?? ''), 'label' => (string) ($row['custom_info_label'] ?? ''), 'images' => $imgs];
+            }
+
+            // Host meta.
+            $author = (int) $post->post_author;
+            $au = $author ? get_userdata($author) : null;
+            $claimable = $au && (bool) array_intersect(['administrator', 'editor'], (array) $au->roles);
+            $hostingSince = $au ? (human_time_diff(strtotime($au->user_registered), current_time('timestamp')) . ' hosting') : '';
+
+            $out = [
+                'id' => $id, 'slug' => $post->post_name,
+                'title' => html_entity_decode(get_the_title($id), ENT_QUOTES),
+                'excerpt' => wp_strip_all_tags(get_the_excerpt($id)),
+                'content' => apply_filters('the_content', $post->post_content),
+                'thumb' => get_the_post_thumbnail_url($id, 'large') ?: '',
+                'tier' => in_array('Featured', $badges, true) ? 'featured' : (get_post_meta($id, 'listing_tier', true) ?: 'free'),
+                'verified' => (bool) sb_acf('accommodation_fully_verified', $id, false),
+                'badges' => $badges,
+                'price' => (float) sb_acf('accommodation_daily_rent', $id, 0),
+                'monthly' => (float) sb_acf('accommodation_monthly_rent', $id, 0),
+                'bedrooms' => (int) sb_acf('accommodation_bedrooms', $id, 0),
+                'beds' => (int) sb_acf('accommodation_beds', $id, 0),
+                'baths' => (int) sb_acf('accommodation_bathrooms', $id, 0),
+                'guests' => (int) sb_acf('accommodation_number_of_guests', $id, 0),
+                'placeType' => (string) sb_acf('what_type_of_place_will_guests_have', $id, ''),
+                'subHeading' => (string) sb_acf('accommodation_sub_heading', $id, ''),
+                'desc' => (string) sb_acf('custom_accommodation_short_description', $id, ''),
+                'muniName' => $locs['names'][0] ?? '', 'muniSlug' => $locs['slugs'][0] ?? '', 'barName' => $locs['names'][1] ?? '',
+                'lat' => $lat, 'lng' => $lng,
+                'gallery' => $gallery_urls, 'galleryFull' => $galleryFull,
+                'amen' => $amen['slugs'], 'amenNames' => $amen['names'], 'amenityNames' => $amen['names'],
+                'cats' => $cats['slugs'], 'catNames' => $cats['names'],
+                'category' => $cats['names'][0] ?? '', 'catName' => $cats['names'][0] ?? '', 'catSlug' => $cats['slugs'][0] ?? '',
+                'exclusions' => $excl['names'],
+                'faqAmenities' => $faqAmenities,
+                'generatorSchedule' => (string) sb_acf('generator_schedule', $id, ''),
+                'services' => $services,
+                'customInfo' => $customInfo,
+                'contactNumber' => (string) sb_acf('accommodation_host_contact_number', $id, ''),
+                'hostName' => (string) sb_acf('accommodation_host_name', $id, ''),
+                'hostPic' => sb_img_url(sb_acf('accommodation_host_picture', $id, null), 'thumbnail'),
+                'hostId' => $author,
+                'hostingSince' => $hostingSince,
+                'bookingLink' => (string) sb_acf('accommodation_booking_link', $id, ''),
+                'airbnbLink' => (string) sb_acf('airbnb_booking_link', $id, ''),
+                'bookingcomLink' => (string) sb_acf('accommodation_bookingcom_link', $id, ''),
+                'websiteLink' => (string) sb_acf('accommodation_website_link', $id, ''),
+                'facebookLink' => (string) sb_acf('facebook_page_link', $id, ''),
+                'instagramLink' => (string) sb_acf('instagram_link', $id, ''),
+                'ratingAvg' => (float) get_post_meta($id, 'sb_rating_avg', true),
+                'ratingCount' => (int) get_post_meta($id, 'sb_rating_count', true),
+                'claimable' => (bool) $claimable,
+            ];
+            return new WP_REST_Response($out, 200);
+        }
+    }
 }
