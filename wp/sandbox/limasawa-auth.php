@@ -109,7 +109,10 @@ if (defined('ABSPATH')) {
                 return null;
             }
             $user = get_user_by('id', (int) $payload['uid']);
-            return $user ?: null;
+            if (!$user) return null;
+            // Suspended hosts (set in the Hosts admin screen) lose API access.
+            if (get_user_meta($user->ID, 'sb_user_suspended', true)) return null;
+            return $user;
         }
     }
     if (!function_exists('sb_user_role')) {
@@ -240,6 +243,9 @@ if (defined('ABSPATH')) {
             $user = get_user_by('email', $email);
             if (!$user || !wp_check_password($password, $user->user_pass, $user->ID)) {
                 return new WP_REST_Response(['error' => 'INVALID_CREDENTIALS'], 401);
+            }
+            if (get_user_meta($user->ID, 'sb_user_suspended', true)) {
+                return new WP_REST_Response(['error' => 'SUSPENDED'], 403);
             }
             $token = sb_jwt_encode(['uid' => (int) $user->ID, 'role' => sb_user_role($user)]);
             return new WP_REST_Response([
