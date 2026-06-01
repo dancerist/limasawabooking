@@ -375,7 +375,7 @@ if (defined('ABSPATH')) {
         wp_add_inline_style('common', '.wp-core-ui .button-primary{background:#25CECE;border-color:#1ab4b4;text-shadow:none}.wp-core-ui .button-primary:hover{background:#1ab4b4;border-color:#1ab4b4}');
     });
     add_action('admin_bar_menu', function ($bar) {
-        if (current_user_can('edit_others_posts')) $bar->add_node(['id' => 'sb-brand', 'title' => '🌴 Limasawa', 'href' => admin_url('admin.php?page=limasawa-cms')]);
+        if (current_user_can('edit_others_posts')) $bar->add_node(['id' => 'sb-brand', 'title' => '🌴 Limasawa', 'href' => admin_url('index.php')]);
     }, 8);
 
     /* ===================== Listings list filters ========================= */
@@ -429,12 +429,6 @@ if (defined('ABSPATH')) {
         elseif ($col === 'sb_host') { $a = (int) get_post_field('post_author', $id); $u = $a ? get_userdata($a) : null; echo esc_html($u ? $u->display_name : '—'); }
     }, 10, 2);
 
-    /* ===================== Top-level "Limasawa" CMS page ================= */
-    add_action('admin_menu', function () {
-        add_menu_page('Limasawa CMS', 'Limasawa', 'edit_others_posts', 'limasawa-cms', function () {
-            echo '<div class="wrap"><h1>Limasawa Booking — CMS Overview</h1><div style="max-width:1100px;margin-top:14px">';
-            if (function_exists('sb_admin_dashboard_widget')) sb_admin_dashboard_widget();
-            echo '</div></div>';
-        }, 'dashicons-palmtree', 3);
-    });
+    // (No standalone "Limasawa" admin menu page — the full Overview widget
+    // renders directly on the main wp-admin Dashboard, full-width.)
 }
