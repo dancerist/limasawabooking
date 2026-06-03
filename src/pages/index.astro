@@ -166,9 +166,12 @@ const jsonLd = [
     <!-- ───────────────── Become a host CTA ───────────────── -->
     <section class="host-cta">
       <div class="host-cta-inner">
-        <h2>Own a place in Limasawa?</h2>
-        <p>List your resort, homestay, or beach house and reach travelers searching for the island.</p>
-        <a href="/list-your-property" class="btn-light">List your property</a>
+        <h2>Own a place or vehicles in Limasawa?</h2>
+        <p>List your resort, homestay, or beach house — or rent out your scooters, motorbikes, and cars — and reach travelers planning their island trip.</p>
+        <div class="host-cta-btns">
+          <a href="/list-your-property" class="btn-light">List your property</a>
+          <a href="/list-rental" class="btn-light btn-light-outline">List your rental</a>
+        </div>
       </div>
     </section>
 
@@ -226,6 +229,9 @@ const jsonLd = [
   .rentals-band-text h2 { font-size: 1.25rem; font-weight: 800; margin: 0 0 .25rem; }
   .rentals-band-text p { margin: 0; color: var(--sb-text-muted, #64748b); line-height: 1.5; font-size: .95rem; }
   .rentals-band-cta { flex: 0 0 auto; font-weight: 800; color: var(--sb-primary-deeper, #279DA3); white-space: nowrap; }
+  .host-cta-btns { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+  .btn-light-outline { background: transparent; border: 1.5px solid rgba(255,255,255,.65); color: #fff; }
+  .btn-light-outline:hover { background: rgba(255,255,255,.14); }
   @media (max-width: 640px) {
     .rentals-band { flex-direction: column; align-items: flex-start; gap: .85rem; padding: 1.25rem; }
   }

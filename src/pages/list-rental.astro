@@ -36,6 +36,9 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
 
       <div class="lr-field" id="lr-plan-field">
         <label>Choose your plan</label>
+        <div class="lr-discount-banner" id="lr-discount-banner" style="display:none">
+          🎉 Returning host — <strong>50% off</strong> any paid plan applied automatically.
+        </div>
         <div class="lr-plans">
           <label class="lr-plan is-selected">
             <input type="radio" name="tier" value="free" checked />
@@ -189,6 +192,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     @media (max-width: 560px) { .lr-row, .lr-row-3 { grid-template-columns: 1fr; } }
 
     /* Plan selector */
+    .lr-discount-banner { background: #F0FDF4; border: 1px solid #BBF7D0; color: #15803D; border-radius: 10px; padding: .6rem .85rem; font-size: .85rem; margin-bottom: .75rem; }
     .lr-plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; }
     .lr-plan { display: flex; flex-direction: column; gap: .25rem; border: 1.5px solid #E2EBF3; border-radius: 12px; padding: .85rem .9rem; cursor: pointer; transition: all .15s; position: relative; }
     .lr-plan input { position: absolute; opacity: 0; }
@@ -226,8 +230,32 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
 
     // ── Plan / payment state ──
     const TIER_PRICES = { pro: { monthly: 399, yearly: 3990 }, featured: { monthly: 999, yearly: 9990 } }
-    let selectedTier = 'free', billing = 'monthly', receiptId = 0
+    let selectedTier = 'free', billing = 'monthly', receiptId = 0, eligibleDiscount = false
     const peso = n => '₱' + Number(n || 0).toLocaleString('en-PH')
+
+    // Returning-host 50% discount: eligible if the host already has any listing
+    // (accommodation or rental). Display only — the server is authoritative.
+    async function checkDiscount() {
+      try {
+        const [r, l] = await Promise.all([
+          fetch(`${API}/my-rentals`, { headers: { Authorization: `Bearer ${token}` } }).then(x => x.json()).catch(() => ({})),
+          fetch(`${API}/my-listings`, { headers: { Authorization: `Bearer ${token}` } }).then(x => x.json()).catch(() => ({})),
+        ])
+        const count = ((r.rentals || []).length) + ((l.listings || []).length)
+        if (count > 0) {
+          eligibleDiscount = true
+          $('lr-discount-banner').style.display = 'block'
+          document.querySelectorAll('.lr-plan').forEach(p => {
+            const t = p.querySelector('input').value
+            if (t === 'free') return
+            const base = TIER_PRICES[t].monthly
+            const el = p.querySelector('.lr-plan-price')
+            if (el) el.innerHTML = `<s style="opacity:.5;font-weight:500">₱${base.toLocaleString()}</s> ₱${Math.floor(base * 0.5).toLocaleString()}<small>/mo</small>`
+          })
+          refreshPlanUI()
+        }
+      } catch (_) {}
+    }
 
     function refreshPlanUI() {
       document.querySelectorAll('.lr-plan').forEach(p => p.classList.toggle('is-selected', p.querySelector('input').value === selectedTier))
@@ -236,9 +264,10 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       $('lr-payment').style.display = paid ? 'block' : 'none'
       $('lr-submit').textContent = paid ? 'Submit for review' : 'Submit rental'
       if (paid) {
-        const amt = TIER_PRICES[selectedTier]?.[billing] || 0
+        let amt = TIER_PRICES[selectedTier]?.[billing] || 0
+        if (eligibleDiscount) amt = Math.floor(amt * 0.5)
         $('lr-amount').textContent = peso(amt)
-        $('lr-bill-label').textContent = '/ ' + billing
+        $('lr-bill-label').textContent = '/ ' + billing + (eligibleDiscount ? ' · 50% off' : '')
       }
     }
     function wirePlan() {
@@ -286,6 +315,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
 
       wirePlan()
       if (editId) loadForEdit()
+      else checkDiscount()
     }
 
     async function loadForEdit() {

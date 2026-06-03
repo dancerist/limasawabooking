@@ -36,6 +36,15 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         <p>Vehicle rentals are being added — check back soon.</p>
       </div>
     </section>
+
+    <!-- Provider CTA -->
+    <section class="rt-host-cta">
+      <div class="rt-host-cta-inner">
+        <h2>Rent out your scooter, motorbike, or car</h2>
+        <p>Got vehicles for hire in Limasawa? List them on Limasawa Booking and reach travelers planning their island trip — free to start.</p>
+        <a href="/list-rental" class="rt-host-cta-btn">List your rental</a>
+      </div>
+    </section>
   </main>
 
   <style is:global>
@@ -58,6 +67,13 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     .rt-empty { text-align: center; padding: 4rem 1rem; color: #64748B; }
     .rt-empty h2 { font-size: 1.25rem; font-weight: 800; color: #1A2533; margin-bottom: .5rem; }
     @media(max-width:560px) { .rt-hero { padding: 2.5rem 1.25rem 1.25rem; } .rt-grid-wrap { padding: 1.5rem 1.25rem; } }
+
+    .rt-host-cta { background: linear-gradient(120deg, #279DA3, #1E8087); color: #fff; margin: 1rem 1.5rem 0; border-radius: 18px; }
+    .rt-host-cta-inner { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.5rem; text-align: center; }
+    .rt-host-cta h2 { font-family: 'DM Sans', sans-serif; font-size: clamp(1.4rem, 3.5vw, 2rem); font-weight: 800; margin-bottom: .6rem; }
+    .rt-host-cta p { opacity: .92; line-height: 1.55; margin-bottom: 1.5rem; max-width: 560px; margin-left: auto; margin-right: auto; }
+    .rt-host-cta-btn { display: inline-block; background: #fff; color: #1A2533; font-weight: 800; padding: .75rem 1.75rem; border-radius: 11px; text-decoration: none; }
+    .rt-host-cta-btn:hover { background: #F0FDF4; }
   </style>
 
   <script define:vars={{ WP_REST }}>window.__RENTAL_API = WP_REST</script>

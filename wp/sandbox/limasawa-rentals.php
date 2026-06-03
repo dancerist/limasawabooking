@@ -232,18 +232,15 @@ if (!function_exists('sb_submit_rental')) {
         $caps = sb_rental_fleet_caps();
         $cap  = $caps[$reqTier] ?? 1;
         $isAdmin = (bool) array_intersect(['administrator', 'editor'], (array) $user->roles);
-        if ($cap > 0 && !$isAdmin) {
-            $existing = (int) (new WP_Query([
-                'post_type' => 'rental', 'author' => (int) $user->ID,
-                'post_status' => ['publish', 'pending', 'draft'], 'fields' => 'ids',
-                'posts_per_page' => -1, 'no_found_rows' => true,
-            ]))->post_count;
-            if ($existing + 1 > $cap) {
-                return new WP_REST_Response([
-                    'success' => false, 'error' => 'FLEET_LIMIT',
-                    'message' => sprintf('Your plan allows %d rental%s. Upgrade to a higher plan to list more vehicles.', $cap, $cap === 1 ? '' : 's'),
-                ], 403);
-            }
+        // Count the host's existing rentals + accommodations — drives both the
+        // fleet cap and the returning-host 50% multi-listing discount.
+        $rentalCount = (int) (new WP_Query(['post_type' => 'rental', 'author' => (int) $user->ID, 'post_status' => ['publish', 'pending', 'draft'], 'fields' => 'ids', 'posts_per_page' => -1, 'no_found_rows' => true]))->post_count;
+        $accomCount  = (int) (new WP_Query(['post_type' => 'accommodation', 'author' => (int) $user->ID, 'post_status' => ['publish', 'pending', 'draft'], 'fields' => 'ids', 'posts_per_page' => -1, 'no_found_rows' => true]))->post_count;
+        if ($cap > 0 && !$isAdmin && $rentalCount + 1 > $cap) {
+            return new WP_REST_Response([
+                'success' => false, 'error' => 'FLEET_LIMIT',
+                'message' => sprintf('Your plan allows %d rental%s. Upgrade to a higher plan to list more vehicles.', $cap, $cap === 1 ? '' : 's'),
+            ], 403);
         }
 
         $id = wp_insert_post([
@@ -259,19 +256,25 @@ if (!function_exists('sb_submit_rental')) {
         $isPaid  = $reqTier !== 'free';
         $billing = ($d['billingPeriod'] ?? 'monthly') === 'yearly' ? 'yearly' : 'monthly';
         $prices  = sb_rental_tier_prices();
-        $amount  = $isPaid ? (float) ($prices[$reqTier][$billing] ?? 0) : 0;
+        $base    = $isPaid ? (float) ($prices[$reqTier][$billing] ?? 0) : 0;
+        // Returning-host 50% discount: applies to a paid rental when the host
+        // already has at least one listing (accommodation or rental).
+        $multiDiscount = $isPaid && ($rentalCount + $accomCount) > 0;
+        $amount  = $multiDiscount ? floor($base * 0.5) : $base;
         update_post_meta($id, 'listing_tier', 'free');
         update_post_meta($id, 'sb_payment', [
-            'tier'          => $reqTier,
-            'billingPeriod' => $billing,
-            'amount'        => $amount,
-            'method'        => sanitize_text_field($d['paymentMethod'] ?? ''),
-            'reference'     => sanitize_text_field($d['paymentReference'] ?? ''),
-            'receiptId'     => (int) ($d['paymentReceiptId'] ?? 0),
-            'status'        => $isPaid ? 'pending_review' : 'not_required',
-            'submittedAt'   => current_time('mysql'),
+            'tier'                => $reqTier,
+            'billingPeriod'       => $billing,
+            'amount'              => $amount,
+            'baseAmount'          => $base,
+            'multiListingDiscount'=> $multiDiscount,
+            'method'              => sanitize_text_field($d['paymentMethod'] ?? ''),
+            'reference'           => sanitize_text_field($d['paymentReference'] ?? ''),
+            'receiptId'           => (int) ($d['paymentReceiptId'] ?? 0),
+            'status'              => $isPaid ? 'pending_review' : 'not_required',
+            'submittedAt'         => current_time('mysql'),
         ]);
-        return new WP_REST_Response(['success' => true, 'id' => (int) $id, 'slug' => get_post_field('post_name', $id), 'status' => 'pending', 'paid' => $isPaid], 201);
+        return new WP_REST_Response(['success' => true, 'id' => (int) $id, 'slug' => get_post_field('post_name', $id), 'status' => 'pending', 'paid' => $isPaid, 'amount' => $amount, 'discount' => $multiDiscount], 201);
     }
 }
 
