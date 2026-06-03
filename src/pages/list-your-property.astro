@@ -454,7 +454,8 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
     /* ── Quill rich-text editor (Long description step) ─────────────────── */
     /* Minimal styling so Quill matches the form's look */
     #quill-longDescription {
-      min-height: 220px;
+      min-height: 150px;
+      max-height: 34vh;
       border: 2px solid #e5e7eb;
       border-top: none;
       border-radius: 0 0 10px 10px;
@@ -470,7 +471,9 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
       font-size: 0.975rem;
       line-height: 1.65;
       padding: 0.85rem 1rem;
-      min-height: 200px;
+      min-height: 130px;
+      max-height: 34vh;
+      overflow-y: auto;
     }
     .ql-editor.ql-blank::before {
       font-style: normal;
@@ -1171,7 +1174,7 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
 
     <!-- ── 13b: Long description ── -->
     <div class="step" data-step="longDescription">
-      <div class="w-full max-w-xl">
+      <div class="w-full max-w-xl overflow-y-auto" style="max-height:calc(100vh - 7rem)">
         <div class="flex items-center gap-2 mb-4">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           <span class="text-xs font-semibold uppercase tracking-widest" style="color:var(--primary)">Full description</span>
@@ -1643,7 +1646,7 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
     paymentReference: '', paymentReceiptId: 0, paymentReceiptUrl: '',
     couponCode: '', couponDiscount: 0, couponNewTotal: 0,
     accommodationCategory:'', placeType:'',
-    municipalityId: 0, municipalityName: '',
+    municipalityId: 1, municipalityName: 'Limasawa',  // only one municipality — defaulted, step skipped
     barangayId: 0, barangayName: '',
     guests:1, bedrooms:0, beds:0, bathrooms:0,
     dailyRate:'', monthlyRate:'', description:'',
@@ -1673,7 +1676,7 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
   // All step IDs in order
   const ALL_STEPS = [
     'welcome','tier','billing','hostName','hostPhone','hostPhoto','propertyName',
-    'accommodationCategory','placeType','municipality','barangay','mapLocation',
+    'accommodationCategory','placeType','barangay','mapLocation',
     'guests','capacity','pricingMode','dailyRate','monthlyRate','roomTypes','perPax','pricingExtras',
     'description','longDescription',
     'bookingLink','airbnbLink','bookingComLink','socialLinks','services',
@@ -2378,7 +2381,7 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
   function onBarangaySearch(query) {
     const drop = document.getElementById('barangay-dropdown')
     const box  = document.getElementById('barangay-search-box')
-    const barangays = BARANGAYS_BY_MUNI[data.municipalityId] || []
+    const barangays = BARANGAYS_BY_MUNI[data.municipalityId] || BARANGAYS_BY_MUNI[1] || []
 
     if (!query.trim()) {
       drop.classList.add('hidden')
@@ -3163,20 +3166,9 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
       })
     }
 
-    // 3. Municipality chip + populate barangay options for that muni
-    if (data.municipalityId || data.municipalityName) {
-      let muniChip = null
-      document.querySelectorAll('[data-step="municipality"] .choice-chip').forEach(c => {
-        const matches = (data.municipalityId && Number(c.dataset.locId) === Number(data.municipalityId))
-          || (data.municipalityName && c.dataset.value === data.municipalityName)
-        c.classList.toggle('selected', matches)
-        if (matches) muniChip = c
-      })
-      // Run the existing handler so its side-effects (loading barangays) fire
-      if (muniChip && typeof selectMunicipality === 'function') {
-        try { selectMunicipality(muniChip) } catch (_) {}
-      }
-    }
+    // 3. Municipality is always Limasawa (the step is skipped); barangays load
+    //    from BARANGAYS_BY_MUNI[1] via the fallback in onBarangaySearch.
+    data.municipalityId = 1; data.municipalityName = 'Limasawa'
 
     // 4. Barangay — show pre-filled name + selected indicator
     if (data.barangayName) {
