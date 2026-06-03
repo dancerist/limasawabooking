@@ -2213,6 +2213,10 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
 
     // ── Tab switching ─────────────────────────────────────────────────────────
     let _currentTab = 'dashboard'
+    // Treat host + admin/editor accounts as hosts (backend sb_user_role returns
+    // 'administrator'/'editor', never 'admin', so check all of them).
+    function isHostRole(r) { return ['host', 'admin', 'administrator', 'editor'].includes(r) }
+
     // ── Rentals panel ──────────────────────────────────────────────────────
     async function loadRentals() {
       const c = document.getElementById('rentals-container')
@@ -2265,7 +2269,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
 
     function switchTab(tab) {
       // Guard: guests can't access host-only tabs (defensive — UI hides them but ?tab= URLs need check)
-      const isHost = _me && (_me.role === 'host' || _me.role === 'admin')
+      const isHost = _me && isHostRole(_me.role)
       const HOST_TABS = ['dashboard', 'my-listings', 'rentals', 'orders', 'reviews']
       if (!isHost && HOST_TABS.includes(tab)) tab = 'saved'
 
@@ -2415,7 +2419,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       const photo = u.avatar && !u.avatar.includes('gravatar')
         ? `<img class="account-photo" id="account-photo-img" src="${escMy(u.avatar)}" alt=""/>`
         : `<div class="account-photo-fallback" id="account-photo-img">${initials}</div>`
-      const roleLabel = (u.role === 'host' || u.role === 'admin') ? 'Host' : 'Guest'
+      const roleLabel = isHostRole(u.role) ? 'Host' : 'Guest'
       document.getElementById('account-container').innerHTML = `
         <div class="account-card">
           <div class="account-row">
@@ -3773,7 +3777,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       // Admins see the host UI on the frontend — admin-specific dashboard
       // lives in WP admin. Anyone who isn't host/admin is treated as a guest.
       document.body.classList.remove('role-guest', 'role-host')
-      const isHostLike = role === 'host' || role === 'admin'
+      const isHostLike = isHostRole(role)
       document.body.classList.add(isHostLike ? 'role-host' : 'role-guest')
       const roleEl = document.getElementById('sidebar-role')
       if (roleEl) roleEl.textContent = isHostLike ? 'Host' : 'Guest'
@@ -3858,7 +3862,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         if (name)   name.textContent = u.name || u.username || 'this user'
       }
 
-      const isHost = u.role === 'host' || u.role === 'admin'
+      const isHost = isHostRole(u.role)
       const wantedTab = new URLSearchParams(location.search).get('tab')
       // Default tab: dashboard for hosts, saved for guests
       const initialTab = wantedTab || (isHost ? 'dashboard' : 'saved')
