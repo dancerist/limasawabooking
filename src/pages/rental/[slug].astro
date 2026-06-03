@@ -1,0 +1,171 @@
+---
+/**
+ * Single rental — /rental/<slug>. Every published rental is prebuilt at build
+ * time (SEO + OG). New rentals appear after the next deploy/rebuild.
+ */
+import Layout from '../../layouts/Layout.astro'
+
+export async function getStaticPaths() {
+  const apiBase = process.env.PUBLIC_WP_REST ?? import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+  const slugs: string[] = []
+  let page = 1
+  while (true) {
+    try {
+      const res = await fetch(`${apiBase}/rentals?page=${page}&per_page=48`)
+      if (!res.ok) break
+      const data = await res.json()
+      for (const r of (data.rentals || [])) slugs.push(r.slug)
+      if (page >= (data.pages || 1)) break
+      page += 1
+    } catch { break }
+  }
+  const out = await Promise.all(slugs.map(async (slug) => {
+    try {
+      const res = await fetch(`${apiBase}/rental/${slug}`)
+      if (!res.ok) return null
+      return { params: { slug }, props: { rental: await res.json() } }
+    } catch { return null }
+  }))
+  return out.filter(Boolean) as any[]
+}
+
+const { rental: r } = Astro.props as { rental: any }
+const peso = (n: number) => '₱' + Number(n || 0).toLocaleString('en-PH')
+const title = r?.title || 'Rental — Limasawa Booking'
+const description = r ? (r.excerpt || `${r.type} rental in Limasawa from ${peso(r.daily)}/day.`).slice(0, 160) : 'Rentals in Limasawa'
+const ogImage = r?.thumb || undefined
+
+// WhatsApp/phone normalisation (PH: 09XX → 639XX)
+function waNormalize(raw: string) {
+  const d = String(raw || '').replace(/\D+/g, '')
+  if (d.length < 7) return ''
+  if (d.length === 11 && d.startsWith('0')) return '63' + d.slice(1)
+  return d
+}
+const wa = r ? waNormalize(r.providerContact) : ''
+const tel = r ? String(r.providerContact || '').replace(/[^\d+]/g, '') : ''
+const gallery = r ? (r.galleryFull?.length ? r.galleryFull : (r.thumb ? [{ src: r.thumb, alt: r.title }] : [])) : []
+const mapBbox = (r && r.lat && r.lng)
+  ? `${r.lng - 0.01}%2C${r.lat - 0.008}%2C${r.lng + 0.01}%2C${r.lat + 0.008}`
+  : null
+---
+
+<Layout title={title} description={description} image={ogImage} type="product">
+  <main class="rs-main">
+    {r && (
+      <article class="rs-wrap">
+        <nav class="rs-breadcrumb"><a href="/rentals">Rentals</a><span>/</span><span>{r.type}</span></nav>
+
+        {gallery.length > 0 && (
+          <div class={`rs-gallery rs-gallery-${Math.min(gallery.length, 3)}`}>
+            {gallery.slice(0, 3).map((g: any) => <img src={g.src} alt={g.alt || r.title} loading="lazy" />)}
+          </div>
+        )}
+
+        <div class="rs-grid">
+          <div class="rs-body">
+            <div class="rs-head">
+              {r.type && <span class="rs-type">{r.type}</span>}
+              <h1 class="rs-title">{r.title}</h1>
+              {r.area && <p class="rs-area">📍 {r.area}, Limasawa Island</p>}
+            </div>
+
+            {r.content && <div class="rs-content" set:html={r.content} />}
+
+            {r.inclusions && (
+              <section class="rs-section">
+                <h2>What's included</h2>
+                <p class="rs-inclusions">{r.inclusions}</p>
+              </section>
+            )}
+
+            {mapBbox && (
+              <section class="rs-section">
+                <h2>Where to pick up</h2>
+                <div class="rs-map">
+                  <iframe title="Map" loading="lazy" src={`https://www.openstreetmap.org/export/embed.html?bbox=${mapBbox}&layer=mapnik&marker=${r.lat}%2C${r.lng}`}></iframe>
+                </div>
+              </section>
+            )}
+
+            <div class="rs-back"><a href="/rentals">← All rentals</a></div>
+          </div>
+
+          <aside class="rs-book">
+            <div class="rs-price">
+              <div><strong>{peso(r.daily)}</strong><span> / day</span></div>
+              {r.hourly > 0 && <p class="rs-hourly">{peso(r.hourly)} / hour</p>}
+            </div>
+            {r.deposit > 0 && <div class="rs-deposit">Deposit · {peso(r.deposit)}</div>}
+            {r.available === false && <div class="rs-unavail">Currently unavailable</div>}
+            {r.providerName && (
+              <div class="rs-provider">
+                <span>Rental provider</span>
+                <strong>{r.providerName}</strong>
+              </div>
+            )}
+            {r.providerContact && (
+              <div class="rs-contact">
+                {tel && <a class="rs-btn rs-btn-call" href={`tel:${tel}`}>Call</a>}
+                {wa && <a class="rs-btn rs-btn-wa" href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
+              </div>
+            )}
+            {!r.providerContact && <p class="rs-note">Contact details coming soon.</p>}
+          </aside>
+        </div>
+      </article>
+    )}
+  </main>
+
+  <style is:global>
+    .rs-main { color: #1A2533; padding: 1.5rem 1.5rem 5rem; max-width: 1080px; margin: 0 auto; }
+    .rs-breadcrumb { display: flex; gap: .5rem; align-items: center; font-size: .82rem; color: #64748B; margin-bottom: 1.25rem; }
+    .rs-breadcrumb a { color: #64748B; text-decoration: none; }
+    .rs-breadcrumb a:hover { color: #279DA3; }
+
+    .rs-gallery { display: grid; gap: 8px; border-radius: 18px; overflow: hidden; margin-bottom: 2rem; }
+    .rs-gallery-1 { grid-template-columns: 1fr; }
+    .rs-gallery-2 { grid-template-columns: 1fr 1fr; }
+    .rs-gallery-3 { grid-template-columns: 2fr 1fr 1fr; }
+    .rs-gallery img { width: 100%; height: 320px; object-fit: cover; background: #E2EBF3; }
+    .rs-gallery-3 img:first-child { grid-row: span 1; }
+
+    .rs-grid { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 48px; align-items: start; }
+    .rs-type { display: inline-block; background: #F5F8FB; color: #279DA3; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; padding: .3rem .7rem; border-radius: 6px; margin-bottom: .75rem; }
+    .rs-title { font-family: 'DM Sans', sans-serif; font-size: clamp(1.6rem, 4vw, 2.4rem); font-weight: 800; line-height: 1.15; margin: 0 0 .5rem; }
+    .rs-area { color: #64748B; margin: 0 0 1.5rem; }
+    .rs-content { font-family: 'Nunito Sans', sans-serif; font-size: 1.05rem; line-height: 1.7; color: #2D3748; }
+    .rs-content > * + * { margin-top: 1.1em; }
+    .rs-section { margin-top: 2.25rem; }
+    .rs-section h2 { font-family: 'DM Sans', sans-serif; font-size: 1.3rem; font-weight: 800; margin-bottom: .85rem; }
+    .rs-inclusions { color: #475569; line-height: 1.6; white-space: pre-line; }
+    .rs-map { height: 320px; border-radius: 16px; overflow: hidden; border: 1px solid #D8E3ED; }
+    .rs-map iframe { width: 100%; height: 100%; border: 0; }
+    .rs-back { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid #E2EBF3; }
+    .rs-back a { color: #1A2533; font-weight: 700; text-decoration: none; }
+    .rs-back a:hover { color: #279DA3; }
+
+    .rs-book { position: sticky; top: 88px; border: 1px solid #D8E3ED; border-radius: 18px; padding: 22px; box-shadow: 0 14px 42px rgba(26,37,51,.10); background: #fff; }
+    .rs-price strong { font-size: 28px; font-weight: 800; }
+    .rs-price span { color: #64748B; }
+    .rs-hourly { color: #64748B; margin: 4px 0 0; }
+    .rs-deposit { margin-top: 12px; padding-top: 12px; border-top: 1px solid #EEF2F6; color: #64748B; font-size: .9rem; }
+    .rs-unavail { margin-top: 12px; background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; border-radius: 8px; padding: .5rem .75rem; font-size: .85rem; font-weight: 700; text-align: center; }
+    .rs-provider { margin-top: 16px; padding-top: 14px; border-top: 1px solid #EEF2F6; display: flex; flex-direction: column; gap: 2px; }
+    .rs-provider span { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #94A3B8; font-weight: 700; }
+    .rs-provider strong { font-size: 1rem; }
+    .rs-contact { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+    .rs-btn { display: flex; align-items: center; justify-content: center; min-height: 46px; border-radius: 10px; font-weight: 800; text-decoration: none; font-size: .9rem; }
+    .rs-btn-call { background: #279DA3; color: #fff; }
+    .rs-btn-wa { background: #25D366; color: #fff; }
+    .rs-note { margin-top: 14px; color: #64748B; font-size: .85rem; }
+
+    @media (max-width: 860px) {
+      .rs-grid { grid-template-columns: 1fr; gap: 28px; }
+      .rs-book { position: static; }
+      .rs-gallery img { height: 220px; }
+      .rs-gallery-3 { grid-template-columns: 1fr 1fr; }
+      .rs-gallery-3 img:first-child { grid-column: span 2; }
+    }
+  </style>
+</Layout>

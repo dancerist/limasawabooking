@@ -1,0 +1,51 @@
+/* Shared rental card styles. Pair with src/scripts/rental-card-template.js. */
+:root {
+  --rt-text: #1A2533;
+  --rt-muted: #64748B;
+  --rt-border: #E2EBF3;
+  --rt-bg: #F5F8FB;
+  --rt-primary: #279DA3;
+}
+
+.rt-card { display: flex; flex-direction: column; text-decoration: none; color: inherit; transition: transform .2s; }
+.rt-card:hover { transform: translateY(-3px); }
+
+.rt-card-img {
+  aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden;
+  background: var(--rt-bg); margin-bottom: .8rem; position: relative;
+}
+.rt-card-img img { width: 100%; height: 100%; object-fit: cover; transition: transform .35s ease; }
+.rt-card:hover .rt-card-img img { transform: scale(1.04); }
+.rt-card-img-ph { width: 100%; height: 100%; display: grid; place-items: center; background: linear-gradient(135deg, #E6F9FA 0%, #C8E8EA 100%); }
+.rt-card-img-ph svg { color: rgba(39,157,163,.45); }
+
+.rt-card-type {
+  position: absolute; top: 12px; left: 12px;
+  background: rgba(255,255,255,.95); color: var(--rt-text);
+  font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+  padding: .3rem .65rem; border-radius: 6px;
+}
+.rt-card-unavail {
+  position: absolute; top: 12px; right: 12px;
+  background: rgba(220,38,38,.95); color: #fff;
+  font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .03em;
+  padding: .3rem .6rem; border-radius: 6px;
+}
+
+.rt-card-title {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 1.05rem; font-weight: 700; line-height: 1.3; color: var(--rt-text);
+  margin: 0 0 .25rem;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+.rt-card-area { font-size: .82rem; color: var(--rt-muted); margin: 0 0 .5rem; }
+.rt-card-price { font-size: .95rem; color: var(--rt-text); }
+.rt-card-price strong { font-size: 1.1rem; font-weight: 800; }
+.rt-card-price span { color: var(--rt-muted); font-weight: 400; }
+.rt-card-hr { color: var(--rt-muted); font-size: .85rem; }
+
+.rt-card-skel {}
+.rt-skel { background: linear-gradient(90deg, #F1F5F9 0%, #E2E8F0 50%, #F1F5F9 100%); background-size: 200% 100%; border-radius: 14px; animation: rtShimmer 1.4s ease-in-out infinite; }
+.rt-skel-img { aspect-ratio: 4 / 3; }
+.rt-skel-line { height: 12px; margin-top: .55rem; }
+@keyframes rtShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
