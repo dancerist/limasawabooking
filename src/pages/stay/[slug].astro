@@ -330,13 +330,20 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     .service-item p { margin: 5px 0 0; color: #64748B; line-height: 1.5; }
     /* Room-types / per-pax breakdown inside the right-hand booking card */
     .bc-rates { margin: 14px 0 2px; border-top: 1px solid #EEF2F6; padding-top: 12px; }
-    .bc-rate-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 6px 0; }
+    .bc-rate-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 6px 0; }
     .bc-rate-name { color: #1A2533; font-weight: 600; font-size: 14px; }
     .bc-rate-name em { color: #64748B; font-weight: 400; font-style: normal; font-size: 12px; }
+    .bc-rate-sub { display: block; color: #64748B; font-weight: 400; font-size: 12px; margin-top: 2px; line-height: 1.4; }
     .bc-rate-row strong { color: #1A2533; font-size: 15px; white-space: nowrap; }
     .bc-rate-add, .bc-rate-note { color: #64748B; font-size: 13px; margin-top: 8px; }
     .bc-rates-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748B; margin-bottom: 4px; }
     .price-from, .intro-price-from { color: #64748B; font-weight: 400; }
+    /* Mobile-only top pricing summary (desktop shows price in the sidebar only) */
+    .sl-mobile-pricing { display: none; }
+    .sl-mobile-pricing .mp-head strong { font-size: 24px; font-weight: 800; color: #1A2533; }
+    .sl-mobile-pricing .mp-head span { color: #64748B; }
+    .sl-mobile-pricing .mp-month { font-size: 14px; }
+    .sl-mobile-pricing .bc-rates:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
     .chip-list { display: flex; flex-wrap: wrap; gap: 10px; }
     .chip-list span { border: 1px solid #FECACA; color: #B91C1C; background: #FEF2F2; border-radius: 999px; padding: 8px 12px; font-size: 14px; }
     .map-location { color: #64748B; margin: -8px 0 16px; }
@@ -385,21 +392,13 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     .gallery-modal-scroll { height: 100%; overflow: auto; padding: 86px clamp(18px, 4vw, 58px) 48px; }
     .gallery-masonry { columns: 3 280px; column-gap: 14px; max-width: 1280px; margin: 0 auto; }
     .gallery-masonry img { display: block; width: 100%; height: auto; break-inside: avoid; margin: 0 0 14px; border-radius: 16px; background: #E2EBF3; }
-    /* Inline price line on narrow screens (booking sidebar drops below the
-       fold at <=860px, so users would otherwise have to scroll to see price) */
-    .intro-price-inline { display: none; }
     @media (max-width: 860px) {
       .stay-wrap { padding: 22px 18px 56px; }
       .listing-nav { height: 64px; padding: 0 18px; }
       .title-row { flex-direction: column; gap: 14px; }
-      .intro-price-inline {
-        display: block; margin-top: 12px; font-size: 17px; color: #1A2533;
-      }
-      .intro-price-inline strong { font-size: 22px; font-weight: 800; }
-      .intro-price-inline > span { color: #475569; }
-      .intro-price-inline .intro-price-monthly {
-        display: inline-block; margin-left: 8px; font-size: 14px; color: #64748B; font-weight: 500;
-      }
+      /* Booking sidebar drops to the very bottom on mobile, so surface the
+         full price breakdown near the top too. */
+      .sl-mobile-pricing { display: block; border: 1px solid #D8E3ED; border-radius: 14px; padding: 16px 18px; margin-bottom: 26px; }
       .photo-grid { grid-template-columns: minmax(0, 2.2fr) minmax(92px, 1fr); grid-template-rows: repeat(3, minmax(84px, 1fr)); gap: 6px; border-radius: 16px; }
       .photo-tile-1 { grid-row: span 3; }
       .photo-tile:nth-child(n+5) { display: none; }
@@ -648,21 +647,13 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
         ([d.placeType, d.category].filter(Boolean).join(' ') + (loc ? ` in ${loc}` : '')).trim() ||
         d.title
       // Host moved out into its own .host-section block (see renderHostBlock).
-      // Inline price line — only shown on narrow screens where the booking
-      // sidebar drops below the fold (CSS toggles visibility at <=860px).
-      const fromPrefix = (d.pricingMode && d.pricingMode !== 'flat') ? 'from ' : ''
-      const priceInline = d.price
-        ? `<p class="intro-price-inline">
-             <span class="intro-price-from">${fromPrefix}</span><strong>₱${Number(d.price).toLocaleString()}</strong><span> / night</span>
-             ${d.monthly ? `<span class="intro-price-monthly">· ₱${Number(d.monthly).toLocaleString()} / month</span>` : ''}
-           </p>`
-        : ''
+      // Price on mobile is handled by renderMobilePricing() (full breakdown),
+      // placed just below this intro; desktop shows it in the sticky sidebar.
       return `<section class="section intro-section">
         <div>
           ${badges ? `<div class="badge-row">${badges}</div>` : ''}
           <h2>${esc(introH)}</h2>
           ${stats ? `<p class="sub-meta">${esc(stats)}</p>` : ''}
-          ${priceInline}
         </div>
       </section>`
     }
@@ -728,7 +719,7 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
       if (mode === 'rooms' && Array.isArray(d.roomTypes) && d.roomTypes.length) {
         const rows = d.roomTypes.map(r => `
           <div class="bc-rate-row">
-            <span class="bc-rate-name">${esc(r.name || 'Room')}${r.capacity ? ` <em>· ${Number(r.capacity)} pax</em>` : ''}</span>
+            <span class="bc-rate-name">${esc(r.name || 'Room')}${r.capacity ? ` <em>· ${Number(r.capacity)} pax</em>` : ''}${r.note ? `<span class="bc-rate-sub">${esc(r.note)}</span>` : ''}</span>
             <strong>₱${Number(r.rate || 0).toLocaleString()}</strong>
           </div>`).join('')
         const addBed = Number(d.additionalBedRate || 0)
@@ -752,6 +743,19 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
         html += `<div class="bc-rates"><div class="bc-rates-title">Extra charges</div>${rows}</div>`
       }
       return html
+    }
+
+    // Mobile-only pricing summary shown near the top of the page (the sticky
+    // booking card drops to the very bottom on narrow screens, so this surfaces
+    // the full price breakdown up top too). Hidden on desktop via CSS.
+    function renderMobilePricing(d) {
+      const extras = Array.isArray(d.pricingExtras) ? d.pricingExtras : []
+      if (!d.price && !extras.length) return ''
+      const fromPrefix = (d.pricingMode && d.pricingMode !== 'flat') ? '<span class="price-from">from </span>' : ''
+      const head = d.price
+        ? `<div class="mp-head">${fromPrefix}<strong>₱${Number(d.price).toLocaleString()}</strong><span> / night</span>${d.monthly ? ` <span class="mp-month">· ₱${Number(d.monthly).toLocaleString()} / month</span>` : ''}</div>`
+        : ''
+      return `<section class="sl-mobile-pricing">${head}${renderSidebarRates(d)}</section>`
     }
 
     function renderServices(d) {
@@ -940,6 +944,7 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
       document.getElementById('sl-photos').innerHTML      = renderPhotoGrid(gallery)
       document.getElementById('sl-main').innerHTML        = [
         renderIntro(d, loc),
+        renderMobilePricing(d),
         renderHostBlock(d),
         renderDescription(d),
         renderThingsToKnow(d),
