@@ -104,6 +104,9 @@ if (!function_exists('sb_rentals_index')) {
         if ($tax) { $tax['relation'] = 'AND'; $args['tax_query'] = $tax; }
         $q = new WP_Query($args);
         $rows = array_map(function ($p) { return sb_rental_format($p, false); }, $q->posts);
+        // Featured first, then Pro, then Free (PHP 8 usort is stable → keeps date order within a tier).
+        $rank = ['featured' => 2, 'pro' => 1, 'free' => 0];
+        usort($rows, function ($a, $b) use ($rank) { return ($rank[$b['tier']] ?? 0) <=> ($rank[$a['tier']] ?? 0); });
         return new WP_REST_Response([
             'rentals' => $rows,
             'total'   => (int) $q->found_posts,
@@ -222,6 +225,27 @@ if (!function_exists('sb_submit_rental')) {
         $d = $req->get_json_params(); if (!is_array($d)) $d = [];
         $title = sanitize_text_field($d['title'] ?? '');
         if ($title === '') return new WP_REST_Response(['success' => false, 'message' => 'Title is required.'], 400);
+
+        // Tier + fleet limits (free=1, pro=5, featured=unlimited). Cap is based
+        // on the REQUESTED tier so a paying host can add their fleet immediately.
+        $reqTier = in_array(($d['tier'] ?? 'free'), ['free', 'pro', 'featured'], true) ? $d['tier'] : 'free';
+        $caps = sb_rental_fleet_caps();
+        $cap  = $caps[$reqTier] ?? 1;
+        $isAdmin = (bool) array_intersect(['administrator', 'editor'], (array) $user->roles);
+        if ($cap > 0 && !$isAdmin) {
+            $existing = (int) (new WP_Query([
+                'post_type' => 'rental', 'author' => (int) $user->ID,
+                'post_status' => ['publish', 'pending', 'draft'], 'fields' => 'ids',
+                'posts_per_page' => -1, 'no_found_rows' => true,
+            ]))->post_count;
+            if ($existing + 1 > $cap) {
+                return new WP_REST_Response([
+                    'success' => false, 'error' => 'FLEET_LIMIT',
+                    'message' => sprintf('Your plan allows %d rental%s. Upgrade to a higher plan to list more vehicles.', $cap, $cap === 1 ? '' : 's'),
+                ], 403);
+            }
+        }
+
         $id = wp_insert_post([
             'post_type' => 'rental', 'post_status' => 'pending',
             'post_title' => $title, 'post_content' => wp_kses_post($d['description'] ?? ''),
@@ -229,8 +253,37 @@ if (!function_exists('sb_submit_rental')) {
         ], true);
         if (is_wp_error($id)) return new WP_REST_Response(['success' => false, 'message' => 'Could not create rental.'], 500);
         sb_apply_rental_fields($id, $d);
+
+        // Paid tiers only take effect once an admin verifies payment — keep the
+        // live tier 'free' until then; record the requested tier + payment.
+        $isPaid  = $reqTier !== 'free';
+        $billing = ($d['billingPeriod'] ?? 'monthly') === 'yearly' ? 'yearly' : 'monthly';
+        $prices  = sb_rental_tier_prices();
+        $amount  = $isPaid ? (float) ($prices[$reqTier][$billing] ?? 0) : 0;
         update_post_meta($id, 'listing_tier', 'free');
-        return new WP_REST_Response(['success' => true, 'id' => (int) $id, 'slug' => get_post_field('post_name', $id), 'status' => 'pending'], 201);
+        update_post_meta($id, 'sb_payment', [
+            'tier'          => $reqTier,
+            'billingPeriod' => $billing,
+            'amount'        => $amount,
+            'method'        => sanitize_text_field($d['paymentMethod'] ?? ''),
+            'reference'     => sanitize_text_field($d['paymentReference'] ?? ''),
+            'receiptId'     => (int) ($d['paymentReceiptId'] ?? 0),
+            'status'        => $isPaid ? 'pending_review' : 'not_required',
+            'submittedAt'   => current_time('mysql'),
+        ]);
+        return new WP_REST_Response(['success' => true, 'id' => (int) $id, 'slug' => get_post_field('post_name', $id), 'status' => 'pending', 'paid' => $isPaid], 201);
+    }
+}
+
+if (!function_exists('sb_rental_fleet_caps')) {
+    function sb_rental_fleet_caps() { return ['free' => 1, 'pro' => 5, 'featured' => 0]; } // 0 = unlimited
+}
+if (!function_exists('sb_rental_tier_prices')) {
+    function sb_rental_tier_prices() {
+        return [
+            'pro'      => ['monthly' => 399, 'yearly' => 3990],
+            'featured' => ['monthly' => 999, 'yearly' => 9990],
+        ];
     }
 }
 
