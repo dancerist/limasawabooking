@@ -20,15 +20,61 @@ const heroImage = featured.find((l) => l.thumb)?.thumb ?? ''
 const guestOpts = [1, 2, 4, 6, 8, 10]
 
 const peso = (n: number) => '₱' + Number(n).toLocaleString('en-PH')
+
+// ── SEO ────────────────────────────────────────────────────────────────
+const seoTitle = 'Limasawa Accommodations · Beachfront Resorts & Homestays'
+const seoDescription =
+  'Book accommodations in Limasawa Island, Southern Leyte — beachfront resorts, affordable homestays, and budget island stays. Compare prices and reserve direct.'
+
+// Visible FAQ (also emitted as FAQPage structured data below) — written to
+// cover the searches travelers actually type: affordable/cheap stays,
+// beachfront, getting there, and scooter rentals (coming soon).
+const faqs = [
+  {
+    q: 'Where can I find affordable accommodations in Limasawa?',
+    a: "Limasawa Booking lists budget homestays, lodges, and whole-house rentals across the island alongside resorts. Browse all stays and sort by price to find cheap accommodations in Limasawa that fit your budget.",
+  },
+  {
+    q: 'Are there beachfront resorts in Limasawa?',
+    a: 'Yes — several beachfront resorts and beach houses on Limasawa Island are listed here, many just steps from the sand with views over the Bohol Sea.',
+  },
+  {
+    q: 'How do I get to Limasawa Island?',
+    a: 'Limasawa is reached by pumpboat from Padre Burgos, Southern Leyte (about 30–45 minutes by sea). Most hosts can help arrange your transfer and pickup.',
+  },
+  {
+    q: 'Can I rent a scooter or motorbike in Limasawa?',
+    a: 'Scooter and motorbike rentals in Limasawa are coming soon to Limasawa Booking. For now, many accommodation hosts can help arrange local transport around the island.',
+  },
+]
+
+const jsonLd = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Limasawa Booking',
+    url: 'https://limasawabooking.com',
+    description: seoDescription,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
+  },
+]
 ---
 
-<Layout title="Find Stays in Limasawa, Philippines">
+<Layout title={seoTitle} description={seoDescription} jsonLd={jsonLd}>
   <main>
     <!-- ───────────────── Hero + search ───────────────── -->
     <section class="hero" style={heroImage ? `background-image: linear-gradient(180deg, rgba(13,30,43,.45), rgba(13,30,43,.65)), url(${heroImage})` : ''}>
       <div class="hero-inner">
         <h1>Find your place in <span>Limasawa</span></h1>
-        <p>Resorts, homestays, and island getaways on one of the Philippines' most historic islands.</p>
+        <p>Beachfront resorts, affordable homestays, and budget island stays in Limasawa, Southern Leyte — one of the Philippines' most historic islands.</p>
 
         <form class="search" action="/stays" method="get">
           <div class="search-field">
@@ -120,13 +166,37 @@ const peso = (n: number) => '₱' + Number(n).toLocaleString('en-PH')
           travelers for its quiet beaches, clear dive sites, and unhurried island pace.
         </p>
         <p>
-          Whether you're after a beachfront resort, a family-run homestay, or a simple lodge near the
-          parola, <a href="/stays">browse all stays</a> to find a place that fits your trip.
+          Whether you're after a beachfront resort, a family-run homestay, an affordable lodge near the
+          parola, or a whole house for the barkada, <a href="/stays">browse all Limasawa accommodations</a>
+          to find a place that fits your trip and budget.
         </p>
+      </div>
+    </section>
+
+    <!-- ───────────────── FAQ (FAQPage schema in <head>) ───────────────── -->
+    <section class="section alt">
+      <div class="section-inner faq">
+        <div class="section-head"><h2>Limasawa travel & booking FAQ</h2></div>
+        {faqs.map((f) => (
+          <details class="faq-item">
+            <summary>{f.q}</summary>
+            <p>{f.a}</p>
+          </details>
+        ))}
       </div>
     </section>
   </main>
 </Layout>
+
+<style>
+  .faq { max-width: 760px; }
+  .faq-item { border: 1px solid var(--sb-border, #e2e8f0); border-radius: 12px; padding: 0 18px; margin-bottom: 12px; background: #fff; }
+  .faq-item summary { cursor: pointer; font-weight: 700; padding: 16px 0; list-style: none; color: var(--sb-text, #1a2533); }
+  .faq-item summary::-webkit-details-marker { display: none; }
+  .faq-item summary::after { content: '+'; float: right; font-weight: 400; color: #94a3b8; font-size: 1.4em; line-height: 1; }
+  .faq-item[open] summary::after { content: '−'; }
+  .faq-item p { margin: 0 0 18px; color: var(--sb-text-muted, #64748b); line-height: 1.6; }
+</style>
 
 <style>
   /* hero */
