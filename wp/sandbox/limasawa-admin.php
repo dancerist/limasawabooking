@@ -21,7 +21,7 @@ if (defined('ABSPATH')) {
     if (!function_exists('sb_admin_do_approve')) {
         function sb_admin_do_approve($id) {
             $id = (int) $id;
-            if (get_post_type($id) !== 'accommodation') return ['ok' => false];
+            if (!in_array(get_post_type($id), ['accommodation', 'rental'], true)) return ['ok' => false];
             $pay = get_post_meta($id, 'sb_payment', true);
             if (!is_array($pay)) $pay = [];
             $billing = ($pay['billingPeriod'] ?? 'monthly') === 'yearly' ? 'yearly' : 'monthly';
@@ -286,6 +286,28 @@ if (defined('ABSPATH')) {
                        . '<td style="font-family:monospace;font-size:.7rem">' . esc_html($pay['reference'] ?? '—') . '</td>'
                        . '<td>' . ($rurl ? '<a class="lnk" target="_blank" href="' . esc_url($rurl) . '">View</a>' : '—') . '</td>'
                        . '<td><a class="button button-small" href="' . esc_url($apr) . '" onclick="return confirm(&#39;Approve payment and publish?&#39;)">Approve</a></td></tr>';
+                }
+                echo '</tbody></table></div>';
+            }
+
+            // Rentals to verify (same approve flow — sb_admin_do_approve handles rentals too)
+            $rpayments = get_posts(['post_type' => 'rental', 'post_status' => 'any', 'posts_per_page' => 10, 'orderby' => 'date', 'order' => 'DESC',
+                'meta_query' => [['key' => 'sb_payment', 'value' => '"status";s:14:"pending_review"', 'compare' => 'LIKE']]]);
+            if ($rpayments) {
+                echo '<div class="sb-section"><div class="sb-sh">' . sb_admin_icon('warn') . 'Rentals to verify <span class="count">' . count($rpayments) . '</span></div><table><thead><tr><th>Rental</th><th>Host</th><th>Tier</th><th>Amount</th><th>Ref</th><th>Receipt</th><th></th></tr></thead><tbody>';
+                foreach ($rpayments as $p) {
+                    $pay = get_post_meta($p->ID, 'sb_payment', true); if (!is_array($pay)) $pay = [];
+                    $host = get_userdata($p->post_author);
+                    $rid = (int) ($pay['receiptId'] ?? 0); $rurl = $rid ? wp_get_attachment_url($rid) : '';
+                    $apr = wp_nonce_url(admin_url('admin-post.php?action=sb_approve_payment&post_id=' . $p->ID), 'sb_approve_' . $p->ID);
+                    $disc = !empty($pay['multiListingDiscount']) ? ' <span class="pill p-green">50% off</span>' : '';
+                    echo '<tr><td><a class="lnk" href="' . esc_url(get_edit_post_link($p->ID)) . '">' . esc_html(wp_trim_words(get_the_title($p->ID), 4)) . '</a></td>'
+                       . '<td>' . esc_html($host ? $host->display_name : '—') . '</td>'
+                       . '<td><span class="pill p-blue">' . esc_html($tier_labels[$pay['tier'] ?? 'free'] ?? ($pay['tier'] ?? '')) . '</span></td>'
+                       . '<td>₱' . number_format((float) ($pay['amount'] ?? 0)) . $disc . '</td>'
+                       . '<td style="font-family:monospace;font-size:.7rem">' . esc_html($pay['reference'] ?? '—') . '</td>'
+                       . '<td>' . ($rurl ? '<a class="lnk" target="_blank" href="' . esc_url($rurl) . '">View</a>' : '—') . '</td>'
+                       . '<td><a class="button button-small" href="' . esc_url($apr) . '" onclick="return confirm(&#39;Approve payment and publish this rental?&#39;)">Approve</a></td></tr>';
                 }
                 echo '</tbody></table></div>';
             }
