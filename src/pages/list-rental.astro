@@ -139,7 +139,8 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         <div class="lr-pay-box">
           <p class="lr-pay-amount">Amount due: <strong id="lr-amount">₱399</strong> <span id="lr-bill-label" style="color:#64748B;font-weight:400">/ monthly</span></p>
           <p class="lr-pay-instr">Pay via GCash, Maya, or BPI, then enter your reference and upload the receipt. We'll verify and activate your plan — your rental goes live once approved.</p>
-          <select id="f-method" class="lr-input"><option value="">Payment method…</option><option value="gcash">GCash</option><option value="maya">Maya</option><option value="bpi">BPI</option></select>
+          <select id="f-method" class="lr-input"><option value="">Payment method…</option><option value="gcash">GCash</option><option value="maya">Maya</option><option value="bpi">BPI transfer</option></select>
+          <div id="lr-pay-details" class="lr-pay-details" style="display:none"></div>
           <input id="f-ref" class="lr-input" placeholder="Payment reference / confirmation no." style="margin-top:.6rem" />
           <div style="margin-top:.6rem">
             <div class="lr-photos" id="lr-receipt-thumb"></div>
@@ -209,6 +210,10 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     .lr-pay-box { border: 1.5px solid #E2EBF3; border-radius: 12px; padding: 1rem; background: #F8FAFC; }
     .lr-pay-amount { font-size: 1rem; margin: 0 0 .35rem; }
     .lr-pay-instr { font-size: .82rem; color: #64748B; line-height: 1.5; margin: 0 0 .75rem; }
+    .lr-pay-details { margin: .6rem 0; border: 1px solid #E2EBF3; border-radius: 10px; padding: .8rem; background: #fff; text-align: center; }
+    .lr-pay-details img { width: min(220px, 100%); border-radius: 10px; display: block; margin: .5rem auto 0; }
+    .lr-pay-row { display: flex; justify-content: space-between; gap: 1rem; font-size: .85rem; padding: .15rem 0; }
+    .lr-pay-row span { color: #64748B; } .lr-pay-row strong { color: #1A2533; }
     @media (max-width: 560px) { .lr-plans { grid-template-columns: 1fr; } }
   </style>
 
@@ -294,6 +299,20 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         } catch (_) {}
         $('lr-receipt-text').textContent = receiptId ? '✓ Receipt uploaded' : '+ Upload receipt'
         e.target.value = ''
+      })
+      // Show the matching account details + QR when a payment method is picked.
+      const PAY = {
+        gcash: { name: 'Nico Lanugon', number: '09260367249', qr: 'https://admin.limasawabooking.com/wp-content/uploads/2026/05/gcash-number.webp' },
+        maya:  { name: 'Nico Lanugon', number: '09260367249', qr: 'https://admin.limasawabooking.com/wp-content/uploads/2026/05/maya-number.webp' },
+        bpi:   { name: 'Nico Lanugon', number: '5739059781', qr: 'https://admin.limasawabooking.com/wp-content/uploads/2026/05/bpi-number.webp' },
+      }
+      $('f-method').addEventListener('change', () => {
+        const m = PAY[$('f-method').value]; const box = $('lr-pay-details')
+        if (!m) { box.style.display = 'none'; return }
+        box.style.display = 'block'
+        box.innerHTML = `<div class="lr-pay-row"><span>Account name</span><strong>${m.name}</strong></div>`
+          + `<div class="lr-pay-row"><span>Account number</span><strong>${m.number}</strong></div>`
+          + `<img src="${m.qr}" alt="Payment QR" loading="lazy" onerror="this.style.display='none'" />`
       })
     }
 
