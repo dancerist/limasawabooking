@@ -30,6 +30,61 @@ if (defined('ABSPATH')) {
         }
     }
 
+    /* ── Tier gating ─────────────────────────────────────────────────────
+     * Blog writing is a Pro+ feature. A host's "tier" is the best tier across
+     * their listings (mirrors the dashboard maxTier). Admins/editors bypass.
+     * -------------------------------------------------------------------- */
+    if (!function_exists('sb_host_max_tier')) {
+        function sb_host_max_tier($user_id) {
+            $q = new WP_Query([
+                'post_type' => 'accommodation', 'author' => (int) $user_id,
+                'post_status' => ['publish', 'pending', 'draft'],
+                'posts_per_page' => -1, 'fields' => 'ids', 'no_found_rows' => true,
+            ]);
+            $rank = ['free' => 0, 'pro' => 1, 'featured' => 2];
+            $best = 'free';
+            foreach ($q->posts as $pid) {
+                $t = get_post_meta($pid, 'listing_tier', true) ?: 'free';
+                if (($rank[$t] ?? 0) > ($rank[$best] ?? 0)) $best = $t;
+            }
+            return $best;
+        }
+    }
+    if (!function_exists('sb_can_blog')) {
+        function sb_can_blog(WP_User $user) {
+            if (array_intersect(['administrator', 'editor'], (array) $user->roles)) return true;
+            return in_array(sb_host_max_tier($user->ID), ['pro', 'featured'], true);
+        }
+    }
+
+    /* ── Public blog card formatter ──────────────────────────────────────
+     * One published WP post → the shape src/scripts/blog-card-template.js
+     * (ported from siargao) expects.
+     * -------------------------------------------------------------------- */
+    if (!function_exists('sb_blog_card')) {
+        function sb_blog_card($p) {
+            $id      = $p->ID;
+            $author  = get_userdata($p->post_author);
+            $picId   = (int) get_user_meta($p->post_author, 'sb_profile_picture_id', true);
+            $avatar  = $picId ? wp_get_attachment_image_url($picId, 'thumbnail') : get_avatar_url($p->post_author, ['size' => 48]);
+            $cats    = get_the_category($id);
+            $primary = (!empty($cats) && strtolower($cats[0]->slug) !== 'uncategorized')
+                ? ['name' => $cats[0]->name, 'slug' => $cats[0]->slug] : null;
+            $excerpt = has_excerpt($id) ? get_the_excerpt($id) : wp_trim_words(wp_strip_all_tags($p->post_content), 28);
+            $words   = str_word_count(wp_strip_all_tags($p->post_content));
+            return [
+                'slug'      => $p->post_name,
+                'title'     => html_entity_decode(get_the_title($id), ENT_QUOTES),
+                'excerpt'   => html_entity_decode($excerpt, ENT_QUOTES),
+                'dateLabel' => get_the_date('M j, Y', $id),
+                'readMin'   => max(1, (int) ceil($words / 200)),
+                'thumb'     => get_the_post_thumbnail_url($id, 'large') ?: '',
+                'category'  => $primary,
+                'author'    => ['name' => $author ? $author->display_name : 'Host', 'avatar' => $avatar ?: ''],
+            ];
+        }
+    }
+
     add_action('rest_api_init', function () {
         $ns = 'limasawa/v1';
         register_rest_route($ns, '/my-posts', [
@@ -42,6 +97,16 @@ if (defined('ABSPATH')) {
             ['methods' => 'GET',    'permission_callback' => '__return_true', 'callback' => 'sb_get_post'],
             ['methods' => 'POST',   'permission_callback' => '__return_true', 'callback' => 'sb_update_post'],
             ['methods' => 'DELETE', 'permission_callback' => '__return_true', 'callback' => 'sb_delete_post'],
+        ]);
+        // ── Public blog (no auth, published only) ──
+        register_rest_route($ns, '/blog/posts', [
+            'methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => 'sb_blog_posts',
+        ]);
+        register_rest_route($ns, '/blog/categories', [
+            'methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => 'sb_blog_categories',
+        ]);
+        register_rest_route($ns, '/blog/post/(?P<slug>[a-z0-9\\-]+)', [
+            'methods' => 'GET', 'permission_callback' => '__return_true', 'callback' => 'sb_blog_single',
         ]);
     });
 
@@ -83,6 +148,7 @@ if (defined('ABSPATH')) {
         function sb_create_post(WP_REST_Request $req) {
             $user = sb_posts_user($req);
             if (!$user) return new WP_REST_Response(['success' => false, 'error' => 'UNAUTHORIZED'], 401);
+            if (!sb_can_blog($user)) return new WP_REST_Response(['success' => false, 'error' => 'TIER_LOCKED', 'message' => 'Writing posts is a Pro Host feature. Upgrade a listing to publish blog posts.'], 403);
             $title = sanitize_text_field((string) $req->get_param('title'));
             if ($title === '') return new WP_REST_Response(['success' => false, 'message' => 'Title is required.'], 400);
 
@@ -137,6 +203,7 @@ if (defined('ABSPATH')) {
         function sb_update_post(WP_REST_Request $req) {
             $g = sb_post_owner_guard($req);
             if (isset($g['err'])) return $g['err'];
+            if (!sb_can_blog($g['user'])) return new WP_REST_Response(['success' => false, 'error' => 'TIER_LOCKED', 'message' => 'Writing posts is a Pro Host feature.'], 403);
             $id = (int) $g['post']->ID;
             $title = sanitize_text_field((string) $req->get_param('title'));
             wp_update_post([
@@ -156,6 +223,85 @@ if (defined('ABSPATH')) {
             if (isset($g['err'])) return $g['err'];
             wp_trash_post((int) $g['post']->ID);
             return new WP_REST_Response(['success' => true], 200);
+        }
+    }
+
+    /* ── Public blog read endpoints ─────────────────────────────────────── */
+    if (!function_exists('sb_blog_posts')) {
+        function sb_blog_posts(WP_REST_Request $req) {
+            $page = max(1, (int) $req->get_param('page'));
+            $per  = min(48, max(1, (int) ($req->get_param('per_page') ?: 12)));
+            $args = [
+                'post_type' => 'post', 'post_status' => 'publish',
+                'posts_per_page' => $per, 'paged' => $page,
+                'orderby' => 'date', 'order' => 'DESC',
+            ];
+            if ($cat = $req->get_param('category')) $args['category_name'] = sanitize_title($cat);
+            if ($s = $req->get_param('search'))     $args['s'] = sanitize_text_field($s);
+            $q = new WP_Query($args);
+            return new WP_REST_Response([
+                'posts' => array_map('sb_blog_card', $q->posts),
+                'total' => (int) $q->found_posts,
+                'pages' => (int) $q->max_num_pages,
+                'page'  => $page,
+            ], 200);
+        }
+    }
+
+    if (!function_exists('sb_blog_categories')) {
+        function sb_blog_categories(WP_REST_Request $req) {
+            $terms = get_categories(['hide_empty' => true]);
+            $out = [];
+            foreach ($terms as $t) {
+                if (strtolower($t->slug) === 'uncategorized') continue;
+                $out[] = ['name' => $t->name, 'slug' => $t->slug, 'count' => (int) $t->count];
+            }
+            return new WP_REST_Response($out, 200);
+        }
+    }
+
+    if (!function_exists('sb_blog_single')) {
+        function sb_blog_single(WP_REST_Request $req) {
+            $slug = sanitize_title((string) $req->get_param('slug'));
+            $post = get_page_by_path($slug, OBJECT, 'post');
+            if (!$post || $post->post_status !== 'publish') {
+                return new WP_REST_Response(['error' => 'NOT_FOUND'], 404);
+            }
+            $card = sb_blog_card($post);
+            $catTerms = get_the_category($post->ID);
+            $categories = [];
+            foreach ($catTerms as $t) {
+                if (strtolower($t->slug) === 'uncategorized') continue;
+                $categories[] = ['name' => $t->name, 'slug' => $t->slug];
+            }
+            // Related: recent published posts, preferring the same primary category.
+            $relArgs = [
+                'post_type' => 'post', 'post_status' => 'publish',
+                'posts_per_page' => 3, 'post__not_in' => [$post->ID],
+                'orderby' => 'date', 'order' => 'DESC', 'no_found_rows' => true,
+            ];
+            if (!empty($catTerms)) $relArgs['category__in'] = [(int) $catTerms[0]->term_id];
+            $rel = new WP_Query($relArgs);
+            $related = array_map('sb_blog_card', $rel->posts);
+            // Top up to 3 with most-recent if same-category came up short.
+            if (count($related) < 3) {
+                $have = array_map(function ($r) { return $r['slug']; }, $related);
+                $fill = new WP_Query([
+                    'post_type' => 'post', 'post_status' => 'publish', 'posts_per_page' => 6,
+                    'post__not_in' => [$post->ID], 'orderby' => 'date', 'order' => 'DESC', 'no_found_rows' => true,
+                ]);
+                foreach ($fill->posts as $fp) {
+                    if (count($related) >= 3) break;
+                    if (in_array($fp->post_name, $have, true)) continue;
+                    $related[] = sb_blog_card($fp);
+                }
+            }
+            $out = array_merge($card, [
+                'content'    => apply_filters('the_content', $post->post_content),
+                'categories' => $categories,
+                'related'    => $related,
+            ]);
+            return new WP_REST_Response($out, 200);
         }
     }
 }

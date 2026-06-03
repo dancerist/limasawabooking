@@ -1,0 +1,229 @@
+---
+/**
+ * Blog archive — /blog  (ported from siargaobooking, rebranded)
+ * Static shell, all content fetched client-side from
+ * GET /wp-json/limasawa/v1/blog/posts and /blog/categories.
+ *
+ * Card markup + styles are shared via:
+ *   - src/scripts/blog-card-template.js
+ *   - src/styles/blog-card.css
+ */
+import Layout from '../../layouts/Layout.astro'
+import '../../styles/blog-card.css'
+
+const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+---
+
+<Layout
+  title="Limasawa Travel Blog — Island Guides & Host Stories"
+  description="Travel guides, beach and dive tips, how to get to Limasawa, and host stories — everything to help you plan your Limasawa Island trip."
+>
+  <main class="bl-main">
+    <!-- Hero -->
+    <section class="bl-hero">
+      <div class="bl-hero-inner">
+        <h1 class="bl-hero-title">Stories from Limasawa</h1>
+        <p class="bl-hero-sub">Travel guides, beach &amp; dive tips, and host stories — straight from the people who live and work on the island.</p>
+        <div class="bl-search-wrap">
+          <svg class="bl-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input id="bl-search" type="search" placeholder="Search articles…" autocomplete="off" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Category chips -->
+    <nav class="bl-cat-bar" aria-label="Blog categories">
+      <div class="bl-cat-strip" id="bl-cat-strip">
+        <button class="bl-cat-chip is-active" data-cat="">All articles</button>
+      </div>
+    </nav>
+
+    <!-- Posts grid -->
+    <section class="bl-grid-wrap">
+      <div class="bl-result-line" id="bl-result-line">Loading…</div>
+      <div class="bl-grid" id="bl-grid"></div>
+      <div class="bl-pager">
+        <button id="bl-load-more" class="bl-load-more" style="display:none">Load more</button>
+      </div>
+      <div class="bl-empty" id="bl-empty" style="display:none">
+        <h2>No posts yet</h2>
+        <p>Check back soon — we're working on it.</p>
+      </div>
+    </section>
+  </main>
+
+  <style is:global>
+    :root {
+      --bl-primary: #279DA3;
+      --bl-primary-deep: #1E8087;
+      --bl-text: #1A2533;
+      --bl-muted: #64748B;
+      --bl-border: #E2EBF3;
+      --bl-bg: #F5F8FB;
+    }
+    .bl-main { color: var(--bl-text); padding-bottom: 5rem; }
+
+    /* Hero */
+    .bl-hero {
+      background: linear-gradient(180deg, #F5F8FB 0%, #fff 100%);
+      padding: 4rem 1.5rem 2rem;
+      text-align: center;
+    }
+    .bl-hero-inner { max-width: 720px; margin: 0 auto; }
+    .bl-hero-title {
+      font-family: 'DM Sans', sans-serif;
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800; line-height: 1.05; color: var(--bl-text);
+      margin-bottom: .85rem;
+    }
+    .bl-hero-sub { font-size: 1.05rem; color: var(--bl-muted); line-height: 1.55; margin-bottom: 2rem; }
+    .bl-search-wrap { position: relative; max-width: 520px; margin: 0 auto; }
+    .bl-search-icon {
+      position: absolute; left: 18px; top: 50%; transform: translateY(-50%);
+      color: var(--bl-muted); pointer-events: none;
+    }
+    #bl-search {
+      width: 100%; padding: .85rem 1rem .85rem 2.85rem;
+      border: 1.5px solid var(--bl-border); border-radius: 999px;
+      font-size: .95rem; background: #fff; outline: none;
+      transition: border-color .15s, box-shadow .15s;
+      box-sizing: border-box;
+    }
+    #bl-search:focus { border-color: var(--bl-primary); box-shadow: 0 0 0 4px rgba(39,157,163,.1); }
+
+    /* Category bar */
+    .bl-cat-bar {
+      position: sticky; top: 0; z-index: 30; background: #fff;
+      border-bottom: 1px solid var(--bl-border);
+      padding: .85rem 1.5rem;
+    }
+    .bl-cat-strip {
+      max-width: 1200px; margin: 0 auto;
+      display: flex; gap: .55rem; overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .bl-cat-strip::-webkit-scrollbar { display: none; }
+    .bl-cat-chip {
+      flex-shrink: 0; background: #fff; color: var(--bl-text);
+      border: 1.5px solid var(--bl-border); border-radius: 999px;
+      padding: .45rem 1.1rem; font-size: .85rem; font-weight: 700;
+      cursor: pointer; white-space: nowrap; transition: all .15s;
+    }
+    .bl-cat-chip:hover { border-color: var(--bl-primary); color: var(--bl-primary); }
+    .bl-cat-chip.is-active { background: var(--bl-text); color: #fff; border-color: var(--bl-text); }
+
+    /* Grid */
+    .bl-grid-wrap { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
+    .bl-result-line { font-size: .85rem; color: var(--bl-muted); margin-bottom: 1.5rem; }
+    .bl-grid {
+      display: grid; gap: 1.75rem 1.25rem;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+
+    /* Pager */
+    .bl-pager { display: flex; justify-content: center; margin-top: 3rem; }
+    .bl-load-more {
+      background: var(--bl-text); color: #fff; border: 0; border-radius: 10px;
+      padding: .85rem 2.5rem; font-weight: 700; font-size: .9rem; cursor: pointer;
+      transition: background .15s;
+    }
+    .bl-load-more:hover { background: #000; }
+    .bl-load-more:disabled { opacity: .55; cursor: not-allowed; }
+
+    /* Empty */
+    .bl-empty { text-align: center; padding: 4rem 1rem; color: var(--bl-muted); }
+    .bl-empty h2 { font-size: 1.25rem; font-weight: 800; color: var(--bl-text); margin-bottom: .5rem; }
+
+    @media(max-width:560px) {
+      .bl-hero { padding: 2.5rem 1.25rem 1.5rem; }
+      .bl-hero-title { font-size: 1.85rem; }
+      .bl-hero-sub  { font-size: .95rem; }
+      .bl-grid-wrap { padding: 1.5rem 1.25rem; }
+    }
+  </style>
+
+  <script define:vars={{ WP_REST }}>
+    window.__BLOG_API = WP_REST
+  </script>
+  <script>
+    import { blogCardHTML, blogSkeletonHTML, blogEsc as esc } from '../../scripts/blog-card-template.js'
+
+    const API = window.__BLOG_API || 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+    const grid       = document.getElementById('bl-grid')
+    const empty      = document.getElementById('bl-empty')
+    const resultLine = document.getElementById('bl-result-line')
+    const loadMore   = document.getElementById('bl-load-more')
+    const search     = document.getElementById('bl-search')
+    const catStrip   = document.getElementById('bl-cat-strip')
+
+    let state = { category: '', search: '', page: 1, totalPages: 1 }
+    let searchTimer
+
+    function renderSkeleton(count = 6) { grid.innerHTML = blogSkeletonHTML(count) }
+    const renderCard = blogCardHTML
+
+    async function loadCategories() {
+      try {
+        const cats = await fetch(`${API}/blog/categories`).then(r => r.json())
+        const html = (cats || []).filter(c => c.count > 0)
+          .map(c => `<button class="bl-cat-chip" data-cat="${esc(c.slug)}">${esc(c.name).replace(/&amp;/g, '&')}<span style="opacity:.5;margin-left:.4rem">${c.count}</span></button>`)
+          .join('')
+        catStrip.insertAdjacentHTML('beforeend', html)
+        catStrip.addEventListener('click', e => {
+          const btn = e.target.closest('.bl-cat-chip')
+          if (!btn) return
+          catStrip.querySelectorAll('.bl-cat-chip').forEach(b => b.classList.toggle('is-active', b === btn))
+          state.category = btn.dataset.cat || ''
+          state.page = 1
+          loadPosts(true)
+        })
+      } catch (_) {}
+    }
+
+    async function loadPosts(replace = true) {
+      if (replace) renderSkeleton()
+      const qs = new URLSearchParams({ page: String(state.page), per_page: '12' })
+      if (state.category) qs.set('category', state.category)
+      if (state.search)   qs.set('search', state.search)
+      try {
+        const data = await fetch(`${API}/blog/posts?${qs}`).then(r => r.json())
+        state.totalPages = data.pages || 1
+        const html = (data.posts || []).map(renderCard).join('')
+        if (replace) grid.innerHTML = html
+        else grid.insertAdjacentHTML('beforeend', html)
+        if (data.total === 0) {
+          resultLine.style.display = 'none'
+          empty.style.display = 'block'
+          loadMore.style.display = 'none'
+        } else {
+          empty.style.display = 'none'
+          const noun = data.total === 1 ? 'article' : 'articles'
+          resultLine.style.display = 'block'
+          resultLine.textContent = `${data.total} ${noun}${state.category ? ' in this category' : ''}${state.search ? ' for "' + state.search + '"' : ''}`
+          loadMore.style.display = state.page < state.totalPages ? 'inline-flex' : 'none'
+        }
+      } catch (e) {
+        grid.innerHTML = `<div class="bl-empty" style="grid-column:1/-1"><h2>Could not load posts</h2><p>${esc(e.message || 'Try again later')}</p></div>`
+      }
+    }
+
+    loadMore.addEventListener('click', async () => {
+      loadMore.disabled = true; loadMore.textContent = 'Loading…'
+      state.page += 1
+      await loadPosts(false)
+      loadMore.disabled = false; loadMore.textContent = 'Load more'
+    })
+
+    search.addEventListener('input', () => {
+      clearTimeout(searchTimer)
+      searchTimer = setTimeout(() => {
+        state.search = search.value.trim()
+        state.page = 1
+        loadPosts(true)
+      }, 320)
+    })
+
+    loadCategories()
+    loadPosts(true)
+  </script>
+</Layout>

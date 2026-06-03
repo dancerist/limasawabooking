@@ -1,0 +1,251 @@
+---
+/**
+ * Blog single post — /blog/<slug>  (ported from siargaobooking, rebranded)
+ *
+ * Every published post is statically prebuilt at build time (real content +
+ * OG tags + SEO). New posts appear after the next deploy/rebuild.
+ */
+import Layout from '../../layouts/Layout.astro'
+
+const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+
+export async function getStaticPaths() {
+  const apiBase = process.env.PUBLIC_WP_REST ?? import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+  const slugs: { slug: string }[] = []
+  let page = 1
+  while (true) {
+    try {
+      const res = await fetch(`${apiBase}/blog/posts?page=${page}&per_page=48`)
+      if (!res.ok) break
+      const data = await res.json()
+      for (const p of (data.posts || [])) slugs.push({ slug: p.slug })
+      if (page >= (data.pages || 1)) break
+      page += 1
+    } catch { break }
+  }
+  const out = await Promise.all(slugs.map(async ({ slug }) => {
+    try {
+      const res = await fetch(`${apiBase}/blog/post/${slug}`)
+      if (!res.ok) return null
+      return { params: { slug }, props: { post: await res.json() } }
+    } catch { return null }
+  }))
+  return out.filter(Boolean) as any[]
+}
+
+const { post } = Astro.props as { post: any }
+const title       = post?.title || 'Limasawa Booking'
+const description = post ? (post.excerpt || '').replace(/\s+/g, ' ').slice(0, 160) : 'Stories from Limasawa'
+const ogImage     = post?.thumb || undefined
+---
+
+<Layout title={title} description={description} image={ogImage} type="article">
+  <main class="bp-main">
+    {post && (
+      <article class="bp-article">
+        <nav class="bp-breadcrumb">
+          <a href="/blog">Blog</a>
+          {post.category && (
+            <>
+              <span class="bp-bc-sep">/</span>
+              <a href={`/blog?cat=${post.category.slug}`} set:html={post.category.name} />
+            </>
+          )}
+        </nav>
+
+        <header class="bp-header">
+          {post.category && <a class="bp-cat" href={`/blog?cat=${post.category.slug}`} set:html={post.category.name} />}
+          <h1 class="bp-title">{post.title}</h1>
+          {post.excerpt && <p class="bp-lede">{post.excerpt}</p>}
+          <div class="bp-meta">
+            {post.author && (
+              <div class="bp-author">
+                <img class="bp-avatar" src={post.author.avatar} alt={post.author.name} loading="lazy" />
+                <div>
+                  <div class="bp-author-name">{post.author.name}</div>
+                  <div class="bp-author-sub">{post.dateLabel} · {post.readMin} min read</div>
+                </div>
+              </div>
+            )}
+            <button class="bp-share" id="bp-share-btn" type="button" aria-label="Share article">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+              Share
+            </button>
+          </div>
+        </header>
+
+        {post.thumb && (
+          <figure class="bp-hero-img">
+            <img src={post.thumb} alt={post.title} />
+          </figure>
+        )}
+
+        <div class="bp-content" set:html={post.content || ''} />
+
+        {post.categories && post.categories.length > 1 && (
+          <div class="bp-tags">
+            {post.categories.map((c: any) => (
+              <a href={`/blog?cat=${c.slug}`} class="bp-tag" set:html={c.name} />
+            ))}
+          </div>
+        )}
+
+        {post.author && (
+          <aside class="bp-author-card">
+            <img class="bp-author-card-avatar" src={post.author.avatar} alt={post.author.name} />
+            <div>
+              <div class="bp-author-card-label">Written by</div>
+              <div class="bp-author-card-name">{post.author.name}</div>
+            </div>
+          </aside>
+        )}
+
+        {post.related && post.related.length > 0 && (
+          <section class="bp-related">
+            <h2 class="bp-related-title">Keep reading</h2>
+            <div class="bp-related-grid">
+              {post.related.map((r: any) => (
+                <a class="bp-related-card" href={`/blog/${r.slug}`}>
+                  {r.thumb
+                    ? <img src={r.thumb} alt={r.title} loading="lazy" />
+                    : <div class="bp-related-noimg"></div>}
+                  <div class="bp-related-body">
+                    {r.category && <span class="bp-related-cat" set:html={r.category.name} />}
+                    <h3 class="bp-related-h3">{r.title}</h3>
+                    <span class="bp-related-meta">{r.dateLabel} · {r.readMin} min</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <div class="bp-back-row">
+          <a href="/blog" class="bp-back-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+            All articles
+          </a>
+        </div>
+      </article>
+    )}
+  </main>
+
+  <style is:global>
+    :root {
+      --bp-primary: #279DA3;
+      --bp-text: #1A2533;
+      --bp-muted: #64748B;
+      --bp-border: #E2EBF3;
+      --bp-bg: #F5F8FB;
+    }
+    .bp-main { color: var(--bp-text); padding: 2rem 1.5rem 6rem; max-width: 760px; margin: 0 auto; }
+
+    .bp-breadcrumb { display: flex; align-items: center; gap: .55rem; font-size: .82rem; color: var(--bp-muted); margin-bottom: 1.5rem; }
+    .bp-breadcrumb a { color: var(--bp-muted); text-decoration: none; }
+    .bp-breadcrumb a:hover { color: var(--bp-primary); }
+    .bp-bc-sep { color: #CBD5E1; }
+
+    .bp-header { margin-bottom: 1.75rem; }
+    .bp-cat {
+      display: inline-block; background: var(--bp-bg); color: var(--bp-primary);
+      font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+      padding: .35rem .8rem; border-radius: 6px; text-decoration: none; margin-bottom: 1rem;
+    }
+    .bp-cat:hover { background: var(--bp-primary); color: #fff; }
+    .bp-title {
+      font-family: 'DM Sans', sans-serif;
+      font-size: clamp(1.85rem, 4.5vw, 2.85rem);
+      font-weight: 800; line-height: 1.1; color: var(--bp-text);
+      margin-bottom: 1rem;
+    }
+    .bp-lede { font-size: 1.15rem; color: var(--bp-muted); line-height: 1.55; margin-bottom: 1.5rem; }
+    .bp-meta { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding-top: 1.25rem; border-top: 1px solid var(--bp-border); }
+    .bp-author { display: flex; align-items: center; gap: .75rem; }
+    .bp-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: var(--bp-bg); }
+    .bp-author-name { font-weight: 700; font-size: .9rem; color: var(--bp-text); }
+    .bp-author-sub  { font-size: .8rem; color: var(--bp-muted); margin-top: 1px; }
+    .bp-share {
+      display: inline-flex; align-items: center; gap: .4rem;
+      background: #fff; border: 1.5px solid var(--bp-border); color: var(--bp-text);
+      border-radius: 8px; padding: .5rem .9rem; font-size: .8rem; font-weight: 700; cursor: pointer;
+      transition: all .15s;
+    }
+    .bp-share:hover { border-color: var(--bp-text); }
+
+    .bp-hero-img { margin: 2rem -1.5rem 2.5rem; border-radius: 0; max-height: 480px; overflow: hidden; }
+    .bp-hero-img img { width: 100%; height: 100%; object-fit: cover; max-height: 480px; display: block; }
+    @media(min-width:760px) { .bp-hero-img { margin: 2rem 0 2.5rem; border-radius: 18px; } }
+
+    .bp-content { font-family: 'Nunito Sans', sans-serif; font-size: 1.07rem; line-height: 1.75; color: #2D3748; }
+    .bp-content > * + * { margin-top: 1.25em; }
+    .bp-content h2 { font-family: 'DM Sans', sans-serif; font-size: 1.6rem; font-weight: 800; color: var(--bp-text); margin-top: 2.5rem; margin-bottom: 1rem; line-height: 1.25; }
+    .bp-content h3 { font-family: 'DM Sans', sans-serif; font-size: 1.25rem; font-weight: 700; color: var(--bp-text); margin-top: 2rem; margin-bottom: .85rem; }
+    .bp-content p  { margin-top: 1.15em; }
+    .bp-content a  { color: var(--bp-primary); text-decoration: underline; text-underline-offset: 3px; }
+    .bp-content a:hover { color: var(--bp-text); }
+    .bp-content ul, .bp-content ol { padding-left: 1.4em; }
+    .bp-content li { margin-bottom: .55em; }
+    .bp-content blockquote {
+      border-left: 4px solid var(--bp-primary);
+      padding: .15em 0 .15em 1.25em;
+      margin-left: 0; color: var(--bp-text); font-size: 1.15rem; font-style: italic;
+    }
+    .bp-content figure { margin: 2rem 0; }
+    .bp-content figure img, .bp-content > img { width: 100%; height: auto; border-radius: 12px; display: block; }
+    .bp-content figcaption { font-size: .82rem; color: var(--bp-muted); text-align: center; margin-top: .55rem; }
+    .bp-content hr { border: 0; border-top: 1px solid var(--bp-border); margin: 2.5rem 0; }
+    .bp-content code { background: var(--bp-bg); padding: .15em .4em; border-radius: 4px; font-size: .92em; }
+    .bp-content pre { background: #0F172A; color: #E2E8F0; padding: 1.25rem; border-radius: 10px; overflow-x: auto; font-size: .88rem; }
+
+    .bp-tags { display: flex; flex-wrap: wrap; gap: .5rem; padding-top: 2rem; border-top: 1px solid var(--bp-border); margin-top: 3rem; }
+    .bp-tag {
+      background: var(--bp-bg); color: var(--bp-text);
+      padding: .35rem .85rem; border-radius: 999px;
+      font-size: .78rem; font-weight: 700; text-decoration: none;
+      transition: all .15s;
+    }
+    .bp-tag:hover { background: var(--bp-text); color: #fff; }
+
+    .bp-author-card {
+      display: flex; align-items: center; gap: 1rem;
+      background: var(--bp-bg); border-radius: 14px; padding: 1.25rem; margin: 2.5rem 0;
+    }
+    .bp-author-card-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; background: #fff; }
+    .bp-author-card-label { font-size: .7rem; color: var(--bp-muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+    .bp-author-card-name  { font-family: 'DM Sans', sans-serif; font-size: 1.1rem; font-weight: 700; color: var(--bp-text); margin-top: 2px; }
+
+    .bp-related { margin-top: 4rem; padding-top: 2.5rem; border-top: 1px solid var(--bp-border); }
+    .bp-related-title { font-family: 'DM Sans', sans-serif; font-size: 1.4rem; font-weight: 800; color: var(--bp-text); margin-bottom: 1.5rem; }
+    .bp-related-grid { display: grid; gap: 1.25rem; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+    .bp-related-card { text-decoration: none; color: inherit; display: flex; flex-direction: column; transition: transform .2s; }
+    .bp-related-card:hover { transform: translateY(-3px); }
+    .bp-related-card img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 10px; background: var(--bp-bg); }
+    .bp-related-noimg { width: 100%; aspect-ratio: 16 / 10; border-radius: 10px; background: linear-gradient(135deg, #E6F9FA, #C8E8EA); }
+    .bp-related-body { padding-top: .85rem; }
+    .bp-related-cat { font-size: .68rem; font-weight: 800; color: var(--bp-primary); text-transform: uppercase; letter-spacing: .04em; }
+    .bp-related-h3  { font-family: 'DM Sans', sans-serif; font-size: 1rem; font-weight: 700; color: var(--bp-text); margin: .35rem 0 .35rem; line-height: 1.3; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+    .bp-related-meta { font-size: .76rem; color: var(--bp-muted); }
+
+    .bp-back-row { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--bp-border); }
+    .bp-back-link { display: inline-flex; align-items: center; gap: .5rem; color: var(--bp-text); text-decoration: none; font-weight: 700; font-size: .9rem; }
+    .bp-back-link:hover { color: var(--bp-primary); }
+  </style>
+
+  <script>
+    document.getElementById('bp-share-btn')?.addEventListener('click', async () => {
+      const url = location.href
+      const title = document.title
+      if (navigator.share) {
+        try { await navigator.share({ title, url }) } catch (_) {}
+        return
+      }
+      try {
+        await navigator.clipboard.writeText(url)
+        const btn = document.getElementById('bp-share-btn')
+        const orig = btn.innerHTML
+        btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Copied'
+        setTimeout(() => { btn.innerHTML = orig }, 1800)
+      } catch (_) {}
+    })
+  </script>
+</Layout>
