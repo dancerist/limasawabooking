@@ -1237,6 +1237,12 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         </svg>
         <span>Add listing</span>
       </a>
+      <a class="nav-item host-only" data-tab="rentals" onclick="switchTab('rentals'); return false" href="#" style="cursor:pointer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 17.5h-5l-2-7H5"/><path d="M10 10.5h5l2 7"/>
+        </svg>
+        <span>My rentals</span>
+      </a>
       <a class="nav-item host-only" data-tab="reviews" href="#" onclick="switchTab('reviews'); return false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -1411,6 +1417,22 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         </div>
         <div class="panel" style="padding:0;overflow:hidden">
           <div id="my-listings-container"><div class="listings-empty">Loading listings…</div></div>
+        </div>
+      </div>
+
+      <div id="rentals-content" style="display:none;">
+        <div class="analytics-header">
+          <div>
+            <h1>Your rentals</h1>
+            <p class="analytics-subtitle">List scooters, motorbikes, or cars for travelers to rent. New rentals are reviewed before going live.</p>
+          </div>
+          <a href="/list-rental" class="my-listings-add-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add rental
+          </a>
+        </div>
+        <div class="panel" style="padding:0;overflow:hidden">
+          <div id="rentals-container"><div class="listings-empty">Loading rentals…</div></div>
         </div>
       </div>
 
@@ -2191,10 +2213,60 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
 
     // ── Tab switching ─────────────────────────────────────────────────────────
     let _currentTab = 'dashboard'
+    // ── Rentals panel ──────────────────────────────────────────────────────
+    async function loadRentals() {
+      const c = document.getElementById('rentals-container')
+      const token = localStorage.getItem('sb_token')
+      try {
+        const data = await fetch(`${API}/my-rentals`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json())
+        c.innerHTML = renderRentals(data.rentals || [])
+      } catch (e) {
+        c.innerHTML = `<div class="listings-empty" style="padding:2rem;text-align:center">Could not load rentals.</div>`
+      }
+    }
+    function renderRentals(rentals) {
+      const rEsc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+      if (!rentals.length) {
+        return `<div class="listings-empty" style="padding:2.5rem 1.5rem;text-align:center">
+          <p style="color:var(--muted);margin-bottom:.85rem">You haven't listed any rentals yet.</p>
+          <a href="/list-rental" class="panel-btn" style="display:inline-block">Add your first rental</a></div>`
+      }
+      const peso = n => '₱' + Number(n || 0).toLocaleString('en-PH')
+      const badge = s => {
+        const m = { live:['#15803D','#F0FDF4','Live'], pending:['#92400E','#FFFBEB','Pending review'], paused:['#9A3412','#FFF7ED','Paused'], draft:['#475569','#F1F5F9','Draft'] }
+        const [col, bg, t] = m[s] || m.draft
+        return `<span style="font-size:.68rem;font-weight:700;color:${col};background:${bg};padding:.15rem .5rem;border-radius:6px">${t}</span>`
+      }
+      const actBtn = 'font-size:.78rem;font-weight:700;color:var(--text);background:#fff;border:1px solid var(--border);border-radius:7px;padding:.35rem .7rem;cursor:pointer;text-decoration:none'
+      return rentals.map(r => `
+        <div style="display:flex;align-items:center;gap:1rem;padding:.9rem 1.25rem;border-bottom:1px solid var(--border)">
+          <div style="width:64px;height:48px;border-radius:8px;overflow:hidden;background:var(--primary-light);flex:0 0 auto">${r.thumb ? `<img src="${rEsc(r.thumb)}" style="width:100%;height:100%;object-fit:cover" alt="" />` : ''}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${rEsc(r.title)}</div>
+            <div style="font-size:.78rem;color:var(--muted);display:flex;gap:.45rem;align-items:center;flex-wrap:wrap;margin-top:.2rem">${badge(r.status)}<span>${rEsc(r.type || '')}</span><span>·</span><span>${peso(r.daily)}/day</span></div>
+          </div>
+          <div style="display:flex;gap:.4rem;flex-wrap:wrap;justify-content:flex-end">
+            <a href="/list-rental?edit=${r.id}" style="${actBtn}">Edit</a>
+            ${r.status === 'paused'
+              ? `<button onclick="rentalAction(${r.id},'unpause')" style="${actBtn}">Unpause</button>`
+              : (r.status === 'live' ? `<button onclick="rentalAction(${r.id},'pause')" style="${actBtn}">Pause</button>` : '')}
+            <button onclick="rentalAction(${r.id},'trash')" style="${actBtn};color:#DC2626">Delete</button>
+          </div>
+        </div>`).join('')
+    }
+    async function rentalAction(id, action) {
+      if (action === 'trash' && !confirm('Delete this rental? This cannot be undone.')) return
+      const token = localStorage.getItem('sb_token')
+      try {
+        await fetch(`${API}/rental-action`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ id, action }) })
+      } catch (e) {}
+      loadRentals()
+    }
+
     function switchTab(tab) {
       // Guard: guests can't access host-only tabs (defensive — UI hides them but ?tab= URLs need check)
       const isHost = _me && (_me.role === 'host' || _me.role === 'admin')
-      const HOST_TABS = ['dashboard', 'my-listings', 'orders', 'reviews']
+      const HOST_TABS = ['dashboard', 'my-listings', 'rentals', 'orders', 'reviews']
       if (!isHost && HOST_TABS.includes(tab)) tab = 'saved'
 
       _currentTab = tab
@@ -2204,16 +2276,17 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       const show = id => { const el = document.getElementById(id); if(el) el.style.display = 'block' }
       const hide = id => { const el = document.getElementById(id); if(el) el.style.display = 'none'  }
       hide('dashboard-content'); hide('my-listings-content'); hide('orders-content'); hide('saved-content')
-      hide('reviews-content'); hide('my-reviews-content'); hide('account-content')
+      hide('reviews-content'); hide('my-reviews-content'); hide('account-content'); hide('rentals-content')
 
       const TITLES = {
-        dashboard: 'Analytics', 'my-listings': 'My Listings', orders: 'Orders & Billing', saved: 'Saved Stays',
+        dashboard: 'Analytics', 'my-listings': 'My Listings', rentals: 'My Rentals', orders: 'Orders & Billing', saved: 'Saved Stays',
         reviews: 'Pending Reviews', 'my-reviews': 'My Reviews', account: 'Account',
       }
       document.getElementById('topbar-title').textContent = TITLES[tab] || 'Dashboard'
 
       if(tab === 'orders')            { show('orders-content') }
       else if(tab === 'my-listings')  { show('my-listings-content') }
+      else if(tab === 'rentals')      { show('rentals-content');    loadRentals() }
       else if(tab === 'saved')        { show('saved-content');      loadSavedListings() }
       else if(tab === 'reviews')      { show('reviews-content');    loadReviews() }
       else if(tab === 'my-reviews')   { show('my-reviews-content'); loadMyReviews() }

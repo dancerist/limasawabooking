@@ -1,0 +1,267 @@
+---
+/**
+ * List a rental — /list-rental  (create) and /list-rental?edit=ID (edit).
+ * Dedicated simple form (rentals have far fewer fields than accommodations).
+ * Auth-gated; submits to /submit-rental, edits via /rental-edit + /update-rental.
+ */
+import Layout from '../layouts/Layout.astro'
+
+const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+---
+
+<Layout title="List your rental" description="List your scooter, motorbike, or car rental on Limasawa Booking." noindex={true}>
+  <main class="lr-main">
+    <!-- Auth wall -->
+    <div class="lr-authwall" id="lr-authwall" style="display:none">
+      <h1>List your rental</h1>
+      <p>Please sign in as a host to list a scooter, motorbike, or car rental in Limasawa.</p>
+      <a class="lr-btn-primary" href="/auth?redirect=/list-rental">Sign in / Register</a>
+    </div>
+
+    <!-- Success -->
+    <div class="lr-success" id="lr-success" style="display:none">
+      <div class="lr-success-icon">✓</div>
+      <h1>Rental submitted!</h1>
+      <p>Your rental is now pending review. We'll publish it shortly — you can track it in your dashboard.</p>
+      <a class="lr-btn-primary" href="/dashboard?tab=rentals">Go to dashboard</a>
+    </div>
+
+    <!-- Form -->
+    <form class="lr-form" id="lr-form" style="display:none">
+      <header class="lr-head">
+        <a href="/dashboard?tab=rentals" class="lr-back">← Dashboard</a>
+        <h1 id="lr-title">List your rental</h1>
+        <p id="lr-sub">Add a scooter, motorbike, bicycle, or car for travelers to rent in Limasawa.</p>
+      </header>
+
+      <div class="lr-field">
+        <label for="f-title">Listing title <span>*</span></label>
+        <input id="f-title" class="lr-input" placeholder="e.g. Honda Click 125 Scooter Rental" required />
+      </div>
+
+      <div class="lr-row">
+        <div class="lr-field">
+          <label for="f-type">Vehicle type <span>*</span></label>
+          <select id="f-type" class="lr-input" required><option value="">Select…</option></select>
+        </div>
+        <div class="lr-field">
+          <label for="f-barangay">Barangay <span>*</span></label>
+          <select id="f-barangay" class="lr-input" required>
+            <option value="">Select…</option>
+            <option value="39">Cabulihan</option>
+            <option value="40">Lugsongan</option>
+            <option value="41">Magallanes</option>
+            <option value="42">San Agustin</option>
+            <option value="43">San Bernardo</option>
+            <option value="44">Triana</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="lr-row lr-row-3">
+        <div class="lr-field">
+          <label for="f-daily">Daily rate (₱) <span>*</span></label>
+          <input id="f-daily" class="lr-input" type="number" min="0" placeholder="400" required />
+        </div>
+        <div class="lr-field">
+          <label for="f-hourly">Hourly rate (₱)</label>
+          <input id="f-hourly" class="lr-input" type="number" min="0" placeholder="80" />
+        </div>
+        <div class="lr-field">
+          <label for="f-deposit">Deposit (₱)</label>
+          <input id="f-deposit" class="lr-input" type="number" min="0" placeholder="1000" />
+        </div>
+      </div>
+
+      <div class="lr-field">
+        <label for="f-inclusions">What's included / notes</label>
+        <textarea id="f-inclusions" class="lr-input" rows="2" placeholder="e.g. Helmet included. Fuel not included. Valid ID required as deposit."></textarea>
+      </div>
+
+      <div class="lr-field">
+        <label for="f-desc">Description</label>
+        <textarea id="f-desc" class="lr-input" rows="4" placeholder="Describe the vehicle, condition, and anything renters should know."></textarea>
+      </div>
+
+      <div class="lr-row">
+        <div class="lr-field">
+          <label for="f-provider">Provider / business name</label>
+          <input id="f-provider" class="lr-input" placeholder="e.g. Island Rides Limasawa" />
+        </div>
+        <div class="lr-field">
+          <label for="f-contact">Contact number</label>
+          <input id="f-contact" class="lr-input" placeholder="e.g. 0917 123 4567" />
+        </div>
+      </div>
+
+      <div class="lr-field">
+        <label>Photos</label>
+        <div class="lr-photos" id="lr-photos"></div>
+        <label class="lr-upload" id="lr-upload-label">
+          <input type="file" id="f-photos" accept="image/*" multiple hidden />
+          <span id="lr-upload-text">+ Add photos</span>
+        </label>
+      </div>
+
+      <div class="lr-error" id="lr-error" hidden></div>
+      <div class="lr-actions">
+        <button type="submit" class="lr-btn-primary" id="lr-submit">Submit rental</button>
+      </div>
+    </form>
+  </main>
+
+  <style is:global>
+    .lr-main { max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 5rem; color: #1A2533; }
+    .lr-authwall, .lr-success { text-align: center; padding: 4rem 1rem; }
+    .lr-authwall h1, .lr-success h1 { font-family: 'DM Sans', sans-serif; font-size: 1.8rem; font-weight: 800; margin-bottom: .75rem; }
+    .lr-authwall p, .lr-success p { color: #64748B; margin-bottom: 1.5rem; line-height: 1.6; }
+    .lr-success-icon { width: 64px; height: 64px; border-radius: 50%; background: #E6F9FA; color: #279DA3; font-size: 2rem; display: grid; place-items: center; margin: 0 auto 1.25rem; font-weight: 800; }
+
+    .lr-head { margin-bottom: 2rem; }
+    .lr-back { color: #64748B; text-decoration: none; font-weight: 700; font-size: .85rem; }
+    .lr-back:hover { color: #279DA3; }
+    .lr-head h1 { font-family: 'DM Sans', sans-serif; font-size: clamp(1.6rem, 4vw, 2.2rem); font-weight: 800; margin: .75rem 0 .35rem; }
+    .lr-head p { color: #64748B; line-height: 1.5; }
+
+    .lr-field { margin-bottom: 1.25rem; }
+    .lr-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .lr-row-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .lr-field label { display: block; font-weight: 700; font-size: .85rem; margin-bottom: .4rem; }
+    .lr-field label span { color: #DC2626; }
+    .lr-input { width: 100%; border: 1.5px solid #E2EBF3; border-radius: 10px; padding: .7rem .85rem; font-size: .95rem; font-family: inherit; background: #fff; box-sizing: border-box; outline: none; transition: border-color .15s; }
+    .lr-input:focus { border-color: #279DA3; box-shadow: 0 0 0 3px rgba(39,157,163,.12); }
+    textarea.lr-input { resize: vertical; }
+
+    .lr-photos { display: flex; flex-wrap: wrap; gap: .6rem; margin-bottom: .6rem; }
+    .lr-photo { position: relative; width: 84px; height: 84px; border-radius: 10px; overflow: hidden; background: #F5F8FB; }
+    .lr-photo img { width: 100%; height: 100%; object-fit: cover; }
+    .lr-photo button { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: rgba(0,0,0,.6); color: #fff; cursor: pointer; font-size: 13px; line-height: 1; }
+    .lr-upload { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 1.1rem; border: 1.5px dashed #BEF0F3; border-radius: 10px; color: #279DA3; font-weight: 700; font-size: .88rem; cursor: pointer; background: #F8FEFE; }
+    .lr-upload:hover { border-color: #279DA3; }
+
+    .lr-error { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; padding: .7rem .9rem; border-radius: 10px; font-size: .88rem; margin-bottom: 1rem; }
+    .lr-actions { margin-top: 1.5rem; }
+    .lr-btn-primary { display: inline-flex; align-items: center; justify-content: center; min-height: 50px; padding: 0 2rem; background: #279DA3; color: #fff; border: 0; border-radius: 11px; font-weight: 800; font-size: .95rem; cursor: pointer; text-decoration: none; }
+    .lr-btn-primary:hover { background: #1E8087; }
+    .lr-btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+    @media (max-width: 560px) { .lr-row, .lr-row-3 { grid-template-columns: 1fr; } }
+  </style>
+
+  <script define:vars={{ WP_REST }}>window.__LR_API = WP_REST</script>
+  <script>
+    const API = window.__LR_API || 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+    const $ = id => document.getElementById(id)
+    const token = localStorage.getItem('sb_token')
+
+    function parseJWT(t) { try { return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))) } catch { return null } }
+    const payload = token ? parseJWT(token) : null
+    const valid = payload && payload.exp > Date.now() / 1000
+
+    if (!valid) { $('lr-authwall').style.display = 'block' }
+    else { $('lr-form').style.display = 'block'; init() }
+
+    let galleryIds = []
+    const editId = parseInt(new URLSearchParams(location.search).get('edit') || '0')
+
+    async function init() {
+      // populate vehicle types
+      try {
+        const types = await fetch(`${API}/rental-types`).then(r => r.json())
+        // include all types even count 0 by also fetching nothing — rental-types is hide_empty;
+        // fall back to a fixed list so a fresh site still shows options
+        const list = (types && types.length) ? types : [
+          {slug:'scooter',name:'Scooter'},{slug:'motorbike',name:'Motorbike'},{slug:'bicycle',name:'Bicycle'},{slug:'car',name:'Car'},{slug:'van',name:'Van'},{slug:'tricycle',name:'Tricycle'}
+        ]
+        const seen = new Set(list.map(t=>t.slug))
+        ;[['scooter','Scooter'],['motorbike','Motorbike'],['bicycle','Bicycle'],['car','Car'],['van','Van'],['tricycle','Tricycle']].forEach(([s,n])=>{ if(!seen.has(s)) list.push({slug:s,name:n}) })
+        $('f-type').innerHTML = '<option value="">Select…</option>' + list.map(t=>`<option value="${t.slug}">${t.name}</option>`).join('')
+      } catch (_) {}
+      // prefill provider name from username
+      if (payload?.data?.user?.username && !editId) $('f-provider').value = payload.data.user.username
+
+      if (editId) loadForEdit()
+    }
+
+    async function loadForEdit() {
+      $('lr-title').textContent = 'Edit rental'
+      $('lr-sub').textContent = 'Update your rental details.'
+      $('lr-submit').textContent = 'Save changes'
+      try {
+        const d = await fetch(`${API}/rental-edit/${editId}`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json())
+        if (!d || d.success === false) throw new Error(d?.message || 'Could not load rental')
+        $('f-title').value = d.title || ''
+        $('f-type').value = d.type || ''
+        $('f-barangay').value = d.barangayId || ''
+        $('f-daily').value = d.dailyRate || ''
+        $('f-hourly').value = d.hourlyRate || ''
+        $('f-deposit').value = d.deposit || ''
+        $('f-inclusions').value = d.inclusions || ''
+        $('f-desc').value = d.description || ''
+        $('f-provider').value = d.providerName || ''
+        $('f-contact').value = d.providerContact || ''
+        galleryIds = (d.galleryIds || []).slice()
+        ;(d.galleryUrls || []).forEach((url, i) => addThumb(url, galleryIds[i]))
+      } catch (e) {
+        showError(e.message || 'Could not load this rental.')
+      }
+    }
+
+    function addThumb(url, id) {
+      const wrap = document.createElement('div')
+      wrap.className = 'lr-photo'
+      wrap.dataset.id = id
+      wrap.innerHTML = `<img src="${url}" alt="" /><button type="button" aria-label="Remove">×</button>`
+      wrap.querySelector('button').onclick = () => { galleryIds = galleryIds.filter(x => x != id); wrap.remove() }
+      $('lr-photos').appendChild(wrap)
+    }
+
+    $('f-photos').addEventListener('change', async e => {
+      const files = [...e.target.files]
+      $('lr-upload-text').textContent = 'Uploading…'
+      for (const file of files) {
+        const fd = new FormData()
+        fd.append('file', file); fd.append('image_type', 'rental')
+        try {
+          const res = await fetch(`${API}/upload-media`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd }).then(r => r.json())
+          if (res.success && res.attachment_id) { galleryIds.push(res.attachment_id); addThumb(res.url, res.attachment_id) }
+        } catch (_) {}
+      }
+      $('lr-upload-text').textContent = '+ Add photos'
+      e.target.value = ''
+    })
+
+    function showError(msg) { const el = $('lr-error'); el.textContent = msg; el.hidden = false; window.scrollTo({ top: 0, behavior: 'smooth' }) }
+
+    $('lr-form').addEventListener('submit', async e => {
+      e.preventDefault()
+      $('lr-error').hidden = true
+      const title = $('f-title').value.trim()
+      const type = $('f-type').value
+      const barangayId = parseInt($('f-barangay').value || '0')
+      const daily = parseFloat($('f-daily').value || '0')
+      if (!title || !type || !barangayId || !daily) { showError('Please fill in the required fields (title, type, barangay, daily rate).'); return }
+      const body = {
+        title, type, barangayId,
+        dailyRate: daily,
+        hourlyRate: parseFloat($('f-hourly').value || '0'),
+        deposit: parseFloat($('f-deposit').value || '0'),
+        inclusions: $('f-inclusions').value.trim(),
+        description: $('f-desc').value.trim(),
+        providerName: $('f-provider').value.trim(),
+        providerContact: $('f-contact').value.trim(),
+        galleryIds,
+      }
+      const btn = $('lr-submit'); btn.disabled = true; btn.textContent = editId ? 'Saving…' : 'Submitting…'
+      try {
+        const url = editId ? `${API}/update-rental/${editId}` : `${API}/submit-rental`
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body) }).then(r => r.json())
+        if (!res.success) throw new Error(res.message || 'Something went wrong.')
+        if (editId) { location.href = '/dashboard?tab=rentals' }
+        else { $('lr-form').style.display = 'none'; $('lr-success').style.display = 'block' }
+      } catch (e) {
+        showError(e.message || 'Could not submit. Please try again.')
+        btn.disabled = false; btn.textContent = editId ? 'Save changes' : 'Submit rental'
+      }
+    })
+  </script>
+</Layout>
