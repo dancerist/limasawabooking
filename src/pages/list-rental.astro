@@ -34,6 +34,34 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         <p id="lr-sub">Add a scooter, motorbike, bicycle, or car for travelers to rent in Limasawa.</p>
       </header>
 
+      <div class="lr-field" id="lr-plan-field">
+        <label>Choose your plan</label>
+        <div class="lr-plans">
+          <label class="lr-plan is-selected">
+            <input type="radio" name="tier" value="free" checked />
+            <span class="lr-plan-name">Free</span>
+            <span class="lr-plan-price">₱0</span>
+            <span class="lr-plan-perk">List 1 vehicle</span>
+          </label>
+          <label class="lr-plan">
+            <input type="radio" name="tier" value="pro" />
+            <span class="lr-plan-name">Pro</span>
+            <span class="lr-plan-price">₱399<small>/mo</small></span>
+            <span class="lr-plan-perk">Up to 5 vehicles · Verified badge · ranks above free</span>
+          </label>
+          <label class="lr-plan">
+            <input type="radio" name="tier" value="featured" />
+            <span class="lr-plan-name">Featured</span>
+            <span class="lr-plan-price">₱999<small>/mo</small></span>
+            <span class="lr-plan-perk">Unlimited fleet · top placement · Featured badge</span>
+          </label>
+        </div>
+        <div class="lr-billing" id="lr-billing" style="display:none">
+          <button type="button" class="lr-bill-opt is-active" data-bill="monthly">Monthly</button>
+          <button type="button" class="lr-bill-opt" data-bill="yearly">Yearly <small>(2 months free)</small></button>
+        </div>
+      </div>
+
       <div class="lr-field">
         <label for="f-title">Listing title <span>*</span></label>
         <input id="f-title" class="lr-input" placeholder="e.g. Honda Click 125 Scooter Rental" required />
@@ -103,6 +131,20 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         </label>
       </div>
 
+      <div class="lr-field" id="lr-payment" style="display:none">
+        <label>Payment</label>
+        <div class="lr-pay-box">
+          <p class="lr-pay-amount">Amount due: <strong id="lr-amount">₱399</strong> <span id="lr-bill-label" style="color:#64748B;font-weight:400">/ monthly</span></p>
+          <p class="lr-pay-instr">Pay via GCash, Maya, or BPI, then enter your reference and upload the receipt. We'll verify and activate your plan — your rental goes live once approved.</p>
+          <select id="f-method" class="lr-input"><option value="">Payment method…</option><option value="gcash">GCash</option><option value="maya">Maya</option><option value="bpi">BPI</option></select>
+          <input id="f-ref" class="lr-input" placeholder="Payment reference / confirmation no." style="margin-top:.6rem" />
+          <div style="margin-top:.6rem">
+            <div class="lr-photos" id="lr-receipt-thumb"></div>
+            <label class="lr-upload"><input type="file" id="f-receipt" accept="image/*" hidden /><span id="lr-receipt-text">+ Upload receipt</span></label>
+          </div>
+        </div>
+      </div>
+
       <div class="lr-error" id="lr-error" hidden></div>
       <div class="lr-actions">
         <button type="submit" class="lr-btn-primary" id="lr-submit">Submit rental</button>
@@ -145,6 +187,25 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     .lr-btn-primary:hover { background: #1E8087; }
     .lr-btn-primary:disabled { opacity: .6; cursor: not-allowed; }
     @media (max-width: 560px) { .lr-row, .lr-row-3 { grid-template-columns: 1fr; } }
+
+    /* Plan selector */
+    .lr-plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; }
+    .lr-plan { display: flex; flex-direction: column; gap: .25rem; border: 1.5px solid #E2EBF3; border-radius: 12px; padding: .85rem .9rem; cursor: pointer; transition: all .15s; position: relative; }
+    .lr-plan input { position: absolute; opacity: 0; }
+    .lr-plan:hover { border-color: #BEF0F3; }
+    .lr-plan.is-selected { border-color: #279DA3; background: #F8FEFE; box-shadow: 0 0 0 3px rgba(39,157,163,.1); }
+    .lr-plan-name { font-weight: 800; font-size: .95rem; }
+    .lr-plan-price { font-weight: 800; color: #279DA3; font-size: 1.05rem; }
+    .lr-plan-price small { font-weight: 500; color: #64748B; font-size: .7rem; }
+    .lr-plan-perk { font-size: .73rem; color: #64748B; line-height: 1.35; }
+    .lr-billing { display: flex; gap: .5rem; margin-top: .7rem; }
+    .lr-bill-opt { border: 1.5px solid #E2EBF3; background: #fff; border-radius: 9px; padding: .45rem .9rem; font-size: .82rem; font-weight: 700; cursor: pointer; color: #1A2533; }
+    .lr-bill-opt small { font-weight: 500; color: #64748B; }
+    .lr-bill-opt.is-active { border-color: #279DA3; background: #F8FEFE; color: #279DA3; }
+    .lr-pay-box { border: 1.5px solid #E2EBF3; border-radius: 12px; padding: 1rem; background: #F8FAFC; }
+    .lr-pay-amount { font-size: 1rem; margin: 0 0 .35rem; }
+    .lr-pay-instr { font-size: .82rem; color: #64748B; line-height: 1.5; margin: 0 0 .75rem; }
+    @media (max-width: 560px) { .lr-plans { grid-template-columns: 1fr; } }
   </style>
 
   <script define:vars={{ WP_REST }}>window.__LR_API = WP_REST</script>
@@ -163,6 +224,50 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     let galleryIds = []
     const editId = parseInt(new URLSearchParams(location.search).get('edit') || '0')
 
+    // ── Plan / payment state ──
+    const TIER_PRICES = { pro: { monthly: 399, yearly: 3990 }, featured: { monthly: 999, yearly: 9990 } }
+    let selectedTier = 'free', billing = 'monthly', receiptId = 0
+    const peso = n => '₱' + Number(n || 0).toLocaleString('en-PH')
+
+    function refreshPlanUI() {
+      document.querySelectorAll('.lr-plan').forEach(p => p.classList.toggle('is-selected', p.querySelector('input').value === selectedTier))
+      const paid = selectedTier !== 'free'
+      $('lr-billing').style.display = paid ? 'flex' : 'none'
+      $('lr-payment').style.display = paid ? 'block' : 'none'
+      $('lr-submit').textContent = paid ? 'Submit for review' : 'Submit rental'
+      if (paid) {
+        const amt = TIER_PRICES[selectedTier]?.[billing] || 0
+        $('lr-amount').textContent = peso(amt)
+        $('lr-bill-label').textContent = '/ ' + billing
+      }
+    }
+    function wirePlan() {
+      document.querySelectorAll('.lr-plan input[name="tier"]').forEach(r => {
+        r.addEventListener('change', () => { selectedTier = r.value; refreshPlanUI() })
+      })
+      document.querySelectorAll('.lr-bill-opt').forEach(b => {
+        b.addEventListener('click', () => {
+          billing = b.dataset.bill
+          document.querySelectorAll('.lr-bill-opt').forEach(x => x.classList.toggle('is-active', x === b))
+          refreshPlanUI()
+        })
+      })
+      $('f-receipt').addEventListener('change', async e => {
+        const file = e.target.files[0]; if (!file) return
+        $('lr-receipt-text').textContent = 'Uploading…'
+        const fd = new FormData(); fd.append('file', file); fd.append('image_type', 'payment_receipt')
+        try {
+          const res = await fetch(`${API}/upload-media`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd }).then(r => r.json())
+          if (res.success && res.attachment_id) {
+            receiptId = res.attachment_id
+            $('lr-receipt-thumb').innerHTML = `<div class="lr-photo"><img src="${res.url}" alt="" /></div>`
+          }
+        } catch (_) {}
+        $('lr-receipt-text').textContent = receiptId ? '✓ Receipt uploaded' : '+ Upload receipt'
+        e.target.value = ''
+      })
+    }
+
     async function init() {
       // populate vehicle types
       try {
@@ -179,6 +284,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       // prefill provider name from username
       if (payload?.data?.user?.username && !editId) $('f-provider').value = payload.data.user.username
 
+      wirePlan()
       if (editId) loadForEdit()
     }
 
@@ -186,6 +292,9 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       $('lr-title').textContent = 'Edit rental'
       $('lr-sub').textContent = 'Update your rental details.'
       $('lr-submit').textContent = 'Save changes'
+      // Tier/payment aren't changed during an edit — hide those sections.
+      $('lr-plan-field').style.display = 'none'
+      $('lr-payment').style.display = 'none'
       try {
         const d = await fetch(`${API}/rental-edit/${editId}`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json())
         if (!d || d.success === false) throw new Error(d?.message || 'Could not load rental')
@@ -240,6 +349,10 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       const barangayId = parseInt($('f-barangay').value || '0')
       const daily = parseFloat($('f-daily').value || '0')
       if (!title || !type || !barangayId || !daily) { showError('Please fill in the required fields (title, type, barangay, daily rate).'); return }
+      const paid = !editId && selectedTier !== 'free'
+      if (paid && (!$('f-method').value || !$('f-ref').value.trim())) {
+        showError('For a paid plan, choose a payment method and enter your payment reference.'); return
+      }
       const body = {
         title, type, barangayId,
         dailyRate: daily,
@@ -250,6 +363,13 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         providerName: $('f-provider').value.trim(),
         providerContact: $('f-contact').value.trim(),
         galleryIds,
+      }
+      if (!editId) {
+        body.tier = selectedTier
+        body.billingPeriod = billing
+        body.paymentMethod = $('f-method').value
+        body.paymentReference = $('f-ref').value.trim()
+        body.paymentReceiptId = receiptId
       }
       const btn = $('lr-submit'); btn.disabled = true; btn.textContent = editId ? 'Saving…' : 'Submitting…'
       try {

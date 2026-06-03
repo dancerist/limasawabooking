@@ -23,12 +23,15 @@ export function rentalCardHTML(r) {
     ? `<img src="${rentalEsc(x.thumb)}" alt="${rentalEsc(x.title || '')}" loading="lazy" />`
     : `<div class="rt-card-img-ph">${RT_NO_IMG}</div>`
   const typeBadge = x.type ? `<span class="rt-card-type">${rentalEsc(x.type)}</span>` : ''
+  const tierBadge = x.tier === 'featured'
+    ? `<span class="rt-card-tier rt-tier-featured">★ Featured</span>`
+    : (x.tier === 'pro' ? `<span class="rt-card-tier rt-tier-verified">✓ Verified</span>` : '')
   const unavail = x.available === false ? `<span class="rt-card-unavail">Unavailable</span>` : ''
   const hourly = Number(x.hourly) ? `<span class="rt-card-hr">· ${peso(x.hourly)}/hr</span>` : ''
   const area = x.area ? `<p class="rt-card-area">${rentalEsc(x.area)}, Limasawa</p>` : ''
 
   return `<a class="rt-card" href="/rental/${rentalEsc(x.slug)}">
-    <div class="rt-card-img">${thumb}${typeBadge}${unavail}</div>
+    <div class="rt-card-img">${thumb}${typeBadge}${tierBadge}${unavail}</div>
     <h3 class="rt-card-title">${rentalEsc(x.title || '')}</h3>
     ${area}
     <div class="rt-card-price"><strong>${peso(x.daily)}</strong><span>/day</span> ${hourly}</div>

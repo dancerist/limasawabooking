@@ -25,6 +25,12 @@
   font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
   padding: .3rem .65rem; border-radius: 6px;
 }
+.rt-card-tier {
+  position: absolute; bottom: 10px; left: 10px;
+  font-size: .68rem; font-weight: 800; padding: .25rem .55rem; border-radius: 6px;
+}
+.rt-tier-featured { background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
+.rt-tier-verified { background: #F0FDF4; color: #15803D; border: 1px solid #BBF7D0; }
 .rt-card-unavail {
   position: absolute; top: 12px; right: 12px;
   background: rgba(220,38,38,.95); color: #fff;
