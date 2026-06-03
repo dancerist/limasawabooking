@@ -44,7 +44,7 @@ const faqs = [
   },
   {
     q: 'Can I rent a scooter or motorbike in Limasawa?',
-    a: 'Scooter and motorbike rentals in Limasawa are coming soon to Limasawa Booking. For now, many accommodation hosts can help arrange local transport around the island.',
+    a: 'Yes — scooter, motorbike, and bicycle rentals in Limasawa are available now. Browse rentals on Limasawa Booking to compare daily and hourly rates and book direct with local providers.',
   },
 ]
 
@@ -147,6 +147,22 @@ const jsonLd = [
       </section>
     )}
 
+    <!-- ───────────────── Rentals CTA ───────────────── -->
+    <section class="section">
+      <div class="section-inner">
+        <a href="/rentals" class="rentals-band">
+          <div class="rentals-band-icon" aria-hidden="true">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 17.5h-5l-2-7H5"/><path d="M10 10.5h5l2 7"/></svg>
+          </div>
+          <div class="rentals-band-text">
+            <h2>Get around the island</h2>
+            <p>Rent a scooter, motorbike, or bicycle in Limasawa — compare daily &amp; hourly rates from local providers.</p>
+          </div>
+          <span class="rentals-band-cta">Browse rentals →</span>
+        </a>
+      </div>
+    </section>
+
     <!-- ───────────────── Become a host CTA ───────────────── -->
     <section class="host-cta">
       <div class="host-cta-inner">
@@ -196,6 +212,23 @@ const jsonLd = [
   .faq-item summary::after { content: '+'; float: right; font-weight: 400; color: #94a3b8; font-size: 1.4em; line-height: 1; }
   .faq-item[open] summary::after { content: '−'; }
   .faq-item p { margin: 0 0 18px; color: var(--sb-text-muted, #64748b); line-height: 1.6; }
+
+  .rentals-band {
+    display: flex; align-items: center; gap: 1.25rem;
+    background: linear-gradient(120deg, #E6F9FA 0%, #F5F8FB 100%);
+    border: 1px solid var(--sb-primary-mid, #BEF0F3);
+    border-radius: 18px; padding: 1.5rem 1.75rem; text-decoration: none; color: var(--sb-text, #1a2533);
+    transition: transform .2s, box-shadow .2s;
+  }
+  .rentals-band:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(39,157,163,.16); }
+  .rentals-band-icon { flex: 0 0 auto; width: 56px; height: 56px; border-radius: 14px; background: #fff; display: grid; place-items: center; color: var(--sb-primary-deeper, #279DA3); }
+  .rentals-band-text { flex: 1; min-width: 0; }
+  .rentals-band-text h2 { font-size: 1.25rem; font-weight: 800; margin: 0 0 .25rem; }
+  .rentals-band-text p { margin: 0; color: var(--sb-text-muted, #64748b); line-height: 1.5; font-size: .95rem; }
+  .rentals-band-cta { flex: 0 0 auto; font-weight: 800; color: var(--sb-primary-deeper, #279DA3); white-space: nowrap; }
+  @media (max-width: 640px) {
+    .rentals-band { flex-direction: column; align-items: flex-start; gap: .85rem; padding: 1.25rem; }
+  }
 </style>
 
 <style>

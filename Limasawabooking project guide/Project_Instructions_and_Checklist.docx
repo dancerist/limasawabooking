@@ -1,0 +1,18 @@
+Project Instructions & Checklist
+
+Phase 1: Listings
+- Add accommodation, rentals, tours manually
+- Enable contact buttons
+
+Phase 2: Map & Guides
+- Add interactive map pins
+- Add travel guides and articles
+
+Phase 3: Extras
+- Favorites, inquiry forms, optional calendar
+
+QA Checklist:
+- Test mobile & desktop layouts
+- Test contact buttons
+- Ensure all listings have images & meta
+- Test search & filters

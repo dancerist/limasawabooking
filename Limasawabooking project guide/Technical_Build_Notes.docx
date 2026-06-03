@@ -1,0 +1,10 @@
+Technical Build Notes
+
+- WordPress as CMS
+- Custom Post Type: Listings
+- Taxonomies: Listing Type, Location/Sub-location
+- Fields: Gallery, Contact, Price, Amenities, Vehicle Type
+- Recommended Plugins: ACF, WPGraphQL, Yoast SEO/RankMath
+- Headless Frontend: Astro or similar
+- Mobile-first design
+- Image optimisation: WebP recommended
