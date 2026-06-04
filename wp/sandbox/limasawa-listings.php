@@ -154,6 +154,11 @@ if (defined('ABSPATH')) {
 
             $badges = sb_acf('accommodation_badges', $post_id, []);
             $rate   = sb_rate_summary($post_id);
+            // Beachfront = the "Beach access"/"beach view" amenity TERM, or the
+            // "Beach access" toggle from the listing form (faq_amenities group).
+            $faqRaw = sb_acf('faq_amenities', $post_id, []);
+            $beachfront = (bool) array_intersect(['beach-access', 'beach-view'], (array) $amen['slugs'])
+                || (is_array($faqRaw) && (!empty($faqRaw['faq_beach_access']) || !empty($faqRaw['faq_beach_view'])));
 
             $out = [
                 'id'        => (int) $post_id,
@@ -167,6 +172,7 @@ if (defined('ABSPATH')) {
                 'monthly'   => $rate['monthly'],
                 'priceMode' => $rate['mode'],
                 'priceFrom' => $rate['priceFrom'],
+                'beachfront'=> $beachfront,
                 'bedrooms'  => (int) sb_acf('accommodation_bedrooms', $post_id, 0),
                 'beds'      => (int) sb_acf('accommodation_beds', $post_id, 0),
                 'baths'     => (int) sb_acf('accommodation_bathrooms', $post_id, 0),

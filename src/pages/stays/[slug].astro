@@ -20,7 +20,7 @@ export async function getStaticPaths() {
       props: { kind: 'location', name: b.name, slug: b.slug, nodes: listings.map(reshapeListing), browseHref: `/stays?location=${b.slug}` },
     })
   }
-  const beach = all.filter((l) => (l.amen || []).some((a: string) => ['beach-access', 'beach-view'].includes(a)))
+  const beach = all.filter((l: any) => l.beachfront || (l.amen || []).some((a: string) => ['beach-access', 'beach-view'].includes(a)))
   out.push({
     params: { slug: 'beachfront' },
     props: { kind: 'beachfront', name: 'Beachfront', slug: 'beachfront', nodes: beach.map(reshapeListing), browseHref: '/stays?amenity=beach-access' },
