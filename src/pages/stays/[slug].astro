@@ -1,0 +1,102 @@
+---
+/**
+ * SEO landing pages — /stays/{barangay} and /stays/beachfront.
+ * Statically prebuilt, keyword-targeted, with the matching listings rendered
+ * as cards + cross-links to the other areas. Long-tail local SEO.
+ */
+import Layout from '../../layouts/Layout.astro'
+import AccommodationCard from '../../components/AccommodationCard.astro'
+import { getListings, reshapeListing } from '../../lib/api'
+import { MUNICIPALITIES } from '../../lib/locations'
+
+export async function getStaticPaths() {
+  const barangays = MUNICIPALITIES[0]?.barangays ?? []
+  const all = (await getListings({ perPage: 48 })).listings
+  const out: any[] = []
+  for (const b of barangays) {
+    const listings = all.filter((l) => l.muniSlug === b.slug)
+    out.push({
+      params: { slug: b.slug },
+      props: { kind: 'location', name: b.name, slug: b.slug, nodes: listings.map(reshapeListing), browseHref: `/stays?location=${b.slug}` },
+    })
+  }
+  const beach = all.filter((l) => (l.amen || []).some((a: string) => ['beach-access', 'beach-view'].includes(a)))
+  out.push({
+    params: { slug: 'beachfront' },
+    props: { kind: 'beachfront', name: 'Beachfront', slug: 'beachfront', nodes: beach.map(reshapeListing), browseHref: '/stays?amenity=beach-access' },
+  })
+  return out
+}
+
+const { kind, name, slug, nodes, browseHref } = Astro.props as any
+const barangays = MUNICIPALITIES[0]?.barangays ?? []
+const isBeach = kind === 'beachfront'
+
+const seoTitle = isBeach
+  ? 'Beachfront Accommodations in Limasawa Island'
+  : `${name} Accommodations — Where to Stay in ${name}, Limasawa`
+const seoDesc = isBeach
+  ? 'Beachfront resorts and beach houses in Limasawa Island, Southern Leyte — stays steps from the sand. Compare rates and book direct with local hosts.'
+  : `Find accommodations in ${name}, Limasawa Island — homestays, resorts, and budget rooms. Compare prices and book direct with local hosts in ${name}.`
+const h1 = isBeach ? 'Beachfront stays in Limasawa' : `Accommodations in ${name}, Limasawa`
+const intro = isBeach
+  ? 'Wake up steps from the water. These Limasawa Island stays have beach access or beach views — ideal for swimming, sunsets, and slow island mornings.'
+  : `${name} is a barangay on Limasawa Island, Southern Leyte. Browse places to stay in ${name} — homestays, lodges, and resorts — and book direct with the hosts who live on the island.`
+---
+
+<Layout title={seoTitle} description={seoDesc}>
+  <main class="ld-main">
+    <nav class="ld-crumb"><a href="/stays">Stays</a> <span>/</span> <span>{name}</span></nav>
+
+    <header class="ld-hero">
+      <h1>{h1}</h1>
+      <p>{intro}</p>
+    </header>
+
+    {nodes.length > 0 ? (
+      <div class="ld-grid">
+        {nodes.map((n: any) => <AccommodationCard listing={n} />)}
+      </div>
+    ) : (
+      <div class="ld-empty">
+        <p>No stays listed {isBeach ? 'with beach access' : `in ${name}`} yet.</p>
+        <a href="/stays" class="ld-link">Browse all Limasawa accommodations →</a>
+      </div>
+    )}
+
+    {nodes.length > 0 && (
+      <div class="ld-more"><a href={browseHref} class="ld-link">View on the map &amp; filter →</a></div>
+    )}
+
+    <section class="ld-areas">
+      <h2>Browse Limasawa by area</h2>
+      <div class="ld-area-links">
+        {barangays.map((b) => <a href={`/stays/${b.slug}`} class={b.slug === slug ? 'is-current' : ''}>{b.name}</a>)}
+        <a href="/stays/beachfront" class={isBeach ? 'is-current' : ''}>Beachfront</a>
+        <a href="/stays">All stays</a>
+      </div>
+    </section>
+  </main>
+
+  <style>
+    .ld-main { max-width: 1200px; margin: 0 auto; padding: 1.5rem 1.5rem 5rem; }
+    .ld-crumb { font-size: .82rem; color: #64748B; margin-bottom: 1.25rem; }
+    .ld-crumb a { color: #64748B; text-decoration: none; }
+    .ld-crumb a:hover { color: #279DA3; }
+    .ld-crumb span { margin: 0 .15rem; }
+    .ld-hero { max-width: 760px; margin-bottom: 2rem; }
+    .ld-hero h1 { font-family: 'DM Sans', sans-serif; font-size: clamp(1.8rem, 4.5vw, 2.6rem); font-weight: 800; line-height: 1.1; color: #1A2533; margin-bottom: .75rem; }
+    .ld-hero p { color: #64748B; line-height: 1.6; font-size: 1.02rem; }
+    .ld-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.75rem 1.25rem; }
+    .ld-empty { padding: 3rem 1rem; text-align: center; color: #64748B; }
+    .ld-link { color: #279DA3; font-weight: 700; text-decoration: none; }
+    .ld-link:hover { color: #1E8087; }
+    .ld-more { margin-top: 2rem; }
+    .ld-areas { margin-top: 3.5rem; padding-top: 2rem; border-top: 1px solid #E2EBF3; }
+    .ld-areas h2 { font-family: 'DM Sans', sans-serif; font-size: 1.25rem; font-weight: 800; color: #1A2533; margin-bottom: 1rem; }
+    .ld-area-links { display: flex; flex-wrap: wrap; gap: .6rem; }
+    .ld-area-links a { border: 1.5px solid #E2EBF3; border-radius: 999px; padding: .45rem 1.1rem; font-size: .85rem; font-weight: 700; color: #1A2533; text-decoration: none; }
+    .ld-area-links a:hover { border-color: #279DA3; color: #279DA3; }
+    .ld-area-links a.is-current { background: #1A2533; color: #fff; border-color: #1A2533; }
+  </style>
+</Layout>

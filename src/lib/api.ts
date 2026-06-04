@@ -200,7 +200,7 @@ export async function getListing(slug: string): Promise<ListingDetail | null> {
  * components consume (AccommodationCard, stay/[slug]). Mirrors the GraphQL
  * `Accommodation` type those components were originally written against.
  */
-function reshapeListing(l: any) {
+export function reshapeListing(l: any) {
   const galleryNodes = (l.gallery || []).map((url: string) => ({ sourceUrl: url, altText: '' }))
 
   const locationNodes: any[] = []
