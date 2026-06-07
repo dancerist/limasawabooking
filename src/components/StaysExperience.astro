@@ -22,8 +22,11 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     </button>
 
     <a href="/" class="st-logo">
+      <span class="st-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 4.6c-2.6 0-4.7 2.1-4.7 4.7 0 3.3 4.7 7.1 4.7 7.1s4.7-3.8 4.7-7.1c0-2.6-2.1-4.7-4.7-4.7z" fill="#fff"/><circle cx="12" cy="9.3" r="1.9" fill="var(--sb-primary)"/></svg>
+      </span>
       <div class="st-brand">
-        <span class="st-wordmark">Limasawa Booking</span>
+        <span class="st-wordmark">Limasawa<strong>Booking</strong></span>
         <span class="st-beta" aria-label="Beta version">BETA</span>
       </div>
     </a>
@@ -277,10 +280,14 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     display: flex; align-items: center; gap: 16px;
     padding: 0 20px;
   }
-  .st-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
+  .st-logo { display: flex; align-items: center; gap: 9px; text-decoration: none; flex-shrink: 0; }
   .st-logo-img { height: 30px; width: auto; }
+  .st-mark { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; background: var(--sb-primary);
+             display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px var(--sb-primary-trans-50); }
+  .st-mark svg { width: 18px; height: 18px; display: block; }
   .st-brand    { display: flex; align-items: center; gap: 8px; line-height: 1; }
   .st-wordmark { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 16px; color: var(--ink); letter-spacing: -.01em; }
+  .st-wordmark strong { color: var(--sb-primary); font-weight: 800; }
   .st-beta {
     font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 9px;
     letter-spacing: .12em; text-transform: uppercase; color: var(--cyan);

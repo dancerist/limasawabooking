@@ -23,8 +23,8 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&family=Nunito+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <style is:global>
     :root {
-      --primary: #3EC7CF; --primary-dark: #32B5BC; --primary-light: #E6F9FA;
-      --primary-trans-10: rgba(62,199,207,0.10); --primary-trans-50: rgba(62,199,207,0.50);
+      --primary: #22ABB3; --primary-dark: #1C949B; --primary-light: #E6F9FA;
+      --primary-trans-10: rgba(34,171,179,0.10); --primary-trans-50: rgba(34,171,179,0.50);
       --secondary: #4C5B6C; --bg: #F5F8FB;
     }
     * { box-sizing: border-box; }
@@ -506,7 +506,12 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         Back
       </button>
-      <a href="/" class="text-sm font-semibold" style="color:var(--primary)">Limasawa Booking</a>
+      <a href="/" class="text-sm font-semibold" style="display:flex;align-items:center;gap:7px;color:var(--secondary);text-decoration:none">
+        <span style="width:24px;height:24px;border-radius:50%;flex-shrink:0;background:var(--primary);display:inline-flex;align-items:center;justify-content:center" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M12 4.6c-2.6 0-4.7 2.1-4.7 4.7 0 3.3 4.7 7.1 4.7 7.1s4.7-3.8 4.7-7.1c0-2.6-2.1-4.7-4.7-4.7z" fill="#fff"/><circle cx="12" cy="9.3" r="1.9" fill="var(--primary)"/></svg>
+        </span>
+        <span>Limasawa<strong style="color:var(--primary)">Booking</strong></span>
+      </a>
       <span id="step-counter" class="text-sm justify-self-end" style="color:#9ca3af"></span>
     </div>
     <!-- Edit-mode toolbar: jump-to-section + save changes (hidden by default, shown when ?edit=ID) -->

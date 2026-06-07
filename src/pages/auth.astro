@@ -5,7 +5,12 @@ import Layout from '../layouts/Layout.astro'
 <Layout title="Sign In — Limasawa Booking" noindex={true} showFooter={false}>
   <div class="auth-wrap">
     <div class="auth-card sb-card">
-      <a href="/" class="auth-logo">Limasawa<strong>Booking</strong></a>
+      <a href="/" class="auth-logo">
+        <span class="auth-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 4.6c-2.6 0-4.7 2.1-4.7 4.7 0 3.3 4.7 7.1 4.7 7.1s4.7-3.8 4.7-7.1c0-2.6-2.1-4.7-4.7-4.7z" fill="#fff"/><circle cx="12" cy="9.3" r="1.9" fill="var(--sb-primary)"/></svg>
+        </span>
+        <span>Limasawa<strong>Booking</strong></span>
+      </a>
 
       <div class="auth-tabs">
         <button class="auth-tab active" data-tab="login" id="tab-login">Sign in</button>
@@ -35,7 +40,9 @@ import Layout from '../layouts/Layout.astro'
 <style>
 .auth-wrap { min-height:calc(100vh - 64px);display:flex;align-items:center;justify-content:center;padding:2rem 1rem;background:var(--sb-bg); }
 .auth-card { width:100%;max-width:400px; }
-.auth-logo { display:block;font-size:1.2rem;color:var(--sb-text);text-decoration:none;margin-bottom:1.5rem;text-align:center; }
+.auth-logo { display:flex;align-items:center;justify-content:center;gap:0.5rem;font-size:1.2rem;font-weight:700;color:var(--sb-text);text-decoration:none;margin-bottom:1.5rem; }
+.auth-mark { width:30px;height:30px;border-radius:50%;flex-shrink:0;background:var(--sb-primary);display:inline-flex;align-items:center;justify-content:center; }
+.auth-mark svg { width:19px;height:19px;display:block; }
 .auth-logo strong { color:var(--sb-primary); }
 .auth-tabs { display:flex;gap:.5rem;margin-bottom:1.5rem;background:var(--sb-secondary-pale);border-radius:var(--sb-radius);padding:4px; }
 .auth-tab { flex:1;padding:.5rem;border:none;background:transparent;border-radius:calc(var(--sb-radius) - 2px);cursor:pointer;font-weight:600;font-size:.9rem;color:var(--sb-text-muted);transition:all .2s; }

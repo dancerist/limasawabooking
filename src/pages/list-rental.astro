@@ -161,11 +161,11 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     .lr-authwall, .lr-success { text-align: center; padding: 4rem 1rem; }
     .lr-authwall h1, .lr-success h1 { font-family: 'DM Sans', sans-serif; font-size: 1.8rem; font-weight: 800; margin-bottom: .75rem; }
     .lr-authwall p, .lr-success p { color: #64748B; margin-bottom: 1.5rem; line-height: 1.6; }
-    .lr-success-icon { width: 64px; height: 64px; border-radius: 50%; background: #E6F9FA; color: #279DA3; font-size: 2rem; display: grid; place-items: center; margin: 0 auto 1.25rem; font-weight: 800; }
+    .lr-success-icon { width: 64px; height: 64px; border-radius: 50%; background: #E6F9FA; color: #22ABB3; font-size: 2rem; display: grid; place-items: center; margin: 0 auto 1.25rem; font-weight: 800; }
 
     .lr-head { margin-bottom: 2rem; }
     .lr-back { color: #64748B; text-decoration: none; font-weight: 700; font-size: .85rem; }
-    .lr-back:hover { color: #279DA3; }
+    .lr-back:hover { color: #22ABB3; }
     .lr-head h1 { font-family: 'DM Sans', sans-serif; font-size: clamp(1.6rem, 4vw, 2.2rem); font-weight: 800; margin: .75rem 0 .35rem; }
     .lr-head p { color: #64748B; line-height: 1.5; }
 
@@ -175,19 +175,19 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     .lr-field label { display: block; font-weight: 700; font-size: .85rem; margin-bottom: .4rem; }
     .lr-field label span { color: #DC2626; }
     .lr-input { width: 100%; border: 1.5px solid #E2EBF3; border-radius: 10px; padding: .7rem .85rem; font-size: .95rem; font-family: inherit; background: #fff; box-sizing: border-box; outline: none; transition: border-color .15s; }
-    .lr-input:focus { border-color: #279DA3; box-shadow: 0 0 0 3px rgba(39,157,163,.12); }
+    .lr-input:focus { border-color: #22ABB3; box-shadow: 0 0 0 3px rgba(39,157,163,.12); }
     textarea.lr-input { resize: vertical; }
 
     .lr-photos { display: flex; flex-wrap: wrap; gap: .6rem; margin-bottom: .6rem; }
     .lr-photo { position: relative; width: 84px; height: 84px; border-radius: 10px; overflow: hidden; background: #F5F8FB; }
     .lr-photo img { width: 100%; height: 100%; object-fit: cover; }
     .lr-photo button { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: rgba(0,0,0,.6); color: #fff; cursor: pointer; font-size: 13px; line-height: 1; }
-    .lr-upload { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 1.1rem; border: 1.5px dashed #BEF0F3; border-radius: 10px; color: #279DA3; font-weight: 700; font-size: .88rem; cursor: pointer; background: #F8FEFE; }
-    .lr-upload:hover { border-color: #279DA3; }
+    .lr-upload { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 1.1rem; border: 1.5px dashed #BEF0F3; border-radius: 10px; color: #22ABB3; font-weight: 700; font-size: .88rem; cursor: pointer; background: #F8FEFE; }
+    .lr-upload:hover { border-color: #22ABB3; }
 
     .lr-error { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; padding: .7rem .9rem; border-radius: 10px; font-size: .88rem; margin-bottom: 1rem; }
     .lr-actions { margin-top: 1.5rem; }
-    .lr-btn-primary { display: inline-flex; align-items: center; justify-content: center; min-height: 50px; padding: 0 2rem; background: #279DA3; color: #fff; border: 0; border-radius: 11px; font-weight: 800; font-size: .95rem; cursor: pointer; text-decoration: none; }
+    .lr-btn-primary { display: inline-flex; align-items: center; justify-content: center; min-height: 50px; padding: 0 2rem; background: #22ABB3; color: #fff; border: 0; border-radius: 11px; font-weight: 800; font-size: .95rem; cursor: pointer; text-decoration: none; }
     .lr-btn-primary:hover { background: #1E8087; }
     .lr-btn-primary:disabled { opacity: .6; cursor: not-allowed; }
     @media (max-width: 560px) { .lr-row, .lr-row-3 { grid-template-columns: 1fr; } }
@@ -198,15 +198,15 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     .lr-plan { display: flex; flex-direction: column; gap: .25rem; border: 1.5px solid #E2EBF3; border-radius: 12px; padding: .85rem .9rem; cursor: pointer; transition: all .15s; position: relative; }
     .lr-plan input { position: absolute; opacity: 0; }
     .lr-plan:hover { border-color: #BEF0F3; }
-    .lr-plan.is-selected { border-color: #279DA3; background: #F8FEFE; box-shadow: 0 0 0 3px rgba(39,157,163,.1); }
+    .lr-plan.is-selected { border-color: #22ABB3; background: #F8FEFE; box-shadow: 0 0 0 3px rgba(39,157,163,.1); }
     .lr-plan-name { font-weight: 800; font-size: .95rem; }
-    .lr-plan-price { font-weight: 800; color: #279DA3; font-size: 1.05rem; }
+    .lr-plan-price { font-weight: 800; color: #22ABB3; font-size: 1.05rem; }
     .lr-plan-price small { font-weight: 500; color: #64748B; font-size: .7rem; }
     .lr-plan-perk { font-size: .73rem; color: #64748B; line-height: 1.35; }
     .lr-billing { display: flex; gap: .5rem; margin-top: .7rem; }
     .lr-bill-opt { border: 1.5px solid #E2EBF3; background: #fff; border-radius: 9px; padding: .45rem .9rem; font-size: .82rem; font-weight: 700; cursor: pointer; color: #1A2533; }
     .lr-bill-opt small { font-weight: 500; color: #64748B; }
-    .lr-bill-opt.is-active { border-color: #279DA3; background: #F8FEFE; color: #279DA3; }
+    .lr-bill-opt.is-active { border-color: #22ABB3; background: #F8FEFE; color: #22ABB3; }
     .lr-pay-box { border: 1.5px solid #E2EBF3; border-radius: 12px; padding: 1rem; background: #F8FAFC; }
     .lr-pay-amount { font-size: 1rem; margin: 0 0 .35rem; }
     .lr-pay-instr { font-size: .82rem; color: #64748B; line-height: 1.5; margin: 0 0 .75rem; }
