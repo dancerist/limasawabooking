@@ -4,7 +4,12 @@ const year = new Date().getFullYear()
 <footer class="site-footer">
   <div class="footer-inner">
     <div class="footer-brand">
-      <a href="/" class="footer-logo">Limasawa<strong>Booking</strong></a>
+      <a href="/" class="footer-logo">
+        <span class="footer-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 4.6c-2.6 0-4.7 2.1-4.7 4.7 0 3.3 4.7 7.1 4.7 7.1s4.7-3.8 4.7-7.1c0-2.6-2.1-4.7-4.7-4.7z" fill="#fff"/><circle cx="12" cy="9.3" r="1.9" fill="var(--sb-primary)"/></svg>
+        </span>
+        <span>Limasawa<strong>Booking</strong></span>
+      </a>
       <p>Find and book accommodation in Limasawa, Philippines.</p>
     </div>
     <div class="footer-cols">
@@ -45,7 +50,12 @@ const year = new Date().getFullYear()
   display: flex; gap: 3rem; flex-wrap: wrap; margin-bottom: 2.5rem;
 }
 .footer-brand { flex: 1; min-width: 200px; }
-.footer-logo { font-size: 1.1rem; color: #fff; text-decoration: none; display: block; margin-bottom: 0.5rem; }
+.footer-logo { font-size: 1.1rem; color: #fff; text-decoration: none; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+.footer-mark {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: var(--sb-primary); display: inline-flex; align-items: center; justify-content: center;
+}
+.footer-mark svg { width: 18px; height: 18px; display: block; }
 .footer-logo strong { color: var(--sb-primary); }
 .footer-brand p { font-size: 0.875rem; line-height: 1.6; margin: 0; }
 .footer-cols { display: flex; gap: 2.5rem; flex-wrap: wrap; }

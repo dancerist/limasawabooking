@@ -18,14 +18,14 @@
   --star:       #f4a925;
   --teal-bg:    #e8f7f7;
 
-  --sb-primary:         #3EC7CF;
-  --sb-primary-dark:    #32B5BC;
-  --sb-primary-deeper:  #279DA3;
+  --sb-primary:         #22ABB3;  /* darkened from #3EC7CF for stronger contrast on white */
+  --sb-primary-dark:    #1C949B;
+  --sb-primary-deeper:  #157E84;
   --sb-primary-light:   #E6F9FA;
   --sb-primary-mid:     #BEF0F3;
-  --sb-primary-trans-10: rgba(62,199,207,0.10);
-  --sb-primary-trans-50: rgba(62,199,207,0.50);
-  --sb-primary-trans-90: rgba(62,199,207,0.90);
+  --sb-primary-trans-10: rgba(34,171,179,0.10);
+  --sb-primary-trans-50: rgba(34,171,179,0.50);
+  --sb-primary-trans-90: rgba(34,171,179,0.90);
 
   --sb-secondary:            #4C5B6C;
   --sb-secondary-mid:        #5E6E80;
