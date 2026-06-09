@@ -13,8 +13,8 @@ const featured = [...nodes]
   .sort((a, b) => (b.listingTier === 'featured' ? 1 : 0) - (a.listingTier === 'featured' ? 1 : 0))
   .slice(0, 8)
 
-// Hero background: a real listing photo when available, else the gradient alone.
-const heroImage = featured.find((l) => l.thumb)?.thumb ?? ''
+// Hero background: aerial drone shot of Limasawa (uploaded to the WP media library).
+const HERO_IMG = 'https://admin.limasawabooking.com/wp-content/uploads/2026/06/limasawa-booking.webp'
 
 // Guest options for the search select.
 const guestOpts = [1, 2, 4, 6, 8, 10]
@@ -71,30 +71,58 @@ const jsonLd = [
 <Layout title={seoTitle} description={seoDescription} jsonLd={jsonLd}>
   <main>
     <!-- ───────────────── Hero + search ───────────────── -->
-    <section class="hero" style={heroImage ? `background-image: linear-gradient(180deg, rgba(13,30,43,.45), rgba(13,30,43,.65)), url(${heroImage})` : ''}>
-      <div class="hero-inner">
-        <h1>Find your place in <span>Limasawa</span></h1>
-        <p>Beachfront resorts, affordable homestays, and budget island stays in Limasawa, Southern Leyte — one of the Philippines' most historic islands.</p>
+    <section class="hero-wrap">
+      <div class="hero" style={`background-image: url(${HERO_IMG})`}>
+        <div class="hero-content">
+          <h1>Explore<br>Limasawa Island</h1>
+          <p>Find accommodation, scooter rentals, tours and local services across Limasawa.</p>
 
-        <form class="search" action="/stays" method="get">
-          <div class="search-field">
-            <label for="s-loc">Where</label>
-            <select id="s-loc" name="location">
-              <option value="">Anywhere in Limasawa</option>
-              {locations.map((l) => <option value={l.slug}>{l.name} ({l.count})</option>)}
-            </select>
+          <form class="hero-search" id="hero-search">
+            <div class="hero-search-field">
+              <svg class="hsf-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+              <select id="hero-q" aria-label="What are you looking for?">
+                <option value="/stays" selected>What are you looking for?</option>
+                <option value="/stays">🏠 All accommodation</option>
+                {categories.map((c) => <option value={`/stays?category=${c.slug}`}>{c.name} ({c.count})</option>)}
+                <option value="/rentals">🛵 Scooter & motorbike rentals</option>
+              </select>
+            </div>
+            <button type="submit" class="hero-search-btn" aria-label="Search">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            </button>
+          </form>
+
+          <div class="hero-stats">
+            <div class="hero-stat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M18.5 14.2c2.2.6 3.7 2.3 3.7 4.8"/></svg>
+              <div><strong>1,200+</strong><span>Monthly Visitors</span></div>
+            </div>
+            <span class="hero-stat-sep"></span>
+            <div class="hero-stat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3.5h6V6H9z"/><path d="M9 11h6"/><path d="M9 15h6"/></svg>
+              <div><strong>{total}+</strong><span>Listings</span></div>
+            </div>
+            <span class="hero-stat-sep"></span>
+            <div class="hero-stat">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4L3 21l1.1-3.3A8.4 8.4 0 1 1 21 11.5z"/><path d="M8.5 11h.01M12 11h.01M15.5 11h.01"/></svg>
+              <div><strong>100%</strong><span>Direct Contact</span></div>
+            </div>
           </div>
-          <div class="search-field">
-            <label for="s-cat">Type</label>
-            <select id="s-cat" name="category">
-              <option value="">Any type</option>
-              {categories.map((c) => <option value={c.slug}>{c.name} ({c.count})</option>)}
-            </select>
-          </div>
-          <button type="submit" class="search-btn">Search</button>
-        </form>
+        </div>
       </div>
     </section>
+    <script is:inline>
+      (function () {
+        var f = document.getElementById('hero-search')
+        if (!f) return
+        f.addEventListener('submit', function (e) {
+          e.preventDefault()
+          var sel = document.getElementById('hero-q')
+          var dest = (sel && sel.value) || '/stays'
+          window.location.href = dest
+        })
+      })()
+    </script>
 
     <!-- ───────────────── Featured stays ───────────────── -->
     <section class="section">
@@ -238,20 +266,73 @@ const jsonLd = [
 </style>
 
 <style>
-  /* hero */
-  .hero { background: linear-gradient(135deg, var(--sb-primary-deeper) 0%, #0d3040 100%); background-size: cover; background-position: center; padding: 5.5rem 1.5rem 6rem; text-align: center; color: #fff; }
-  .hero-inner { max-width: 820px; margin: 0 auto; }
-  .hero h1 { font-family: 'DM Sans', sans-serif; font-size: clamp(2.2rem, 6vw, 3.4rem); margin: 0 0 1rem; letter-spacing: -0.02em; text-shadow: 0 2px 24px rgba(0,0,0,.25); }
-  .hero h1 span { color: var(--sb-primary-mid); }
-  .hero > .hero-inner > p { font-size: 1.15rem; color: #e6f1f5; margin: 0 0 2.25rem; line-height: 1.6; text-shadow: 0 1px 12px rgba(0,0,0,.25); }
+  /* hero — contained (container width, rounded), aerial photo + left overlay */
+  .hero-wrap { padding: 1.5rem 1.5rem 0; }
+  .hero {
+    position: relative; max-width: 1200px; margin: 0 auto;
+    border-radius: 24px; overflow: hidden; min-height: 480px;
+    display: flex; align-items: center; color: #fff;
+    background-size: cover; background-position: center;
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, rgba(10,42,56,.92) 0%, rgba(10,42,56,.74) 30%, rgba(10,42,56,.38) 54%, rgba(10,42,56,0) 78%);
+  }
+  .hero-content { position: relative; box-sizing: border-box; padding: clamp(1.75rem, 4vw, 3.5rem); max-width: 560px; width: 100%; }
+  .hero-search, .hero-search * { box-sizing: border-box; }
+  .hero-content h1 {
+    font-family: 'DM Sans', sans-serif; font-weight: 800;
+    font-size: clamp(2.3rem, 5.2vw, 3.7rem); line-height: 1.04; letter-spacing: -0.02em;
+    margin: 0 0 1rem; text-shadow: 0 2px 24px rgba(0,0,0,.35);
+  }
+  .hero-content > p {
+    font-size: clamp(1rem, 1.5vw, 1.18rem); color: #eaf3f6; line-height: 1.55;
+    margin: 0 0 1.75rem; max-width: 440px; text-shadow: 0 1px 12px rgba(0,0,0,.3);
+  }
 
-  /* search bar */
-  .search { display: flex; gap: 0; background: #fff; border-radius: var(--sb-radius-lg); box-shadow: 0 12px 40px rgba(13,30,43,.22); padding: .5rem; max-width: 720px; margin: 0 auto; align-items: stretch; }
-  .search-field { flex: 1; display: flex; flex-direction: column; align-items: flex-start; padding: .5rem .9rem; text-align: left; border-right: 1px solid var(--sb-border); }
-  .search-field label { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--sb-text-muted); margin-bottom: .15rem; }
-  .search-field select { border: none; background: transparent; font-size: .95rem; color: var(--sb-text); font-family: inherit; width: 100%; outline: none; cursor: pointer; padding: 0; }
-  .search-btn { flex: none; background: var(--sb-primary); color: #fff; border: none; border-radius: var(--sb-radius); font-weight: 700; font-size: .95rem; padding: 0 1.75rem; margin-left: .25rem; cursor: pointer; transition: background .2s; }
-  .search-btn:hover { background: var(--sb-primary-dark); }
+  /* search */
+  .hero-search { display: flex; gap: .5rem; background: #fff; border-radius: 14px; padding: .5rem; box-shadow: 0 14px 40px rgba(10,42,56,.28); max-width: 540px; }
+  .hero-search-field { position: relative; flex: 1; display: flex; align-items: center; gap: .55rem; padding-left: .9rem; min-width: 0; }
+  .hsf-icon { color: var(--sb-text-muted); flex: 0 0 auto; }
+  .hero-search-field select {
+    appearance: none; -webkit-appearance: none; border: none; background: transparent; outline: none;
+    cursor: pointer; width: 100%; min-width: 0; max-width: 100%; text-overflow: ellipsis;
+    font-family: inherit; font-size: 1rem; font-weight: 500;
+    color: var(--sb-text); padding: .7rem 1.75rem .7rem 0;
+  }
+  .hero-search-field::after {
+    content: ""; position: absolute; right: .55rem; top: 50%; width: 9px; height: 9px;
+    border-right: 2px solid var(--sb-text-muted); border-bottom: 2px solid var(--sb-text-muted);
+    transform: translateY(-65%) rotate(45deg); pointer-events: none;
+  }
+  .hero-search-btn {
+    flex: 0 0 auto; width: 52px; border: none; border-radius: 10px;
+    background: var(--sb-primary); color: #fff; cursor: pointer;
+    display: grid; place-items: center; transition: background .2s;
+  }
+  .hero-search-btn:hover { background: var(--sb-primary-dark); }
+
+  /* stats */
+  .hero-stats { display: flex; align-items: center; gap: 1.25rem; margin-top: 1.75rem; flex-wrap: wrap; }
+  .hero-stat { display: flex; align-items: center; gap: .6rem; }
+  .hero-stat svg { width: 30px; height: 30px; flex: 0 0 auto; opacity: .95; }
+  .hero-stat strong { display: block; font-family: 'DM Sans', sans-serif; font-size: 1.4rem; font-weight: 800; line-height: 1; }
+  .hero-stat span { font-size: .82rem; color: #cfe0e6; }
+  .hero-stat-sep { width: 1px; height: 34px; background: rgba(255,255,255,.28); }
+
+  @media (max-width: 720px) {
+    .hero-wrap { padding: 1rem 1rem 0; }
+    .hero { min-height: 430px; border-radius: 20px; }
+    .hero::before { background: linear-gradient(180deg, rgba(10,42,56,.42) 0%, rgba(10,42,56,.78) 58%, rgba(10,42,56,.93) 100%); }
+    .hero-content { max-width: 100%; padding: 1.6rem 1.35rem; }
+    .hero-content > p { max-width: 100%; }
+    .hero-search { max-width: 100%; }
+    .hero-stat-sep { display: none; }
+    .hero-stats { gap: .8rem 1.3rem; margin-top: 1.4rem; }
+    .hero-stat svg { width: 26px; height: 26px; }
+    .hero-stat strong { font-size: 1.2rem; }
+    .hero-stat span { font-size: .72rem; color: #d6e4ea; }
+  }
 
   /* sections */
   .section { padding: 3.5rem 1.5rem; }
