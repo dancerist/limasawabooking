@@ -11,7 +11,7 @@ const { categories, locations } = deriveFacets(listings)
 const { nodes } = await getAccommodations(48)
 const featured = [...nodes]
   .sort((a, b) => (b.listingTier === 'featured' ? 1 : 0) - (a.listingTier === 'featured' ? 1 : 0))
-  .slice(0, 6)
+  .slice(0, 8)
 
 // Hero background: a real listing photo when available, else the gradient alone.
 const heroImage = featured.find((l) => l.thumb)?.thumb ?? ''
@@ -106,7 +106,7 @@ const jsonLd = [
         {featured.length === 0 ? (
           <p class="muted">Listings are being added — check back soon.</p>
         ) : (
-          <div class="grid grid-3">
+          <div class="grid grid-4">
             {featured.map((node) => <AccommodationCard listing={node} />)}
           </div>
         )}
@@ -265,9 +265,10 @@ const jsonLd = [
   .muted.sm { font-size: .85rem; }
 
   .grid { display: grid; gap: 1.25rem; }
-  .grid-3 { grid-template-columns: repeat(3, 1fr); }
-  @media (max-width: 900px) { .grid-3 { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 560px) { .grid-3 { grid-template-columns: 1fr; } }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 1100px) { .grid-4 { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 900px)  { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px)  { .grid-4 { grid-template-columns: 1fr; } }
 
   /* tiles (category / location) */
   .tile-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
