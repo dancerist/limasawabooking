@@ -11,14 +11,14 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
 ---
 
 <Layout
-  title="Scooter & Motorbike Rentals in Limasawa"
-  description="Rent a scooter, motorbike, or bicycle in Limasawa Island. Compare daily and hourly rates from local providers and explore the island your way."
+  title="Vehicle Rentals in Limasawa — Scooters, Cars, Boats & Jet Skis"
+  description="Rent scooters, motorbikes, cars, boats, and jet skis in Limasawa Island. Filter by type and price, and book direct with local providers."
 >
   <main class="rt-main">
     <section class="rt-hero">
       <div class="rt-hero-inner">
         <h1 class="rt-hero-title">Rentals in Limasawa</h1>
-        <p class="rt-hero-sub">Scooters, motorbikes, and more — rent from local providers and explore the island at your own pace.</p>
+        <p class="rt-hero-sub">Scooters, motorbikes, cars, boats &amp; jet skis — rent from local providers and explore the island at your own pace.</p>
       </div>
     </section>
 
@@ -29,7 +29,28 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     </nav>
 
     <section class="rt-grid-wrap">
-      <div class="rt-result-line" id="rt-result-line">Loading…</div>
+      <div class="rt-controls">
+        <div class="rt-result-line" id="rt-result-line">Loading…</div>
+        <div class="rt-control-fields">
+          <label class="rt-control">
+            <span>Price</span>
+            <select id="rt-price">
+              <option value="">Any price</option>
+              <option value="0-500">≤ ₱500</option>
+              <option value="500-1000">₱500 – ₱1,000</option>
+              <option value="1000-">Over ₱1,000</option>
+            </select>
+          </label>
+          <label class="rt-control">
+            <span>Sort</span>
+            <select id="rt-sort">
+              <option value="featured">Recommended</option>
+              <option value="price-asc">Price: low to high</option>
+              <option value="price-desc">Price: high to low</option>
+            </select>
+          </label>
+        </div>
+      </div>
       <div class="rt-grid" id="rt-grid"></div>
       <div class="rt-empty" id="rt-empty" style="display:none">
         <h2>No rentals yet</h2>
@@ -62,7 +83,12 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     .rt-cat-chip.is-active { background: #1A2533; color: #fff; border-color: #1A2533; }
 
     .rt-grid-wrap { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
-    .rt-result-line { font-size: .85rem; color: #64748B; margin-bottom: 1.5rem; }
+    .rt-controls { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .rt-result-line { font-size: .85rem; color: #64748B; }
+    .rt-control-fields { display: flex; gap: .6rem; flex-wrap: wrap; }
+    .rt-control { display: flex; align-items: center; gap: .4rem; font-size: .78rem; font-weight: 700; color: #64748B; }
+    .rt-control select { font-family: inherit; font-size: .85rem; font-weight: 600; color: #1A2533; background: #fff; border: 1.5px solid #E2EBF3; border-radius: 10px; padding: .5rem .7rem; cursor: pointer; outline: none; }
+    .rt-control select:focus { border-color: #22ABB3; }
     .rt-grid { display: grid; gap: 1.75rem 1.25rem; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
     .rt-empty { text-align: center; padding: 4rem 1rem; color: #64748B; }
     .rt-empty h2 { font-size: 1.25rem; font-weight: 800; color: #1A2533; margin-bottom: .5rem; }
@@ -85,7 +111,37 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     const empty = document.getElementById('rt-empty')
     const resultLine = document.getElementById('rt-result-line')
     const catStrip = document.getElementById('rt-cat-strip')
-    let state = { type: '' }
+    const priceSel = document.getElementById('rt-price')
+    const sortSel = document.getElementById('rt-sort')
+    let state = { type: '', price: '', sort: 'featured' }
+    let cache = []  // last fetched rentals for the current type
+
+    const TIER_RANK = { featured: 2, pro: 1, free: 0 }
+    const rate = r => Number(r.daily) || Number(r.hourly) || 0
+
+    function applyView() {
+      let list = cache.slice()
+      // price filter (on the primary rate number)
+      if (state.price) {
+        const [lo, hi] = state.price.split('-')
+        const min = Number(lo) || 0
+        const max = hi === '' || hi === undefined ? Infinity : Number(hi)
+        list = list.filter(r => { const p = rate(r); return p >= min && p <= max })
+      }
+      // sort
+      if (state.sort === 'price-asc') list.sort((a, b) => rate(a) - rate(b))
+      else if (state.sort === 'price-desc') list.sort((a, b) => rate(b) - rate(a))
+      else list.sort((a, b) => (TIER_RANK[b.tier] || 0) - (TIER_RANK[a.tier] || 0))
+
+      if (!list.length) { grid.innerHTML = ''; empty.style.display = 'block'; resultLine.style.display = 'none'; return }
+      empty.style.display = 'none'; resultLine.style.display = 'block'
+      const noun = list.length === 1 ? 'rental' : 'rentals'
+      resultLine.textContent = `${list.length} ${noun}${state.type ? ' in this category' : ''}`
+      grid.innerHTML = list.map(rentalCardHTML).join('')
+    }
+
+    priceSel.addEventListener('change', () => { state.price = priceSel.value; applyView() })
+    sortSel.addEventListener('change', () => { state.sort = sortSel.value; applyView() })
 
     async function loadTypes() {
       try {
@@ -109,12 +165,8 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       if (state.type) qs.set('type', state.type)
       try {
         const data = await fetch(`${API}/rentals?${qs}`).then(r => r.json())
-        const rentals = data.rentals || []
-        if (!rentals.length) { grid.innerHTML = ''; empty.style.display = 'block'; resultLine.style.display = 'none'; return }
-        empty.style.display = 'none'; resultLine.style.display = 'block'
-        const noun = data.total === 1 ? 'rental' : 'rentals'
-        resultLine.textContent = `${data.total} ${noun}${state.type ? ' in this category' : ''}`
-        grid.innerHTML = rentals.map(rentalCardHTML).join('')
+        cache = data.rentals || []
+        applyView()
       } catch (e) {
         grid.innerHTML = `<div class="rt-empty" style="grid-column:1/-1"><h2>Could not load rentals</h2><p>${esc(e.message || 'Try again later')}</p></div>`
       }

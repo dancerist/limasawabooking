@@ -16,6 +16,8 @@ export function rentalEsc(s) {
 }
 
 const peso = n => '₱' + Number(n || 0).toLocaleString('en-PH')
+const RT_UNIT = { day: '/day', hour: '/hr', trip: '/trip', person: '/person' }
+export const rtUnitLabel = u => RT_UNIT[u] || '/day'
 
 export function rentalCardHTML(r) {
   const x = r || {}
@@ -27,14 +29,16 @@ export function rentalCardHTML(r) {
     ? `<span class="rt-card-tier rt-tier-featured">★ Featured</span>`
     : (x.tier === 'pro' ? `<span class="rt-card-tier rt-tier-verified">✓ Verified</span>` : '')
   const unavail = x.available === false ? `<span class="rt-card-unavail">Unavailable</span>` : ''
-  const hourly = Number(x.hourly) ? `<span class="rt-card-hr">· ${peso(x.hourly)}/hr</span>` : ''
+  const unit = rtUnitLabel(x.rateUnit)
+  // Secondary hourly rate, only when the primary rate isn't already hourly.
+  const hourly = (Number(x.hourly) && x.rateUnit !== 'hour') ? `<span class="rt-card-hr">· ${peso(x.hourly)}/hr</span>` : ''
   const area = x.area ? `<p class="rt-card-area">${rentalEsc(x.area)}, Limasawa</p>` : ''
 
   return `<a class="rt-card" href="/rental/${rentalEsc(x.slug)}">
     <div class="rt-card-img">${thumb}${typeBadge}${tierBadge}${unavail}</div>
     <h3 class="rt-card-title">${rentalEsc(x.title || '')}</h3>
     ${area}
-    <div class="rt-card-price"><strong>${peso(x.daily)}</strong><span>/day</span> ${hourly}</div>
+    <div class="rt-card-price"><strong>${peso(x.daily)}</strong><span>${unit}</span> ${hourly}</div>
   </a>`
 }
 

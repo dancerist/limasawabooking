@@ -52,6 +52,7 @@ if (!function_exists('sb_rental_format')) {
             'typeSlug'  => $type ? $type->slug : '',
             'daily'     => (float) sb_acf('rental_daily_rate', $id, 0),
             'hourly'    => (float) sb_acf('rental_hourly_rate', $id, 0),
+            'rateUnit'  => sb_acf('rental_rate_unit', $id, 'day') ?: 'day', // day|hour|trip|person
             'deposit'   => (float) sb_acf('rental_deposit', $id, 0),
             'available' => (bool) sb_acf('rental_available', $id, true),
             'tier'      => get_post_meta($id, 'listing_tier', true) ?: 'free',
@@ -171,6 +172,7 @@ if (!function_exists('sb_apply_rental_fields')) {
     function sb_apply_rental_fields($id, array $d) {
         if (isset($d['dailyRate']))  update_field('rental_daily_rate', (float) $d['dailyRate'], $id);
         if (isset($d['hourlyRate'])) update_field('rental_hourly_rate', (float) $d['hourlyRate'], $id);
+        if (!empty($d['rateUnit']) && in_array($d['rateUnit'], ['day','hour','trip','person'], true)) update_field('rental_rate_unit', $d['rateUnit'], $id);
         if (isset($d['deposit']))    update_field('rental_deposit', (float) $d['deposit'], $id);
         if (isset($d['inclusions'])) update_field('rental_inclusions', sanitize_textarea_field($d['inclusions']), $id);
         if (isset($d['providerName']))    update_field('rental_provider_name', sanitize_text_field($d['providerName']), $id);
@@ -226,8 +228,8 @@ if (!function_exists('sb_submit_rental')) {
         $title = sanitize_text_field($d['title'] ?? '');
         if ($title === '') return new WP_REST_Response(['success' => false, 'message' => 'Title is required.'], 400);
 
-        // Tier + fleet limits (free=1, pro=5, featured=unlimited). Cap is based
-        // on the REQUESTED tier so a paying host can add their fleet immediately.
+        // Tier + fleet limits (free=1, verified/pro=3, featured=unlimited). Cap is
+        // based on the REQUESTED tier so a paying host can add their fleet immediately.
         $reqTier = in_array(($d['tier'] ?? 'free'), ['free', 'pro', 'featured'], true) ? $d['tier'] : 'free';
         $caps = sb_rental_fleet_caps();
         $cap  = $caps[$reqTier] ?? 1;
@@ -279,13 +281,15 @@ if (!function_exists('sb_submit_rental')) {
 }
 
 if (!function_exists('sb_rental_fleet_caps')) {
-    function sb_rental_fleet_caps() { return ['free' => 1, 'pro' => 5, 'featured' => 0]; } // 0 = unlimited
+    // Free = 1 listing, Verified (pro) = up to 3, Featured = unlimited (0).
+    function sb_rental_fleet_caps() { return ['free' => 1, 'pro' => 3, 'featured' => 0]; } // 0 = unlimited
 }
 if (!function_exists('sb_rental_tier_prices')) {
+    // Verified ₱99/mo (₱990/yr), Featured ₱149/mo (₱1,490/yr).
     function sb_rental_tier_prices() {
         return [
-            'pro'      => ['monthly' => 399, 'yearly' => 3990],
-            'featured' => ['monthly' => 999, 'yearly' => 9990],
+            'pro'      => ['monthly' => 99,  'yearly' => 990],
+            'featured' => ['monthly' => 149, 'yearly' => 1490],
         ];
     }
 }
@@ -333,6 +337,7 @@ if (!function_exists('sb_rental_edit_get')) {
             'id' => $id, 'slug' => $post->post_name, 'status' => $post->post_status,
             'title' => html_entity_decode(get_the_title($id), ENT_QUOTES),
             'type' => $type ? $type->slug : '',
+            'rateUnit' => sb_acf('rental_rate_unit', $id, 'day') ?: 'day',
             'dailyRate' => (float) sb_acf('rental_daily_rate', $id, 0) ?: '',
             'hourlyRate' => (float) sb_acf('rental_hourly_rate', $id, 0) ?: '',
             'deposit' => (float) sb_acf('rental_deposit', $id, 0) ?: '',

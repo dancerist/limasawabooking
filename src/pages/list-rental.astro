@@ -48,15 +48,15 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
           </label>
           <label class="lr-plan">
             <input type="radio" name="tier" value="pro" />
-            <span class="lr-plan-name">Pro</span>
-            <span class="lr-plan-price">₱399<small>/mo</small></span>
-            <span class="lr-plan-perk">Up to 5 vehicles · Verified badge · ranks above free</span>
+            <span class="lr-plan-name">Verified</span>
+            <span class="lr-plan-price">₱99<small>/mo</small></span>
+            <span class="lr-plan-perk">Up to 3 listings · Verified badge · ranks above free</span>
           </label>
           <label class="lr-plan">
             <input type="radio" name="tier" value="featured" />
             <span class="lr-plan-name">Featured</span>
-            <span class="lr-plan-price">₱999<small>/mo</small></span>
-            <span class="lr-plan-perk">Unlimited fleet · top placement · Featured badge</span>
+            <span class="lr-plan-price">₱149<small>/mo</small></span>
+            <span class="lr-plan-perk">Unlimited listings · top placement · Featured badge</span>
           </label>
         </div>
         <div class="lr-billing" id="lr-billing" style="display:none">
@@ -73,7 +73,17 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       <div class="lr-row">
         <div class="lr-field">
           <label for="f-type">Vehicle type <span>*</span></label>
-          <select id="f-type" class="lr-input" required><option value="">Select…</option></select>
+          <select id="f-type" class="lr-input" required>
+            <option value="">Select…</option>
+            <option value="scooter">Scooter</option>
+            <option value="motorbike">Motorbike</option>
+            <option value="car">Car</option>
+            <option value="van">Van</option>
+            <option value="boat">Boat</option>
+            <option value="jet-ski">Jet Ski</option>
+            <option value="bicycle">Bicycle</option>
+            <option value="tricycle">Tricycle</option>
+          </select>
         </div>
         <div class="lr-field">
           <label for="f-barangay">Barangay <span>*</span></label>
@@ -89,14 +99,26 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         </div>
       </div>
 
-      <div class="lr-row lr-row-3">
+      <div class="lr-row">
         <div class="lr-field">
-          <label for="f-daily">Daily rate (₱) <span>*</span></label>
-          <input id="f-daily" class="lr-input" type="number" min="0" placeholder="400" required />
+          <label for="f-daily">Rate (₱) <span>*</span></label>
+          <input id="f-daily" class="lr-input" type="number" min="0" placeholder="700" required />
         </div>
         <div class="lr-field">
-          <label for="f-hourly">Hourly rate (₱)</label>
-          <input id="f-hourly" class="lr-input" type="number" min="0" placeholder="80" />
+          <label for="f-unit">Charged per <span>*</span></label>
+          <select id="f-unit" class="lr-input">
+            <option value="day">per day</option>
+            <option value="hour">per hour</option>
+            <option value="trip">per trip</option>
+            <option value="person">per person</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="lr-row">
+        <div class="lr-field">
+          <label for="f-hourly">Also available hourly (₱)</label>
+          <input id="f-hourly" class="lr-input" type="number" min="0" placeholder="100" />
         </div>
         <div class="lr-field">
           <label for="f-deposit">Deposit (₱)</label>
@@ -137,7 +159,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       <div class="lr-field" id="lr-payment" style="display:none">
         <label>Payment</label>
         <div class="lr-pay-box">
-          <p class="lr-pay-amount">Amount due: <strong id="lr-amount">₱399</strong> <span id="lr-bill-label" style="color:#64748B;font-weight:400">/ monthly</span></p>
+          <p class="lr-pay-amount">Amount due: <strong id="lr-amount">₱99</strong> <span id="lr-bill-label" style="color:#64748B;font-weight:400">/ monthly</span></p>
           <p class="lr-pay-instr">Pay via GCash, Maya, or BPI, then enter your reference and upload the receipt. We'll verify and activate your plan — your rental goes live once approved.</p>
           <select id="f-method" class="lr-input"><option value="">Payment method…</option><option value="gcash">GCash</option><option value="maya">Maya</option><option value="bpi">BPI transfer</option></select>
           <div id="lr-pay-details" class="lr-pay-details" style="display:none"></div>
@@ -234,7 +256,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     const editId = parseInt(new URLSearchParams(location.search).get('edit') || '0')
 
     // ── Plan / payment state ──
-    const TIER_PRICES = { pro: { monthly: 399, yearly: 3990 }, featured: { monthly: 999, yearly: 9990 } }
+    const TIER_PRICES = { pro: { monthly: 99, yearly: 990 }, featured: { monthly: 149, yearly: 1490 } }
     let selectedTier = 'free', billing = 'monthly', receiptId = 0, eligibleDiscount = false
     const peso = n => '₱' + Number(n || 0).toLocaleString('en-PH')
 
@@ -317,18 +339,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     }
 
     async function init() {
-      // populate vehicle types
-      try {
-        const types = await fetch(`${API}/rental-types`).then(r => r.json())
-        // include all types even count 0 by also fetching nothing — rental-types is hide_empty;
-        // fall back to a fixed list so a fresh site still shows options
-        const list = (types && types.length) ? types : [
-          {slug:'scooter',name:'Scooter'},{slug:'motorbike',name:'Motorbike'},{slug:'bicycle',name:'Bicycle'},{slug:'car',name:'Car'},{slug:'van',name:'Van'},{slug:'tricycle',name:'Tricycle'}
-        ]
-        const seen = new Set(list.map(t=>t.slug))
-        ;[['scooter','Scooter'],['motorbike','Motorbike'],['bicycle','Bicycle'],['car','Car'],['van','Van'],['tricycle','Tricycle']].forEach(([s,n])=>{ if(!seen.has(s)) list.push({slug:s,name:n}) })
-        $('f-type').innerHTML = '<option value="">Select…</option>' + list.map(t=>`<option value="${t.slug}">${t.name}</option>`).join('')
-      } catch (_) {}
+      // Vehicle types are static <option>s in the markup (scooter…jet-ski).
       // prefill provider name from username
       if (payload?.data?.user?.username && !editId) $('f-provider').value = payload.data.user.username
 
@@ -351,6 +362,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         $('f-type').value = d.type || ''
         $('f-barangay').value = d.barangayId || ''
         $('f-daily').value = d.dailyRate || ''
+        $('f-unit').value = d.rateUnit || 'day'
         $('f-hourly').value = d.hourlyRate || ''
         $('f-deposit').value = d.deposit || ''
         $('f-inclusions').value = d.inclusions || ''
@@ -397,7 +409,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       const type = $('f-type').value
       const barangayId = parseInt($('f-barangay').value || '0')
       const daily = parseFloat($('f-daily').value || '0')
-      if (!title || !type || !barangayId || !daily) { showError('Please fill in the required fields (title, type, barangay, daily rate).'); return }
+      if (!title || !type || !barangayId || !daily) { showError('Please fill in the required fields (title, type, barangay, rate).'); return }
       const paid = !editId && selectedTier !== 'free'
       if (paid && (!$('f-method').value || !$('f-ref').value.trim())) {
         showError('For a paid plan, choose a payment method and enter your payment reference.'); return
@@ -405,6 +417,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       const body = {
         title, type, barangayId,
         dailyRate: daily,
+        rateUnit: $('f-unit').value || 'day',
         hourlyRate: parseFloat($('f-hourly').value || '0'),
         deposit: parseFloat($('f-deposit').value || '0'),
         inclusions: $('f-inclusions').value.trim(),

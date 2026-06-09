@@ -31,8 +31,10 @@ export async function getStaticPaths() {
 
 const { rental: r } = Astro.props as { rental: any }
 const peso = (n: number) => '₱' + Number(n || 0).toLocaleString('en-PH')
+const RT_UNIT: Record<string, string> = { day: '/ day', hour: '/ hour', trip: '/ trip', person: '/ person' }
+const unitLabel = RT_UNIT[r?.rateUnit] || '/ day'
 const title = r?.title || 'Rental — Limasawa Booking'
-const description = r ? (r.excerpt || `${r.type} rental in Limasawa from ${peso(r.daily)}/day.`).slice(0, 160) : 'Rentals in Limasawa'
+const description = r ? (r.excerpt || `${r.type} rental in Limasawa from ${peso(r.daily)} ${unitLabel}.`).slice(0, 160) : 'Rentals in Limasawa'
 const ogImage = r?.thumb || undefined
 
 // WhatsApp/phone normalisation (PH: 09XX → 639XX)
@@ -93,8 +95,8 @@ const mapBbox = (r && r.lat && r.lng)
 
           <aside class="rs-book">
             <div class="rs-price">
-              <div><strong>{peso(r.daily)}</strong><span> / day</span></div>
-              {r.hourly > 0 && <p class="rs-hourly">{peso(r.hourly)} / hour</p>}
+              <div><strong>{peso(r.daily)}</strong><span> {unitLabel}</span></div>
+              {r.hourly > 0 && r.rateUnit !== 'hour' && <p class="rs-hourly">{peso(r.hourly)} / hour</p>}
             </div>
             {r.deposit > 0 && <div class="rs-deposit">Deposit · {peso(r.deposit)}</div>}
             {r.available === false && <div class="rs-unavail">Currently unavailable</div>}
