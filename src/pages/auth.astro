@@ -20,7 +20,7 @@ import Layout from '../layouts/Layout.astro'
       <!-- Login -->
       <form id="form-login" class="auth-form">
         <label>Email<input class="sb-input" type="email" id="login-email" required autocomplete="email" /></label>
-        <label>Password<input class="sb-input" type="password" id="login-password" required autocomplete="current-password" /></label>
+        <label>Password<span class="pw-field"><input class="sb-input" type="password" id="login-password" required autocomplete="current-password" /><button type="button" class="pw-toggle" data-target="login-password" aria-label="Show password" aria-pressed="false"></button></span></label>
         <div id="login-error" class="auth-error" hidden></div>
         <button type="submit" class="btn-primary" style="width:100%">Sign in</button>
       </form>
@@ -29,7 +29,7 @@ import Layout from '../layouts/Layout.astro'
       <form id="form-register" class="auth-form" hidden>
         <label>Name<input class="sb-input" type="text" id="reg-name" required /></label>
         <label>Email<input class="sb-input" type="email" id="reg-email" required autocomplete="email" /></label>
-        <label>Password<input class="sb-input" type="password" id="reg-password" required minlength="8" /></label>
+        <label>Password<span class="pw-field"><input class="sb-input" type="password" id="reg-password" required minlength="8" /><button type="button" class="pw-toggle" data-target="reg-password" aria-label="Show password" aria-pressed="false"></button></span></label>
         <div id="reg-error" class="auth-error" hidden></div>
         <button type="submit" class="btn-primary" style="width:100%">Create account</button>
       </form>
@@ -49,6 +49,11 @@ import Layout from '../layouts/Layout.astro'
 .auth-tab.active { background:#fff;color:var(--sb-primary);box-shadow:0 1px 4px rgba(0,0,0,.08); }
 .auth-form { display:flex;flex-direction:column;gap:1rem; }
 .auth-form label { display:flex;flex-direction:column;gap:.35rem;font-size:.875rem;font-weight:600;color:var(--sb-text); }
+.pw-field { position:relative;display:block; }
+.pw-field .sb-input { padding-right:2.9rem; }
+.pw-toggle { position:absolute;top:50%;right:.45rem;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;background:none;border:0;border-radius:8px;color:#94A3B8;cursor:pointer;line-height:0;transition:color .15s,background .15s; }
+.pw-toggle:hover { color:var(--sb-primary);background:var(--sb-secondary-pale,#f1f5f9); }
+.pw-toggle svg { width:19px;height:19px;display:block; }
 .auth-error { background:#fff5f5;border:1px solid #feb2b2;color:#c53030;padding:.75rem;border-radius:var(--sb-radius);font-size:.875rem; }
 </style>
 
@@ -56,6 +61,23 @@ import Layout from '../layouts/Layout.astro'
   const REST = 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
   const params = new URLSearchParams(location.search)
   const redirect = params.get('redirect') || '/dashboard'
+
+  // Show/hide password toggles (eye icon)
+  const EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
+  const EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20C5 20 1 12 1 12a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+  document.querySelectorAll<HTMLButtonElement>('.pw-toggle').forEach((btn) => {
+    const input = document.getElementById(btn.dataset.target || '') as HTMLInputElement | null
+    if (!input) return
+    btn.innerHTML = EYE
+    btn.addEventListener('click', () => {
+      const show = input.type === 'password'
+      input.type = show ? 'text' : 'password'
+      btn.innerHTML = show ? EYE_OFF : EYE
+      btn.setAttribute('aria-pressed', String(show))
+      btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password')
+      input.focus()
+    })
+  })
 
   // Map backend error codes (limasawa-auth.php) → friendly messages.
   const ERRORS: Record<string, string> = {
