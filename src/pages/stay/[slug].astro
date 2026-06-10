@@ -1319,7 +1319,7 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
         const meta = await fetch(`${API}/listing/${slug}`).then(r => r.json())
         if (meta && meta.id) {
           const editLink = document.getElementById('owner-edit-link')
-          if (editLink) editLink.href = `/list-your-home?edit=${meta.id}`
+          if (editLink) editLink.href = `/list-your-property?edit=${meta.id}`
         }
       } catch (_) {}
     } catch (_) {}
