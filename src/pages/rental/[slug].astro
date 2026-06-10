@@ -46,7 +46,6 @@ function waNormalize(raw: string) {
 }
 const wa = r ? waNormalize(r.providerContact) : ''
 const tel = r ? String(r.providerContact || '').replace(/[^\d+]/g, '') : ''
-const gallery = r ? (r.galleryFull?.length ? r.galleryFull : (r.thumb ? [{ src: r.thumb, alt: r.title }] : [])) : []
 const mapBbox = (r && r.lat && r.lng)
   ? `${r.lng - 0.01}%2C${r.lat - 0.008}%2C${r.lng + 0.01}%2C${r.lat + 0.008}`
   : null
@@ -58,16 +57,9 @@ const mapBbox = (r && r.lat && r.lng)
       <article class="rs-wrap">
         <nav class="rs-breadcrumb"><a href="/rentals">Rentals</a><span>/</span><span>{r.type}</span></nav>
 
-        {gallery.length > 0 && (
-          <div class={`rs-gallery rs-gallery-${Math.min(gallery.length, 3)}`}>
-            {gallery.slice(0, 3).map((g: any) => <img src={g.src} alt={g.alt || r.title} loading="lazy" />)}
-          </div>
-        )}
-
         <div class="rs-grid">
           <div class="rs-body">
             <div class="rs-head">
-              {r.type && <span class="rs-type">{r.type}</span>}
               <h1 class="rs-title">{r.title}</h1>
               {r.area && <p class="rs-area">📍 {r.area}, Limasawa Island</p>}
             </div>
@@ -125,15 +117,7 @@ const mapBbox = (r && r.lat && r.lng)
     .rs-breadcrumb a { color: #64748B; text-decoration: none; }
     .rs-breadcrumb a:hover { color: #279DA3; }
 
-    .rs-gallery { display: grid; gap: 8px; border-radius: 18px; overflow: hidden; margin-bottom: 2rem; }
-    .rs-gallery-1 { grid-template-columns: 1fr; }
-    .rs-gallery-2 { grid-template-columns: 1fr 1fr; }
-    .rs-gallery-3 { grid-template-columns: 2fr 1fr 1fr; }
-    .rs-gallery img { width: 100%; height: 320px; object-fit: cover; background: #E2EBF3; }
-    .rs-gallery-3 img:first-child { grid-row: span 1; }
-
     .rs-grid { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 48px; align-items: start; }
-    .rs-type { display: inline-block; background: #F5F8FB; color: #279DA3; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; padding: .3rem .7rem; border-radius: 6px; margin-bottom: .75rem; }
     .rs-title { font-family: 'DM Sans', sans-serif; font-size: clamp(1.6rem, 4vw, 2.4rem); font-weight: 800; line-height: 1.15; margin: 0 0 .5rem; }
     .rs-area { color: #64748B; margin: 0 0 1.5rem; }
     .rs-content { font-family: 'Nunito Sans', sans-serif; font-size: 1.05rem; line-height: 1.7; color: #2D3748; }
@@ -165,9 +149,6 @@ const mapBbox = (r && r.lat && r.lng)
     @media (max-width: 860px) {
       .rs-grid { grid-template-columns: 1fr; gap: 28px; }
       .rs-book { position: static; }
-      .rs-gallery img { height: 220px; }
-      .rs-gallery-3 { grid-template-columns: 1fr 1fr; }
-      .rs-gallery-3 img:first-child { grid-column: span 2; }
     }
   </style>
 </Layout>
