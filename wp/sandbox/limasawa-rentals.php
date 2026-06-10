@@ -58,6 +58,8 @@ if (!function_exists('sb_rental_format')) {
             'tier'      => get_post_meta($id, 'listing_tier', true) ?: 'free',
             'providerName'    => (string) sb_acf('rental_provider_name', $id, ''),
             'providerContact' => (string) sb_acf('rental_provider_contact', $id, ''),
+            'facebook'  => (string) sb_acf('rental_facebook', $id, ''),
+            'instagram' => (string) sb_acf('rental_instagram', $id, ''),
             'thumb'     => $thumb,
             'gallery'   => $gallery,
             'area'      => $locNames[0] ?? '',
@@ -177,6 +179,8 @@ if (!function_exists('sb_apply_rental_fields')) {
         if (isset($d['inclusions'])) update_field('rental_inclusions', sanitize_textarea_field($d['inclusions']), $id);
         if (isset($d['providerName']))    update_field('rental_provider_name', sanitize_text_field($d['providerName']), $id);
         if (isset($d['providerContact'])) update_field('rental_provider_contact', sanitize_text_field($d['providerContact']), $id);
+        if (isset($d['facebook']))  update_field('rental_facebook', esc_url_raw(trim((string) $d['facebook'])), $id);
+        if (isset($d['instagram'])) update_field('rental_instagram', esc_url_raw(trim((string) $d['instagram'])), $id);
         if (isset($d['available']))  update_field('rental_available', $d['available'] ? 1 : 0, $id);
         if (!empty($d['mapLocation']) && isset($d['mapLocation']['lat'], $d['mapLocation']['lng'])) {
             update_field('rental_location', [
@@ -344,6 +348,8 @@ if (!function_exists('sb_rental_edit_get')) {
             'inclusions' => (string) sb_acf('rental_inclusions', $id, ''),
             'providerName' => (string) sb_acf('rental_provider_name', $id, ''),
             'providerContact' => (string) sb_acf('rental_provider_contact', $id, ''),
+            'facebook' => (string) sb_acf('rental_facebook', $id, ''),
+            'instagram' => (string) sb_acf('rental_instagram', $id, ''),
             'available' => (bool) sb_acf('rental_available', $id, true),
             'description' => $post->post_content,
             'barangayId' => $bar ? (int) $bar->term_id : 0,

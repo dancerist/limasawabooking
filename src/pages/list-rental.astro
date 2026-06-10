@@ -162,6 +162,17 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         </div>
       </div>
 
+      <div class="lr-row">
+        <div class="lr-field">
+          <label for="f-facebook">Facebook page</label>
+          <input id="f-facebook" class="lr-input" type="url" placeholder="https://facebook.com/yourpage" />
+        </div>
+        <div class="lr-field">
+          <label for="f-instagram">Instagram page</label>
+          <input id="f-instagram" class="lr-input" type="url" placeholder="https://instagram.com/yourpage" />
+        </div>
+      </div>
+
       <div class="lr-field">
         <label>Photos</label>
         <div class="lr-photos" id="lr-photos"></div>
@@ -400,6 +411,8 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         $('f-desc').value = d.description || ''
         $('f-provider').value = d.providerName || ''
         $('f-contact').value = d.providerContact || ''
+        $('f-facebook').value = d.facebook || ''
+        $('f-instagram').value = d.instagram || ''
         galleryIds = (d.galleryIds || []).slice()
         ;(d.galleryUrls || []).forEach((url, i) => addThumb(url, galleryIds[i]))
       } catch (e) {
@@ -455,6 +468,8 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         description: $('f-desc').value.trim(),
         providerName: $('f-provider').value.trim(),
         providerContact: $('f-contact').value.trim(),
+        facebook: $('f-facebook').value.trim(),
+        instagram: $('f-instagram').value.trim(),
         galleryIds,
       }
       if (!editId) {
