@@ -42,21 +42,36 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         <div class="lr-plans">
           <label class="lr-plan is-selected">
             <input type="radio" name="tier" value="free" checked />
+            <span class="lr-plan-check" aria-hidden="true"></span>
             <span class="lr-plan-name">Free</span>
             <span class="lr-plan-price">₱0</span>
-            <span class="lr-plan-perk">List 1 vehicle</span>
+            <ul class="lr-plan-perks">
+              <li>1 listing</li>
+              <li>Standard placement</li>
+            </ul>
           </label>
           <label class="lr-plan">
             <input type="radio" name="tier" value="pro" />
+            <span class="lr-plan-badge">Popular</span>
+            <span class="lr-plan-check" aria-hidden="true"></span>
             <span class="lr-plan-name">Verified</span>
             <span class="lr-plan-price">₱99<small>/mo</small></span>
-            <span class="lr-plan-perk">Up to 3 listings · Verified badge · ranks above free</span>
+            <ul class="lr-plan-perks">
+              <li>Up to 3 listings</li>
+              <li>Verified badge</li>
+              <li>Ranks above free</li>
+            </ul>
           </label>
           <label class="lr-plan">
             <input type="radio" name="tier" value="featured" />
+            <span class="lr-plan-check" aria-hidden="true"></span>
             <span class="lr-plan-name">Featured</span>
             <span class="lr-plan-price">₱149<small>/mo</small></span>
-            <span class="lr-plan-perk">Unlimited listings · top placement · Featured badge</span>
+            <ul class="lr-plan-perks">
+              <li>Unlimited listings</li>
+              <li>Top placement</li>
+              <li>Featured badge</li>
+            </ul>
           </label>
         </div>
         <div class="lr-billing" id="lr-billing" style="display:none">
@@ -152,7 +167,9 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         <div class="lr-photos" id="lr-photos"></div>
         <label class="lr-upload" id="lr-upload-label">
           <input type="file" id="f-photos" accept="image/*" multiple hidden />
-          <span id="lr-upload-text">+ Add photos</span>
+          <svg class="lr-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v13"/></svg>
+          <span id="lr-upload-text">Add photos</span>
+          <small>JPG or PNG · the vehicle's best shots</small>
         </label>
       </div>
 
@@ -179,7 +196,10 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
   </main>
 
   <style is:global>
-    .lr-main { max-width: 720px; margin: 0 auto; padding: 2rem 1.5rem 5rem; color: #1A2533; }
+    .lr-main { max-width: 720px; margin: 0 auto; padding: 2.5rem 1.5rem 5rem; color: #1A2533; }
+    .lr-form { background: #fff; border: 1px solid #E9EEF3; border-radius: 18px; padding: 1.75rem; box-shadow: 0 4px 24px rgba(20,40,55,.05); }
+    .lr-form .lr-head { margin-bottom: 1.75rem; }
+    @media (max-width: 560px) { .lr-form { padding: 1.25rem; } }
     .lr-authwall, .lr-success { text-align: center; padding: 4rem 1rem; }
     .lr-authwall h1, .lr-success h1 { font-family: 'DM Sans', sans-serif; font-size: 1.8rem; font-weight: 800; margin-bottom: .75rem; }
     .lr-authwall p, .lr-success p { color: #64748B; margin-bottom: 1.5rem; line-height: 1.6; }
@@ -194,8 +214,10 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     .lr-field { margin-bottom: 1.25rem; }
     .lr-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     .lr-row-3 { grid-template-columns: 1fr 1fr 1fr; }
-    .lr-field label { display: block; font-weight: 700; font-size: .85rem; margin-bottom: .4rem; }
-    .lr-field label span { color: #DC2626; }
+    /* Field-title labels only — exclude the plan-card + upload labels so they don't
+       inherit display:block (which broke the flex layout) or the asterisk red. */
+    .lr-field label:not(.lr-plan):not(.lr-upload) { display: block; font-weight: 700; font-size: .85rem; margin-bottom: .4rem; }
+    .lr-field label:not(.lr-plan):not(.lr-upload) > span { color: #DC2626; }
     .lr-input { width: 100%; border: 1.5px solid #E2EBF3; border-radius: 10px; padding: .7rem .85rem; font-size: .95rem; font-family: inherit; background: #fff; box-sizing: border-box; outline: none; transition: border-color .15s; }
     .lr-input:focus { border-color: #22ABB3; box-shadow: 0 0 0 3px rgba(39,157,163,.12); }
     textarea.lr-input { resize: vertical; }
@@ -204,8 +226,10 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     .lr-photo { position: relative; width: 84px; height: 84px; border-radius: 10px; overflow: hidden; background: #F5F8FB; }
     .lr-photo img { width: 100%; height: 100%; object-fit: cover; }
     .lr-photo button { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: rgba(0,0,0,.6); color: #fff; cursor: pointer; font-size: 13px; line-height: 1; }
-    .lr-upload { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 1.1rem; border: 1.5px dashed #BEF0F3; border-radius: 10px; color: #22ABB3; font-weight: 700; font-size: .88rem; cursor: pointer; background: #F8FEFE; }
-    .lr-upload:hover { border-color: #22ABB3; }
+    .lr-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem; width: 100%; min-height: 104px; padding: 1.1rem; border: 1.5px dashed #CBD5E1; border-radius: 12px; color: #64748B; font-weight: 700; font-size: .9rem; cursor: pointer; background: #F8FAFC; text-align: center; transition: border-color .15s, background .15s, color .15s; box-sizing: border-box; }
+    .lr-upload:hover { border-color: #22ABB3; background: #F4FDFD; color: #22ABB3; }
+    .lr-upload-icon { width: 26px; height: 26px; color: #22ABB3; }
+    .lr-upload small { font-weight: 500; color: #94A3B8; font-size: .74rem; }
 
     .lr-error { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; padding: .7rem .9rem; border-radius: 10px; font-size: .88rem; margin-bottom: 1rem; }
     .lr-actions { margin-top: 1.5rem; }
@@ -216,15 +240,22 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
 
     /* Plan selector */
     .lr-discount-banner { background: #F0FDF4; border: 1px solid #BBF7D0; color: #15803D; border-radius: 10px; padding: .6rem .85rem; font-size: .85rem; margin-bottom: .75rem; }
-    .lr-plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; }
-    .lr-plan { display: flex; flex-direction: column; gap: .25rem; border: 1.5px solid #E2EBF3; border-radius: 12px; padding: .85rem .9rem; cursor: pointer; transition: all .15s; position: relative; }
-    .lr-plan input { position: absolute; opacity: 0; }
-    .lr-plan:hover { border-color: #BEF0F3; }
-    .lr-plan.is-selected { border-color: #22ABB3; background: #F8FEFE; box-shadow: 0 0 0 3px rgba(39,157,163,.1); }
-    .lr-plan-name { font-weight: 800; font-size: .95rem; }
-    .lr-plan-price { font-weight: 800; color: #22ABB3; font-size: 1.05rem; }
-    .lr-plan-price small { font-weight: 500; color: #64748B; font-size: .7rem; }
-    .lr-plan-perk { font-size: .73rem; color: #64748B; line-height: 1.35; }
+    .lr-plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: .7rem; }
+    .lr-plan { display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; border: 1.5px solid #E2EBF3; border-radius: 14px; padding: 1.05rem .9rem .95rem; cursor: pointer; transition: border-color .15s, box-shadow .15s, background .15s; position: relative; background: #fff; }
+    .lr-plan input { position: absolute; opacity: 0; pointer-events: none; }
+    .lr-plan:hover { border-color: #9FE3E6; }
+    .lr-plan.is-selected { border-color: #22ABB3; background: #F4FDFD; box-shadow: 0 0 0 3px rgba(34,171,179,.12); }
+    .lr-plan-name { font-weight: 800; font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: #64748B; }
+    .lr-plan.is-selected .lr-plan-name { color: #1A8089; }
+    .lr-plan-price { font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 1.5rem; line-height: 1; color: #1A2533; }
+    .lr-plan-price small { font-weight: 600; color: #94A3B8; font-size: .72rem; margin-left: 1px; }
+    .lr-plan-perks { list-style: none; margin: .15rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .32rem; }
+    .lr-plan-perks li { font-size: .75rem; color: #5A6B7B; line-height: 1.3; padding-left: 1.05rem; position: relative; }
+    .lr-plan-perks li::before { content: ''; position: absolute; left: 1px; top: .28em; width: .42rem; height: .24rem; border-left: 2px solid #22ABB3; border-bottom: 2px solid #22ABB3; transform: rotate(-45deg); }
+    .lr-plan-check { position: absolute; top: .7rem; right: .7rem; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #CBD5E1; background: #fff; transition: all .15s; }
+    .lr-plan.is-selected .lr-plan-check { background: #22ABB3; border-color: #22ABB3; }
+    .lr-plan.is-selected .lr-plan-check::after { content: ''; position: absolute; left: 5px; top: 2px; width: 5px; height: 9px; border-right: 2px solid #fff; border-bottom: 2px solid #fff; transform: rotate(45deg); }
+    .lr-plan-badge { position: absolute; top: -9px; left: .85rem; background: #22ABB3; color: #fff; font-size: .58rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; padding: .2rem .45rem; border-radius: 6px; }
     .lr-billing { display: flex; gap: .5rem; margin-top: .7rem; }
     .lr-bill-opt { border: 1.5px solid #E2EBF3; background: #fff; border-radius: 9px; padding: .45rem .9rem; font-size: .82rem; font-weight: 700; cursor: pointer; color: #1A2533; }
     .lr-bill-opt small { font-weight: 500; color: #64748B; }
@@ -396,7 +427,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
           if (res.success && res.attachment_id) { galleryIds.push(res.attachment_id); addThumb(res.url, res.attachment_id) }
         } catch (_) {}
       }
-      $('lr-upload-text').textContent = '+ Add photos'
+      $('lr-upload-text').textContent = 'Add photos'
       e.target.value = ''
     })
 
