@@ -19,6 +19,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       <div class="rt-hero-inner">
         <h1 class="rt-hero-title">Rentals in Limasawa</h1>
         <p class="rt-hero-sub">Scooters, motorbikes, cars, boats &amp; jet skis — rent from local providers and explore the island at your own pace.</p>
+        <a href="/list-rental" class="rt-hero-btn">List your rental</a>
       </div>
     </section>
 
@@ -74,6 +75,8 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     .rt-hero-inner { max-width: 720px; margin: 0 auto; }
     .rt-hero-title { font-family: 'DM Sans', sans-serif; font-size: clamp(2rem, 5vw, 2.85rem); font-weight: 800; line-height: 1.05; margin-bottom: .75rem; }
     .rt-hero-sub { font-size: 1.05rem; color: #64748B; line-height: 1.55; }
+    .rt-hero-btn { display: inline-block; margin-top: 1.5rem; background: #22ABB3; color: #fff; font-weight: 700; font-size: .95rem; padding: .8rem 1.85rem; border-radius: 12px; text-decoration: none; box-shadow: 0 6px 20px rgba(34,171,179,.3); transition: background .2s, transform .2s; }
+    .rt-hero-btn:hover { background: #1C949B; transform: translateY(-1px); }
 
     .rt-cat-bar { position: sticky; top: 64px; z-index: 30; background: #fff; border-bottom: 1px solid #E2EBF3; padding: .85rem 1.5rem; }
     .rt-cat-strip { max-width: 1200px; margin: 0 auto; display: flex; gap: .55rem; overflow-x: auto; scrollbar-width: none; }
