@@ -291,9 +291,6 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     const payload = token ? parseJWT(token) : null
     const valid = payload && payload.exp > Date.now() / 1000
 
-    if (!valid) { $('lr-authwall').style.display = 'block' }
-    else { $('lr-form').style.display = 'block'; init() }
-
     let galleryIds = []
     const editId = parseInt(new URLSearchParams(location.search).get('edit') || '0')
 
@@ -301,6 +298,11 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     const TIER_PRICES = { pro: { monthly: 99, yearly: 990 }, featured: { monthly: 149, yearly: 1490 } }
     let selectedTier = 'free', billing = 'monthly', receiptId = 0, eligibleDiscount = false
     const peso = n => '₱' + Number(n || 0).toLocaleString('en-PH')
+
+    // Gate AFTER all module state above — init() reads editId/selectedTier,
+    // so calling it earlier hits the let/const temporal dead zone and dies silently.
+    if (!valid) { $('lr-authwall').style.display = 'block' }
+    else { $('lr-form').style.display = 'block'; init() }
 
     // Returning-host 50% discount: eligible if the host already has any listing
     // (accommodation or rental). Display only — the server is authoritative.
@@ -382,12 +384,14 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
 
     async function init() {
       // Vehicle types are static <option>s in the markup (scooter…jet-ski).
-      // prefill provider name from username
-      if (payload?.data?.user?.username && !editId) $('f-provider').value = payload.data.user.username
-
       wirePlan()
-      if (editId) loadForEdit()
-      else checkDiscount()
+      if (editId) { loadForEdit(); return }
+      checkDiscount()
+      // Prefill provider name from the account — the JWT only carries uid/role.
+      try {
+        const me = await fetch(`${API}/me`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json())
+        if (me?.user?.username && !$('f-provider').value) $('f-provider').value = me.user.username
+      } catch (_) {}
     }
 
     async function loadForEdit() {
@@ -455,8 +459,9 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       const daily = parseFloat($('f-daily').value || '0')
       if (!title || !type || !barangayId || !daily) { showError('Please fill in the required fields (title, type, barangay, rate).'); return }
       const paid = !editId && selectedTier !== 'free'
-      if (paid && (!$('f-method').value || !$('f-ref').value.trim())) {
-        showError('For a paid plan, choose a payment method and enter your payment reference.'); return
+      // Proof of payment = a typed reference no. OR an uploaded receipt — either is enough.
+      if (paid && (!$('f-method').value || (!$('f-ref').value.trim() && !receiptId))) {
+        showError('For a paid plan, choose a payment method and add proof of payment — a reference number or a receipt photo.'); return
       }
       const body = {
         title, type, barangayId,

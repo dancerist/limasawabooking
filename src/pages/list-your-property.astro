@@ -1542,7 +1542,7 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
           </label>
           <input id="input-paymentReference" class="form-input" type="text" placeholder="e.g. 2024123456789"
             style="max-width:360px;"
-            oninput="data.paymentReference = this.value.trim()" />
+            oninput="onPaymentReferenceInput(this)" />
         </div>
 
         <div class="mt-5">
@@ -2188,12 +2188,13 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
     const btn = document.getElementById('payment-next')
     const help = document.getElementById('payment-help')
     if (!btn) return
-    const ready = data.paymentAmount <= 0 || (data.paymentMethod && data.paymentReceiptId)
+    // Proof of payment = uploaded receipt OR typed reference no. — either is enough.
+    const ready = data.paymentAmount <= 0 || (data.paymentMethod && (data.paymentReceiptId || data.paymentReference))
     btn.disabled = !ready
     if (help) {
       help.textContent = ready
-        ? 'Receipt uploaded. Continue to review.'
-        : 'Select a payment method and upload your receipt.'
+        ? 'Proof of payment added. Continue to review.'
+        : 'Select a payment method, then upload your receipt or enter your reference number.'
     }
   }
 
@@ -2231,9 +2232,14 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
     }
   }
 
+  function onPaymentReferenceInput(el) {
+    data.paymentReference = el.value.trim()
+    validatePaymentStep()
+  }
+
   function confirmPayment() {
-    if (data.paymentAmount > 0 && (!data.paymentMethod || !data.paymentReceiptId)) {
-      alert('Please select a payment method and upload your receipt.')
+    if (data.paymentAmount > 0 && (!data.paymentMethod || (!data.paymentReceiptId && !data.paymentReference))) {
+      alert('Please select a payment method and add proof of payment — a receipt photo or reference number.')
       return
     }
     nextStep()
@@ -3414,7 +3420,7 @@ const allAmenityTerms = ["Air conditioning", "Backyard", "Barbecue utensils", "B
     startForm, goToStep, nextStep, prevStep, skipStep,
     selectTier, selectBillingPeriod, selectChoice, adjustCounter,
     onHostPhotoSelect, confirmHostPhoto,
-    selectPaymentMethod, onPaymentReceiptSelect, confirmPayment,
+    selectPaymentMethod, onPaymentReceiptSelect, onPaymentReferenceInput, confirmPayment,
     onGallerySelect, onGalleryDrop, removeGalleryPhoto,
     selectMunicipality, onBarangaySearch, onBarangayKeydown, pickBarangay, clearBarangay, confirmBarangay, skipBarangay,
     onMapSearch, pickMapResult, confirmMapLocation,
