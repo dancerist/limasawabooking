@@ -183,8 +183,10 @@ if (!function_exists('sb_apply_rental_fields')) {
         if (isset($d['instagram'])) update_field('rental_instagram', esc_url_raw(trim((string) $d['instagram'])), $id);
         if (isset($d['available']))  update_field('rental_available', $d['available'] ? 1 : 0, $id);
         if (!empty($d['mapLocation']) && isset($d['mapLocation']['lat'], $d['mapLocation']['lng'])) {
+            // Clamp to Limasawa — bad geocodes fall back to the barangay centroid.
+            list($rlat, $rlng) = sb_limasawa_safe_coords($d['mapLocation']['lat'], $d['mapLocation']['lng'], (int) ($d['barangayId'] ?? 0));
             update_field('rental_location', [
-                'lat' => (float) $d['mapLocation']['lat'], 'lng' => (float) $d['mapLocation']['lng'],
+                'lat' => $rlat, 'lng' => $rlng,
                 'address' => sanitize_text_field($d['mapLocation']['address'] ?? ''),
             ], $id);
         }

@@ -47,6 +47,41 @@ if (defined('ABSPATH')) {
             return $img['url'] ?? '';
         }
     }
+    if (!function_exists('sb_on_limasawa')) {
+        // Rough bounding box around Limasawa Island (with margin). Host map pins
+        // outside it are geocoding mistakes (e.g. a pin on mainland Leyte) and
+        // must never reach the browse map.
+        function sb_on_limasawa($lat, $lng) {
+            $lat = (float) $lat; $lng = (float) $lng;
+            return $lat >= 9.84 && $lat <= 10.01 && $lng >= 124.99 && $lng <= 125.13;
+        }
+    }
+    if (!function_exists('sb_limasawa_safe_coords')) {
+        // Returns [lat, lng] guaranteed on the island: valid coords pass through,
+        // otherwise fall back to the barangay centroid (location term), else the
+        // island center. Centroids derived from real listing GPS data.
+        function sb_limasawa_safe_coords($lat, $lng, $barangay_term_id = 0) {
+            $lat = (float) $lat; $lng = (float) $lng;
+            if (sb_on_limasawa($lat, $lng)) {
+                return [$lat, $lng];
+            }
+            $centroids = [
+                'san-bernardo' => [9.9490, 125.0645],
+                'san-agustin'  => [9.9595, 125.0630],
+                'lugsongan'    => [9.9235, 125.0785],
+                'magallanes'   => [9.9090, 125.0765],
+                'cabulihan'    => [9.9135, 125.0720],
+                'triana'       => [9.9250, 125.0740],
+            ];
+            if ($barangay_term_id) {
+                $t = get_term((int) $barangay_term_id, 'location');
+                if ($t && !is_wp_error($t) && isset($centroids[$t->slug])) {
+                    return $centroids[$t->slug];
+                }
+            }
+            return [9.9250, 125.0730];
+        }
+    }
     if (!function_exists('sb_terms')) {
         function sb_terms($post_id, $taxonomy) {
             $terms = wp_get_post_terms($post_id, $taxonomy);

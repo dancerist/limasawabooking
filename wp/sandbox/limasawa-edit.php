@@ -91,11 +91,13 @@ if (!function_exists('sb_apply_listing_fields')) {
         sb_submit_field('facebook_page_link', esc_url_raw($d['facebookLink'] ?? ''), $post_id);
         sb_submit_field('instagram_link', esc_url_raw($d['instagramLink'] ?? ''), $post_id);
 
-        // Pin location (ACF google_map)
+        // Pin location (ACF google_map). Coords are clamped to Limasawa — a bad
+        // geocode (pin on mainland Leyte) falls back to the barangay centroid.
         if (!empty($d['mapLocation']) && is_array($d['mapLocation']) && isset($d['mapLocation']['lat'], $d['mapLocation']['lng'])) {
+            list($mlat, $mlng) = sb_limasawa_safe_coords($d['mapLocation']['lat'], $d['mapLocation']['lng'], (int) ($d['barangayId'] ?? 0));
             sb_submit_field('accommodation_location', [
-                'lat'     => (float) $d['mapLocation']['lat'],
-                'lng'     => (float) $d['mapLocation']['lng'],
+                'lat'     => $mlat,
+                'lng'     => $mlng,
                 'address' => sanitize_text_field($d['mapLocation']['address'] ?? ($d['address1'] ?? '')),
             ], $post_id);
         }

@@ -1083,13 +1083,15 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
 const WP_REST_BASE = window.__SB_WP_REST || 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
 // Limasawa barangay fallback centroids — only used if a listing lacks a real
 // ACF map pin (all current listings have one, so this is a safety net).
+// Barangay centroids derived from real listing GPS data — keep in sync with
+// sb_limasawa_safe_coords() in wp/sandbox/limasawa-listings.php.
 const MUNI_COORDS = {
-  'san-bernardo': [9.9492, 125.0650],
-  'san-agustin':  [9.9300, 125.0700],
-  'lugsongan':    [9.9550, 125.0720],
-  'magallanes':   [9.9180, 125.0820],
-  'cabulihan':    [9.9420, 125.0600],
-  'triana':       [9.9330, 125.0620],
+  'san-bernardo': [9.9490, 125.0645],
+  'san-agustin':  [9.9595, 125.0630],
+  'lugsongan':    [9.9235, 125.0785],
+  'magallanes':   [9.9090, 125.0765],
+  'cabulihan':    [9.9135, 125.0720],
+  'triana':       [9.9250, 125.0740],
 }
 
 const HIST_BUCKETS = 24
@@ -1172,26 +1174,38 @@ async function fetchJson(url, options = {}) {
 }
 
 async function fetchPins() {
-  // Skip session cache when filtering by location — keeps the cache for the
-  // global /stays page only (matches backend cache behavior).
-  if (!F.location) {
-    try {
-      const cached = sessionStorage.getItem(PIN_CACHE_KEY)
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (Array.isArray(parsed)) return parsed
-      }
-    } catch (_) {}
-  }
-
+  // Session cache is used for the global /stays page only (matches backend
+  // cache behavior) — and as stale-while-revalidate: cached pins paint the
+  // map instantly, then a background fetch corrects any moved/edited pins
+  // (a long-lived tab must not keep showing a stale coordinate forever).
   const url = F.location
     ? `${WP_REST_BASE}/map-pins?location=${encodeURIComponent(F.location)}`
     : `${WP_REST_BASE}/map-pins`
-  const pins = await fetchJson(url)
-  if (!F.location) {
-    try { sessionStorage.setItem(PIN_CACHE_KEY, JSON.stringify(pins)) } catch (_) {}
+  const fetchFresh = async () => {
+    const pins = await fetchJson(url)
+    if (!F.location && Array.isArray(pins)) {
+      try { sessionStorage.setItem(PIN_CACHE_KEY, JSON.stringify(pins)) } catch (_) {}
+    }
+    return Array.isArray(pins) ? pins : []
   }
-  return Array.isArray(pins) ? pins : []
+
+  if (!F.location) {
+    let cached = null
+    try {
+      const parsed = JSON.parse(sessionStorage.getItem(PIN_CACHE_KEY) || 'null')
+      if (Array.isArray(parsed)) cached = parsed
+    } catch (_) {}
+    if (cached) {
+      fetchFresh().then(fresh => {
+        if (fresh.length && JSON.stringify(fresh) !== JSON.stringify(allPins)) {
+          allPins = fresh
+          renderAllPins(fresh)
+        }
+      }).catch(() => {})
+      return cached
+    }
+  }
+  return fetchFresh()
 }
 
 const TAX_CACHE_KEY = 'sb_tax_v1'
