@@ -58,8 +58,10 @@ const REST = 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
 .logo-mark svg { width: 19px; height: 19px; display: block; }
 .logo-text strong { color: var(--sb-primary); }
 .nav-links { margin-left: auto; display: flex; align-items: center; gap: 1.25rem; }
-.nav-links a { color: var(--sb-text); text-decoration: none; font-size: 0.9rem; font-weight: 500; }
-.nav-links a:hover { color: var(--sb-primary); }
+/* Text links only — the .btn-primary CTA keeps its own colors (a plain
+   `.nav-links a:hover` outranks .btn-primary and paints its text teal-on-teal). */
+.nav-links a:not(.btn-primary) { color: var(--sb-text); text-decoration: none; font-size: 0.9rem; font-weight: 500; }
+.nav-links a:not(.btn-primary):hover { color: var(--sb-primary); }
 .nav-account { position: relative; }
 .nav-avatar-btn {
   width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid var(--sb-border);

@@ -56,17 +56,20 @@ h1, h2, h3, h4, h5, h6 { font-family: 'DM Sans', system-ui, -apple-system, sans-
   border: none; cursor: pointer; transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
   font-size: 0.95rem; text-decoration: none;
 }
-.btn-primary:hover { background: var(--sb-primary-dark); box-shadow: 0 4px 16px rgba(62,199,207,0.35); transform: translateY(-1px); }
-.btn-primary:active { transform: translateY(0); }
+.btn-primary:hover { background: var(--sb-primary-dark); color: #fff; box-shadow: 0 4px 14px var(--sb-primary-trans-50); transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); box-shadow: none; }
+.btn-primary:focus-visible { outline: 2px solid var(--sb-primary); outline-offset: 2px; }
 
 .btn-secondary {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
   background: var(--sb-secondary-light); color: var(--sb-secondary); font-weight: 600;
   padding: 0.75rem 1.5rem; border-radius: var(--sb-radius);
-  border: none; cursor: pointer; transition: background 0.2s;
+  border: none; cursor: pointer; transition: background 0.2s, transform 0.15s;
   font-size: 0.95rem; text-decoration: none;
 }
-.btn-secondary:hover { background: #DDE6F0; }
+.btn-secondary:hover { background: #DDE6F0; transform: translateY(-1px); }
+.btn-secondary:active { transform: translateY(0); }
+.btn-secondary:focus-visible { outline: 2px solid var(--sb-secondary); outline-offset: 2px; }
 
 .btn-outline {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
@@ -75,7 +78,9 @@ h1, h2, h3, h4, h5, h6 { font-family: 'DM Sans', system-ui, -apple-system, sans-
   border: 2px solid var(--sb-primary); cursor: pointer; transition: all 0.2s;
   font-size: 0.95rem; text-decoration: none;
 }
-.btn-outline:hover { background: var(--sb-primary-light); }
+.btn-outline:hover { background: var(--sb-primary-light); transform: translateY(-1px); }
+.btn-outline:active { transform: translateY(0); }
+.btn-outline:focus-visible { outline: 2px solid var(--sb-primary); outline-offset: 2px; }
 
 .sb-input {
   width: 100%; padding: 0.75rem 1rem;
