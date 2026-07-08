@@ -1,0 +1,291 @@
+---
+import Layout from '../layouts/Layout.astro'
+const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
+---
+
+<Layout
+  title="Claim your listing"
+  description="Confirm you're the host of this property and unlock the dashboard to manage photos, pricing, and bookings."
+  noindex={true}
+>
+  <main class="claim-page">
+    <div class="claim-wrap">
+      <a href="/stays" class="claim-back" id="claim-back">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+        Back to listing
+      </a>
+
+      <h1>Claim this listing</h1>
+      <p class="claim-lede">Confirm you're the host of this place and we'll transfer it to your account so you can manage it directly.</p>
+
+      <!-- Loading state -->
+      <div class="claim-status" id="claim-loading">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+        Loading listing…
+      </div>
+
+      <!-- Auth wall -->
+      <div class="claim-auth" id="claim-auth" hidden>
+        <h2>Sign in to continue</h2>
+        <p>You'll need an account to claim a listing. We use this to link the listing to you and email you when it's approved.</p>
+        <a class="claim-btn primary" id="claim-signin">Sign in</a>
+        <a class="claim-btn ghost" id="claim-signup">Create account</a>
+      </div>
+
+      <!-- Already-owner state -->
+      <div class="claim-success" id="claim-already" hidden>
+        <h2>You already manage this listing</h2>
+        <p>This listing is already linked to your account. Open your dashboard to make changes.</p>
+        <a class="claim-btn primary" href="/dashboard">Open dashboard</a>
+      </div>
+
+      <!-- Form -->
+      <form class="claim-form" id="claim-form" hidden>
+        <!-- Listing summary -->
+        <div class="claim-listing" id="claim-listing-card">
+          <img id="cl-thumb" src="" alt="" loading="lazy" />
+          <div>
+            <div class="cl-title" id="cl-title"></div>
+            <div class="cl-meta" id="cl-meta"></div>
+          </div>
+        </div>
+
+        <div class="claim-field">
+          <label for="claim-phone">WhatsApp / Phone number</label>
+          <input id="claim-phone" type="tel" required autocomplete="tel" placeholder="+63 9XX XXX XXXX" />
+          <p class="claim-help">If this matches the number on the listing we can fast-track approval.</p>
+        </div>
+
+        <div class="claim-field">
+          <label for="claim-message">Anything else we should know? (optional)</label>
+          <textarea id="claim-message" rows="3" placeholder="e.g. I've owned this place since 2023, you can also reach me on Facebook @example"></textarea>
+        </div>
+
+        <div class="claim-actions">
+          <button type="submit" class="claim-btn primary" id="claim-submit">Submit claim</button>
+        </div>
+
+        <p class="claim-error" id="claim-error" hidden></p>
+        <p class="claim-fineprint">We review every claim manually within 24 hours. You'll get an email when it's approved or if we need anything else.</p>
+      </form>
+
+      <!-- Success state -->
+      <div class="claim-success" id="claim-done" hidden>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary,#0d9488)"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <h2>Claim submitted</h2>
+        <p id="claim-done-msg">Thanks — we'll review your claim within 24 hours and email you when it's done.</p>
+        <a class="claim-btn primary" href="/">Back to home</a>
+      </div>
+
+      <!-- Not-found state -->
+      <div class="claim-status error" id="claim-notfound" hidden>
+        <h2>Listing not found</h2>
+        <p>We couldn't find that listing. <a href="/stays">Browse all stays →</a></p>
+      </div>
+
+      <!-- Already claimed (current author is a real host, not an admin) -->
+      <div class="claim-status error" id="claim-not-claimable" hidden>
+        <h2>This listing is already claimed</h2>
+        <p>A real host already manages this property on Limasawa Booking. If you believe this is your listing and ownership is wrong, <a id="cnc-mailto" href="mailto:">email us</a> and we'll sort it out.</p>
+      </div>
+    </div>
+  </main>
+
+  <style>
+    .claim-page { min-height:calc(100vh - 80px); background:#F4F8FB; padding:48px 24px 80px; }
+    .claim-wrap { max-width:560px; margin:0 auto; }
+    .claim-back { display:inline-flex; align-items:center; gap:6px; color:#475569; font-size:14px; text-decoration:none; margin-bottom:24px; font-weight:600; }
+    .claim-back:hover { color:#1A2533; }
+    .claim-wrap h1 { font-family:'DM Sans', sans-serif; font-size:32px; font-weight:800; color:#1A2533; line-height:1.15; margin:0 0 10px; letter-spacing:-0.02em; }
+    .claim-lede { color:#475569; font-size:15px; line-height:1.55; margin:0 0 28px; }
+
+    .claim-status, .claim-auth, .claim-success, .claim-form {
+      background:#fff; border:1px solid #E2EBF3; border-radius:18px; padding:28px;
+      box-shadow:0 6px 20px rgba(13,30,43,.05);
+    }
+    .claim-status { display:flex; align-items:center; gap:10px; color:#64748B; font-size:14px; }
+    .claim-status.error h2 { font-family:'DM Sans', sans-serif; font-size:20px; font-weight:700; color:#1A2533; margin:0 0 8px; }
+    .claim-status.error p { color:#475569; font-size:14px; margin:0; }
+    .claim-status.error a { color:var(--primary,#0d9488); font-weight:700; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .claim-auth h2, .claim-success h2 { font-family:'DM Sans', sans-serif; font-size:22px; font-weight:800; color:#1A2533; margin:0 0 10px; }
+    .claim-auth p, .claim-success p { color:#475569; font-size:14px; line-height:1.55; margin:0 0 18px; }
+    .claim-success { text-align:center; padding:36px 28px; }
+    .claim-success svg { display:block; margin:0 auto 14px; }
+
+    .claim-listing { display:flex; gap:14px; padding:14px; border:1px solid #E2EBF3; border-radius:12px; margin-bottom:24px; background:#F8FAFC; }
+    .claim-listing img { width:84px; height:84px; object-fit:cover; border-radius:10px; flex-shrink:0; background:#E2EBF3; }
+    .cl-title { font-family:'DM Sans', sans-serif; font-weight:700; color:#1A2533; font-size:15px; line-height:1.3; }
+    .cl-meta { font-size:12.5px; color:#64748B; margin-top:4px; }
+
+    .claim-field { margin-bottom:20px; }
+    .claim-field label { display:block; font-size:13px; font-weight:700; color:#1A2533; margin-bottom:6px; }
+    .claim-field input, .claim-field textarea {
+      width:100%; padding:10px 13px; border:1.5px solid #D8E3ED; border-radius:10px;
+      font-size:14px; color:#1A2533; background:#fff; font-family:inherit;
+      transition: border-color .12s, box-shadow .12s;
+    }
+    .claim-field input:focus, .claim-field textarea:focus {
+      outline:none; border-color:var(--primary,#0d9488);
+      box-shadow:0 0 0 3px rgba(13,148,136,.15);
+    }
+    .claim-field textarea { resize:vertical; min-height:80px; }
+    .claim-help { font-size:12px; color:#64748B; margin:6px 0 0; line-height:1.4; }
+
+    .claim-actions { margin-top:8px; }
+    .claim-btn {
+      display:inline-flex; align-items:center; justify-content:center; gap:8px;
+      padding:12px 20px; border-radius:10px; font-family:'DM Sans', sans-serif;
+      font-weight:700; font-size:15px; cursor:pointer; border:0; text-decoration:none;
+      transition: filter .12s, transform .12s;
+    }
+    .claim-btn.primary { background:var(--primary,#0d9488); color:#fff; }
+    .claim-btn.primary:hover { filter:brightness(.92); transform:translateY(-1px); }
+    .claim-btn.primary:disabled { opacity:.55; cursor:not-allowed; transform:none; }
+    .claim-btn.ghost { background:#F1F5F9; color:#1A2533; margin-left:8px; }
+    .claim-btn.ghost:hover { background:#E2EBF3; }
+
+    .claim-error { color:#DC2626; font-size:13px; font-weight:600; margin:14px 0 0; }
+    .claim-fineprint { color:#94A3B8; font-size:12px; line-height:1.5; margin:18px 0 0; }
+  </style>
+
+  <script define:vars={{ WP_REST }}>
+    (function () {
+      const params = new URLSearchParams(location.search)
+      const slug = (params.get('listing') || '').trim()
+
+      const $loading       = document.getElementById('claim-loading')
+      const $auth          = document.getElementById('claim-auth')
+      const $already       = document.getElementById('claim-already')
+      const $form          = document.getElementById('claim-form')
+      const $done          = document.getElementById('claim-done')
+      const $notfound      = document.getElementById('claim-notfound')
+      const $notClaimable  = document.getElementById('claim-not-claimable')
+      const $back          = document.getElementById('claim-back')
+      const $err           = document.getElementById('claim-error')
+
+      function show(el) {
+        ;[$loading,$auth,$already,$form,$done,$notfound,$notClaimable].forEach(e => { if (e) e.hidden = true })
+        if (el) el.hidden = false
+      }
+
+      if (!slug) { show($notfound); return }
+      if ($back) $back.href = '/stay/' + slug
+
+      function parseJWT(t) {
+        try { return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))) } catch { return null }
+      }
+      function validToken() {
+        const t = localStorage.getItem('sb_token')
+        const p = t ? parseJWT(t) : null
+        return (p && p.exp > Date.now()/1000) ? t : null
+      }
+
+      async function loadListing() {
+        try {
+          const res = await fetch(WP_REST + '/listing/' + encodeURIComponent(slug))
+          if (!res.ok) throw new Error('not_found')
+          return await res.json()
+        } catch { return null }
+      }
+
+      async function init() {
+        const token = validToken()
+
+        // Auth wall
+        if (!token) {
+          const redirect = encodeURIComponent(location.pathname + location.search)
+          document.getElementById('claim-signin').href   = '/auth?redirect=' + redirect
+          document.getElementById('claim-signup').href   = '/auth?tab=register&redirect=' + redirect
+          show($auth); return
+        }
+
+        const listing = await loadListing()
+        if (!listing || !listing.id) { show($notfound); return }
+
+        // Are we already the author? Compare via /me to find current uid.
+        // limasawa /me returns { status:'ok', user:{ id, ... } }.
+        let meId = null
+        try {
+          const meRes = await fetch(WP_REST + '/me', { headers: { Authorization: 'Bearer ' + token } })
+          const me = await meRes.json()
+          meId = (me && me.user && me.user.id) ? Number(me.user.id) : null
+          if (meId && meId === Number(listing.hostId)) {
+            show($already); return
+          }
+        } catch {}
+
+        // Not claimable: a real host already owns it. Show the polite block.
+        if (!listing.claimable) {
+          const mt = document.getElementById('cnc-mailto')
+          if (mt) mt.href = `mailto:hello@limasawabooking.com?subject=${encodeURIComponent('Claim conflict for ' + (listing.title || slug))}&body=${encodeURIComponent('Listing: ' + (listing.title || slug) + '\nURL: ' + location.origin + '/stay/' + slug + '\n\nWhy I think this should be mine:\n')}`
+          show($notClaimable); return
+        }
+
+        // Render listing summary card
+        const thumbUrl = (listing.gallery && listing.gallery[0]) || listing.thumb || ''
+        document.getElementById('cl-thumb').src = thumbUrl
+        document.getElementById('cl-thumb').alt = listing.title || ''
+        document.getElementById('cl-title').textContent = listing.subHeading || listing.title || slug
+        const metaParts = [
+          listing.muniName || '',
+          listing.category || '',
+          listing.priceFrom ? 'from ₱' + Number(listing.priceFrom).toLocaleString() : '',
+        ].filter(Boolean)
+        document.getElementById('cl-meta').textContent = metaParts.join(' · ')
+
+        show($form)
+      }
+
+      async function submitClaim(e) {
+        e.preventDefault()
+        const token = validToken()
+        if (!token) { show($auth); return }
+
+        const phone   = document.getElementById('claim-phone').value.trim()
+        const message = document.getElementById('claim-message').value.trim()
+
+        const $btn = document.getElementById('claim-submit')
+        $btn.disabled = true
+        $btn.textContent = 'Submitting…'
+        $err.hidden = true
+
+        try {
+          // Look up listing.id again (lighter than re-rendering)
+          const listing = await loadListing()
+          if (!listing || !listing.id) throw new Error('Listing not found.')
+
+          const res = await fetch(WP_REST + '/claim-listing', {
+            method: 'POST',
+            headers: { 'Content-Type':'application/json', Authorization: 'Bearer ' + token },
+            body: JSON.stringify({
+              listing_id: listing.id,
+              phone, message,
+            }),
+          })
+          const data = await res.json()
+          if (!res.ok || !data.success) {
+            const msg = data.message || 'Could not submit your claim. Please try again.'
+            $err.textContent = msg
+            $err.hidden = false
+            $btn.disabled = false
+            $btn.textContent = 'Submit claim'
+            return
+          }
+          if (data.message) document.getElementById('claim-done-msg').textContent = data.message
+          show($done)
+        } catch (e) {
+          $err.textContent = (e && e.message) || 'Network error. Please try again.'
+          $err.hidden = false
+          $btn.disabled = false
+          $btn.textContent = 'Submit claim'
+        }
+      }
+
+      document.getElementById('claim-form').addEventListener('submit', submitClaim)
+      init()
+    })()
+  </script>
+</Layout>

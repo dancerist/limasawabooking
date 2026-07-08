@@ -585,24 +585,22 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     }
 
     function renderHostBlock(d) {
-      if (!d.hostName) return ''
+      // Slug is exposed in this script as SLUG (via define:vars) — referring to
+      // bare `slug` here returns undefined and the link never renders.
+      const claimSlug = (typeof SLUG === 'string' && SLUG) ? SLUG : ''
+      // Claim CTA shows whenever the listing is still admin-owned (claimable).
+      // updateClaimLinkState() may later swap it to a "claim under review" pill.
+      const claimLink = (claimSlug && d.claimable)
+        ? `<a id="host-claim-link" class="host-claim-link" data-listing-id="${d.id}" href="/claim-listing?listing=${encodeURIComponent(claimSlug)}">Are you the host? Claim this listing &rarr;</a>`
+        : ''
+      // Admin-imported listings often have no host name yet — but those are
+      // exactly the ones that need claiming, so surface the CTA on its own.
+      if (!d.hostName) return claimLink ? `<section class="section host-section">${claimLink}</section>` : ''
       const initials = (d.hostName||'').split(' ').map(p => p[0] || '').slice(0, 2).join('').toUpperCase()
       const inner = d.hostPic
         ? `<img src="${esc(d.hostPic)}" alt="${esc(d.hostName||'')}" loading="lazy" />`
         : `<span>${esc(initials)}</span>`
       const verified = d.verified ? `<span class="host-verified-pill">Verified host</span>` : ''
-      // Slug is exposed in this script as SLUG (via define:vars). Use that
-      // — referring to bare `slug` here returns undefined and the link
-      // never renders.
-      const claimSlug = (typeof SLUG === 'string' && SLUG) ? SLUG : ''
-      // Only render the claim CTA when the current author is an admin
-      // (i.e. we imported the listing manually). Listings owned by a real
-      // user are already claimed and shouldn't show the link.
-      // updateClaimLinkState() may further swap this to a "claim under
-      // review" pill once /my-claims resolves.
-      const claimLink = (claimSlug && d.claimable)
-        ? `<a id="host-claim-link" class="host-claim-link" data-listing-id="${d.id}" href="/claim-listing?listing=${encodeURIComponent(claimSlug)}">Are you the host? Claim this listing &rarr;</a>`
-        : ''
       return `<section class="section host-section">
         <div class="host-block">
           <div class="host-block-avatar">${inner}</div>

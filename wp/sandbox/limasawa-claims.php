@@ -168,6 +168,14 @@ add_action('admin_post_sb_approve_claim', function () {
     $claimant = (int) $row->claimant_user_id;
     update_post_meta($listing->ID, 'sb_listing_original_author', (int) $listing->post_author);
     wp_update_post(['ID' => $listing->ID, 'post_author' => $claimant]);
+    // Promote the claimant to host so they get the host dashboard (My Listings,
+    // edit, analytics). sb_user_role() reads the WP role and never derives host
+    // from ownership, so a guest who claims a listing stays a guest without this.
+    // Leave admins/editors/existing hosts untouched.
+    $cu = get_userdata($claimant);
+    if ($cu && !array_intersect(['host', 'administrator', 'editor'], (array) $cu->roles)) {
+        $cu->set_role('host');
+    }
     // Seed claimant avatar from the listing host picture if they have none.
     if (!(int) get_user_meta($claimant, 'sb_profile_picture_id', true)) {
         $hp = function_exists('get_field') ? get_field('accommodation_host_picture', $listing->ID) : 0;
