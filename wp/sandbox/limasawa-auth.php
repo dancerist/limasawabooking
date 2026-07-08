@@ -183,6 +183,11 @@ if (defined('ABSPATH')) {
             'permission_callback' => '__return_true',
             'callback'            => 'sb_auth_login',
         ]);
+        register_rest_route($ns, '/auth/google', [
+            'methods'             => 'POST',
+            'permission_callback' => '__return_true',
+            'callback'            => 'sb_auth_google',
+        ]);
         register_rest_route($ns, '/me', [
             ['methods' => 'GET',  'permission_callback' => '__return_true', 'callback' => 'sb_auth_me'],
             ['methods' => 'POST', 'permission_callback' => '__return_true', 'callback' => 'sb_auth_update_me'],
@@ -247,6 +252,82 @@ if (defined('ABSPATH')) {
             if (get_user_meta($user->ID, 'sb_user_suspended', true)) {
                 return new WP_REST_Response(['error' => 'SUSPENDED'], 403);
             }
+            $token = sb_jwt_encode(['uid' => (int) $user->ID, 'role' => sb_user_role($user)]);
+            return new WP_REST_Response([
+                'status'    => 'ok',
+                'authToken' => $token,
+                'user'      => sb_user_payload($user),
+            ], 200);
+        }
+    }
+
+    if (!function_exists('sb_auth_google')) {
+        /**
+         * POST /auth/google — Sign in with Google (Google Identity Services).
+         * Body: { credential: <Google ID token from GIS> }.
+         * The token is verified server-side against Google's tokeninfo endpoint
+         * and the audience must match the client ID stored in the
+         * `sb_google_client_id` wp_option (client IDs are public, not secrets).
+         * Finds the user by email or creates a guest account (random password).
+         */
+        function sb_auth_google(WP_REST_Request $req) {
+            if (!sb_rate_limit('google', 10, 60)) {
+                return new WP_REST_Response(['error' => 'RATE_LIMITED'], 429);
+            }
+            $client_id = (string) get_option('sb_google_client_id');
+            if ($client_id === '') {
+                return new WP_REST_Response(['error' => 'NOT_CONFIGURED', 'message' => 'Google sign-in is not enabled.'], 501);
+            }
+            $credential = trim((string) $req->get_param('credential'));
+            if ($credential === '' || substr_count($credential, '.') !== 2) {
+                return new WP_REST_Response(['error' => 'INVALID_TOKEN'], 400);
+            }
+
+            $res = wp_remote_get(
+                'https://oauth2.googleapis.com/tokeninfo?id_token=' . rawurlencode($credential),
+                ['timeout' => 10]
+            );
+            if (is_wp_error($res) || wp_remote_retrieve_response_code($res) !== 200) {
+                return new WP_REST_Response(['error' => 'INVALID_TOKEN'], 401);
+            }
+            $info = json_decode(wp_remote_retrieve_body($res), true);
+            $iss_ok = in_array($info['iss'] ?? '', ['accounts.google.com', 'https://accounts.google.com'], true);
+            if (
+                !is_array($info)
+                || ($info['aud'] ?? '') !== $client_id
+                || !$iss_ok
+                || (int) ($info['exp'] ?? 0) < time()
+                || ($info['email_verified'] ?? '') !== 'true'
+                || empty($info['email'])
+            ) {
+                return new WP_REST_Response(['error' => 'INVALID_TOKEN'], 401);
+            }
+
+            $email = sanitize_email($info['email']);
+            $user  = get_user_by('email', $email);
+
+            if (!$user) {
+                $name = sanitize_text_field((string) ($info['name'] ?? ''));
+                $uid  = wp_insert_user([
+                    'user_login'   => $email,
+                    'user_email'   => $email,
+                    'user_pass'    => wp_generate_password(32, true, true),
+                    'display_name' => $name !== '' ? $name : $email,
+                    'role'         => 'guest',
+                ]);
+                if (is_wp_error($uid)) {
+                    return new WP_REST_Response(['error' => 'CREATE_FAILED'], 500);
+                }
+                $user = get_user_by('id', $uid);
+                update_user_meta($user->ID, 'sb_google_sub', sanitize_text_field((string) ($info['sub'] ?? '')));
+            } elseif (!get_user_meta($user->ID, 'sb_google_sub', true)) {
+                update_user_meta($user->ID, 'sb_google_sub', sanitize_text_field((string) ($info['sub'] ?? '')));
+            }
+
+            if (get_user_meta($user->ID, 'sb_user_suspended', true)) {
+                return new WP_REST_Response(['error' => 'SUSPENDED'], 403);
+            }
+
             $token = sb_jwt_encode(['uid' => (int) $user->ID, 'role' => sb_user_role($user)]);
             return new WP_REST_Response([
                 'status'    => 'ok',

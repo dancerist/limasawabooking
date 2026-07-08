@@ -49,9 +49,48 @@ const tel = r ? String(r.providerContact || '').replace(/[^\d+]/g, '') : ''
 const mapBbox = (r && r.lat && r.lng)
   ? `${r.lng - 0.01}%2C${r.lat - 0.008}%2C${r.lng + 0.01}%2C${r.lat + 0.008}`
   : null
+
+const rentalUrl = `https://limasawabooking.com/rental/${r?.slug || ''}`
+const UNIT_TEXT: Record<string, string> = { day: 'per day', hour: 'per hour', trip: 'per trip', person: 'per person' }
+const jsonLd = r ? [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: title,
+    description,
+    url: rentalUrl,
+    category: r.type || 'Vehicle rental',
+    ...(r.gallery?.length ? { image: r.gallery.slice(0, 6) } : ogImage ? { image: ogImage } : {}),
+    ...(Number(r.daily) > 0 ? {
+      offers: {
+        '@type': 'Offer',
+        price: Number(r.daily),
+        priceCurrency: 'PHP',
+        availability: r.available === false ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
+        url: rentalUrl,
+        priceSpecification: {
+          '@type': 'UnitPriceSpecification',
+          price: Number(r.daily),
+          priceCurrency: 'PHP',
+          unitText: UNIT_TEXT[r.rateUnit] || 'per day',
+        },
+      },
+    } : {}),
+    ...(r.providerName ? { brand: { '@type': 'Organization', name: r.providerName } } : {}),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://limasawabooking.com/' },
+      { '@type': 'ListItem', position: 2, name: 'Rentals', item: 'https://limasawabooking.com/rentals/' },
+      { '@type': 'ListItem', position: 3, name: title, item: rentalUrl },
+    ],
+  },
+] : undefined
 ---
 
-<Layout title={title} description={description} image={ogImage} type="product">
+<Layout title={title} description={description} image={ogImage} type="product" jsonLd={jsonLd}>
   <main class="rs-main">
     {r && (
       <article class="rs-wrap">

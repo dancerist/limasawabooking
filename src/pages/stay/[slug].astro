@@ -8,7 +8,7 @@ interface PathProps {
   title: string
   description: string
   image?: string
-  jsonLd?: Record<string, any>
+  jsonLd?: Record<string, any> | Record<string, any>[]
 }
 
 export async function getStaticPaths() {
@@ -41,16 +41,31 @@ export async function getStaticPaths() {
             gallery[0]?.sourceUrl ||
             l.featuredImage?.node?.sourceUrl ||
             undefined
-          const muni = (l.locations?.nodes || []).find((t: any) => t?.databaseId)?.name || ''
+          // reshapeListing emits databaseId: 0 for every location node, so take
+          // the first named term (locations are stored flat — one barangay term).
+          const muni = (l.locations?.nodes || []).map((t: any) => t?.name).find(Boolean) || ''
           const catNode = l.accommodationsCategory?.nodes?.[0]
           const cat = catNode?.name || ''
           const catSlug = catNode?.slug || ''
           const fallbackDesc = [cat, muni && `in ${muni}, Limasawa`].filter(Boolean).join(' ').trim()
-          const description =
+          const baseDesc =
             (data.customAccommodationShortDescription || '').trim() ||
             (l.excerpt || '').replace(/<[^>]*>/g, '').trim().slice(0, 160) ||
             fallbackDesc ||
             'Find this accommodation on Limasawa Booking.'
+          // Enrich the meta description with booking signals — the base sentence
+          // alone is often just "Private room in home in Limasawa", which wastes
+          // the search snippet.
+          const priceFrom = Number(l.priceFrom || 0)
+          const ratingAvg = Number(l.ratingAvg || 0)
+          const ratingCount = Number(l.ratingCount || 0)
+          const guestCount = Number(data.accommodationNumberOfGuests || 0)
+          const description = [
+            baseDesc.replace(/[.\s]+$/, ''),
+            priceFrom > 0 ? `From ₱${priceFrom.toLocaleString('en-PH')}/night` : '',
+            ratingCount > 0 ? `Rated ${ratingAvg}/5 (${ratingCount} review${ratingCount === 1 ? '' : 's'})` : '',
+            guestCount > 0 ? `Sleeps ${guestCount}` : '',
+          ].filter(Boolean).join(' · ')
           const title = data.accommodationSubHeading || l.title || 'Listing'
 
           // ─── Build LodgingBusiness JSON-LD ──────────────────────────────────
@@ -81,19 +96,28 @@ export async function getStaticPaths() {
             url,
             ...(galleryImages.length ? { image: galleryImages } : image ? { image } : {}),
             ...(priceRange ? { priceRange } : {}),
-            ...(dailyRate > 0 ? {
+            ...((dailyRate > 0 || priceFrom > 0) ? {
               offers: {
                 '@type': 'Offer',
-                price: dailyRate,
+                price: dailyRate > 0 ? dailyRate : priceFrom,
                 priceCurrency: 'PHP',
                 availability: 'https://schema.org/InStock',
                 url,
               },
             } : {}),
+            ...(ratingCount > 0 ? {
+              aggregateRating: {
+                '@type': 'AggregateRating',
+                ratingValue: ratingAvg,
+                reviewCount: ratingCount,
+                bestRating: 5,
+                worstRating: 1,
+              },
+            } : {}),
             address: {
               '@type': 'PostalAddress',
               ...(muni ? { addressLocality: muni } : {}),
-              addressRegion: 'Surigao del Norte',
+              addressRegion: 'Southern Leyte',
               addressCountry: 'PH',
             },
             ...(typeof lat === 'number' && typeof lng === 'number' ? {
@@ -121,13 +145,23 @@ export async function getStaticPaths() {
             } : {}),
           }
 
+          const breadcrumbLd = {
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://limasawabooking.com/' },
+              { '@type': 'ListItem', position: 2, name: 'Stays', item: 'https://limasawabooking.com/stays/' },
+              { '@type': 'ListItem', position: 3, name: title, item: url },
+            ],
+          }
+
           return {
             params: { slug: l.slug },
             props: {
               title,
-              description: description.slice(0, 200),
+              description: description.slice(0, 250),
               image,
-              jsonLd,
+              jsonLd: [jsonLd, breadcrumbLd],
             },
           }
         })

@@ -1,0 +1,120 @@
+---
+import Layout from '../layouts/Layout.astro'
+const UPDATED = 'July 8, 2026'
+---
+
+<Layout
+  title="Privacy Policy"
+  description="How LimasawaBooking.com collects, uses, and protects your personal data, in line with the Philippine Data Privacy Act of 2012 (RA 10173)."
+>
+  <main class="legal-wrap">
+    <header class="legal-head">
+      <h1>Privacy Policy</h1>
+      <p class="legal-updated">Last updated: {UPDATED}</p>
+    </header>
+
+    <article class="legal-body">
+      <section>
+        <h2>1. Overview</h2>
+        <p>
+          This policy explains what personal data LimasawaBooking.com ("<strong>Limasawa Booking</strong>",
+          "we", "us") collects, why we collect it, and the choices you have. We process personal data in
+          accordance with the <strong>Philippine Data Privacy Act of 2012 (Republic Act No. 10173)</strong>
+          and its implementing rules.
+        </p>
+      </section>
+
+      <section>
+        <h2>2. What we collect</h2>
+        <ul>
+          <li><strong>Account data</strong> — email address, username, display name, and (optionally) a profile photo when you register as a guest or host.</li>
+          <li><strong>Listing data</strong> — property or rental details hosts submit, including contact phone numbers, social links, photos, and map location. Listing contact details are published publicly by design so guests can reach you.</li>
+          <li><strong>Subscription payment references</strong> — for paid listing tiers we store the payment method, the reference number and/or receipt image you submit, and the amount. We never see or store e-wallet or bank credentials.</li>
+          <li><strong>Reviews and posts</strong> — content you choose to publish.</li>
+          <li><strong>Usage data</strong> — first-party, aggregated listing view and click counts (with basic bot filtering). We do not build advertising profiles and we do not use third-party ad trackers.</li>
+          <li><strong>Newsletter</strong> — your email address, if you subscribe.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>3. Local storage and cookies</h2>
+        <p>
+          When you sign in, an authentication token is stored in your browser's local storage
+          (<code>sb_token</code>) so you stay logged in, along with your saved-listings list
+          (<code>sb_saved</code>) and small interface preferences. These are functional only — we do not use
+          advertising or cross-site tracking cookies. Third-party services we embed (map tiles, fonts) may
+          set their own technical cookies; see section 5.
+        </p>
+      </section>
+
+      <section>
+        <h2>4. How we use your data</h2>
+        <ul>
+          <li>to operate accounts, listings, saved lists, reviews, and the host dashboard;</li>
+          <li>to verify and activate paid listing tiers;</li>
+          <li>to show hosts aggregate analytics about their own listings;</li>
+          <li>to send transactional email (e.g. subscription expiry warnings) and, only if you opted in, the newsletter;</li>
+          <li>to keep the platform safe (moderation, fraud and abuse prevention).</li>
+        </ul>
+        <p>We do not sell personal data.</p>
+      </section>
+
+      <section>
+        <h2>5. Third-party services</h2>
+        <ul>
+          <li><strong>Hosting</strong> — the site is served via Vercel and Cloudflare; our backend is hosted on our WordPress server. These providers process technical request data (such as IP addresses) to deliver the site.</li>
+          <li><strong>Maps</strong> — map tiles are loaded from OpenStreetMap/CartoDB; your browser requests tiles directly from them.</li>
+          <li><strong>Fonts</strong> — web fonts are loaded from Google Fonts.</li>
+          <li><strong>Google Sign-In</strong> — if you choose to sign in with Google, Google shares your name, email, and profile photo with us to create or access your account.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>6. Retention</h2>
+        <p>
+          Account and listing data is kept while your account is active. If you delete a listing or your
+          account, associated public content is removed from the site; payment references are retained as
+          long as needed for accounting and dispute purposes. Aggregated statistics contain no personal
+          identifiers.
+        </p>
+      </section>
+
+      <section>
+        <h2>7. Your rights</h2>
+        <p>
+          Under the Data Privacy Act you may request access to, correction of, or deletion of your personal
+          data, object to processing, and lodge a complaint with the National Privacy Commission
+          (privacy.gov.ph). To exercise any of these rights, email us at
+          <a href="mailto:nico@podiumapps.com">nico@podiumapps.com</a> — we respond within a reasonable
+          period and verify identity before acting on requests.
+        </p>
+      </section>
+
+      <section>
+        <h2>8. Security</h2>
+        <p>
+          The site is served over HTTPS, passwords are stored hashed by WordPress, and authentication uses
+          signed, expiring tokens. No system is perfectly secure — if we become aware of a breach affecting
+          your personal data we will notify affected users and the National Privacy Commission as required
+          by law.
+        </p>
+      </section>
+
+      <section>
+        <h2>9. Children</h2>
+        <p>
+          The site is not directed at children under 18 and we do not knowingly collect their personal data.
+        </p>
+      </section>
+
+      <section>
+        <h2>10. Changes and contact</h2>
+        <p>
+          We may update this policy from time to time; the date above reflects the current version.
+          Questions or requests: <a href="mailto:nico@podiumapps.com">nico@podiumapps.com</a>.
+          See also our <a href="/terms">Terms &amp; Conditions</a>.
+        </p>
+      </section>
+    </article>
+  </main>
+</Layout>

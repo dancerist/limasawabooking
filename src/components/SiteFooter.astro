@@ -1,75 +1,321 @@
 ---
 const year = new Date().getFullYear()
+const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
 ---
 <footer class="site-footer">
-  <div class="footer-inner">
-    <div class="footer-brand">
-      <a href="/" class="footer-logo">
-        <span class="footer-mark" aria-hidden="true">
+
+  <!-- ── Newsletter band ─────────────────────────────────────── -->
+  <div class="ft-band ft-newsletter">
+    <div class="ft-nl-copy">
+      <h3>Island updates, straight to your inbox</h3>
+      <p>New stays, rentals, and Limasawa travel guides. No spam — unsubscribe anytime.</p>
+    </div>
+    <form id="ft-nl-form" class="ft-nl-form" novalidate>
+      <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" class="ft-nl-hp" />
+      <div class="ft-nl-row">
+        <input type="email" name="email" required placeholder="you@example.com" aria-label="Email address" class="ft-nl-input" />
+        <button type="submit" class="ft-nl-btn">Subscribe</button>
+      </div>
+      <p class="ft-nl-msg" id="ft-nl-msg" role="status"></p>
+    </form>
+  </div>
+
+  <!-- ── Main band ───────────────────────────────────────────── -->
+  <div class="ft-band ft-main">
+    <div class="ft-brand">
+      <a href="/" class="ft-logo">
+        <span class="ft-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none"><path d="M12 4.6c-2.6 0-4.7 2.1-4.7 4.7 0 3.3 4.7 7.1 4.7 7.1s4.7-3.8 4.7-7.1c0-2.6-2.1-4.7-4.7-4.7z" fill="#fff"/><circle cx="12" cy="9.3" r="1.9" fill="var(--sb-primary)"/></svg>
         </span>
         <span>Limasawa<strong>Booking</strong></span>
       </a>
-      <p>Find and book accommodation in Limasawa, Philippines.</p>
+      <p class="ft-tagline">
+        Every stay, rental, and travel guide for Limasawa Island — book direct with local hosts.
+      </p>
+      <div class="ft-contact">
+        <a href="mailto:nico@podiumapps.com">nico@podiumapps.com</a>
+        <span>Limasawa Island, Southern Leyte, PH</span>
+      </div>
     </div>
-    <div class="footer-cols">
+
+    <nav class="ft-links" aria-label="Footer">
       <div>
         <h4>Explore</h4>
-        <a href="/stays">Browse Stays</a>
-        <a href="/rentals">Rentals</a>
-        <a href="/blog">Blog</a>
+        <a href="/stays">Browse stays</a>
+        <a href="/stays/beachfront">Beachfront stays</a>
+        <a href="/rentals">Vehicle rentals</a>
+        <a href="/blog">Travel guides</a>
       </div>
       <div>
-        <h4>Account</h4>
-        <a href="/auth">Sign in</a>
-        <a href="/auth?tab=register">Register</a>
-        <a href="/dashboard">Dashboard</a>
-      </div>
-      <div>
-        <h4>Hosts</h4>
+        <h4>For hosts</h4>
         <a href="/list-your-property">List your property</a>
         <a href="/list-rental">List your rental</a>
+        <a href="/claim-listing">Claim your listing</a>
+        <a href="/dashboard">Host dashboard</a>
+      </div>
+      <div>
+        <h4>Account &amp; legal</h4>
+        <a href="/auth">Sign in</a>
+        <a href="/auth?tab=register">Create account</a>
+        <a href="/privacy">Privacy policy</a>
+        <a href="/terms">Terms &amp; conditions</a>
+      </div>
+    </nav>
+
+    <div class="ft-app" id="ft-app">
+      <h4>Take the island with you</h4>
+      <p>Install Limasawa Booking on your phone — full screen, right from your home screen. No app store needed.</p>
+      <div class="ft-app-btns">
+        <button type="button" class="ft-app-btn" id="pwa-install-android">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.6 9.48l1.84-3.18c.16-.31.04-.7-.26-.85a.637.637 0 0 0-.83.22l-1.88 3.24a11.46 11.46 0 0 0-8.94 0L5.65 5.67a.643.643 0 0 0-.87-.2c-.28.18-.37.54-.22.83L6.4 9.48A10.81 10.81 0 0 0 1 18h22a10.81 10.81 0 0 0-5.4-8.52zM7 15.25a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5zm10 0a1.25 1.25 0 1 1 0-2.5 1.25 1.25 0 0 1 0 2.5z"/></svg>
+          <span><small>Install on</small>Android</span>
+        </button>
+        <button type="button" class="ft-app-btn" id="pwa-install-ios">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
+          <span><small>Add on</small>iPhone &amp; iPad</span>
+        </button>
       </div>
     </div>
   </div>
-  <div class="footer-bottom">
+
+  <!-- ── Watermark + bottom bar ──────────────────────────────── -->
+  <div class="ft-watermark" aria-hidden="true">LIMASAWA</div>
+  <div class="ft-bottom">
     <span>© {year} LimasawaBooking.com</span>
-    <span>
-      <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a>
+    <span class="ft-bottom-links">
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
+      <span class="ft-made">Made in Southern Leyte 🏝️</span>
     </span>
+  </div>
+
+  <!-- iOS / fallback install instructions -->
+  <div class="pwa-sheet" id="pwa-sheet" hidden>
+    <div class="pwa-sheet-card" role="dialog" aria-modal="true" aria-labelledby="pwa-sheet-title">
+      <h5 id="pwa-sheet-title">Add to your home screen</h5>
+      <ol id="pwa-sheet-steps"></ol>
+      <button type="button" class="pwa-sheet-close" id="pwa-sheet-close">Got it</button>
+    </div>
   </div>
 </footer>
 
+<script is:inline define:vars={{ WP_REST }}>
+(function () {
+  /* ── Newsletter ── */
+  var form = document.getElementById('ft-nl-form')
+  if (form) {
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault()
+      var msg = document.getElementById('ft-nl-msg')
+      var btn = form.querySelector('.ft-nl-btn')
+      var email = (form.elements.email.value || '').trim()
+      if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        msg.textContent = 'Please enter a valid email address.'
+        msg.className = 'ft-nl-msg err'
+        return
+      }
+      btn.disabled = true; btn.textContent = 'Subscribing…'
+      try {
+        var res = await fetch(WP_REST + '/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, source: 'footer', website: form.elements.website.value || '' }),
+        })
+        var data = await res.json().catch(function () { return {} })
+        if (res.ok) {
+          msg.textContent = data.message || "You're on the list!"
+          msg.className = 'ft-nl-msg ok'
+          form.reset()
+        } else {
+          msg.textContent = data.message || 'Something went wrong — please try again.'
+          msg.className = 'ft-nl-msg err'
+        }
+      } catch (_) {
+        msg.textContent = 'Network error — please try again.'
+        msg.className = 'ft-nl-msg err'
+      }
+      btn.disabled = false; btn.textContent = 'Subscribe'
+    })
+  }
+
+  /* ── PWA install buttons ── */
+  var deferredPrompt = null
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault()
+    deferredPrompt = e
+  })
+
+  var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
+  var appBlock = document.getElementById('ft-app')
+  if (standalone && appBlock) appBlock.style.display = 'none'
+
+  function showSheet(steps) {
+    var sheet = document.getElementById('pwa-sheet')
+    var list = document.getElementById('pwa-sheet-steps')
+    if (!sheet || !list) return
+    list.innerHTML = steps.map(function (s) { return '<li>' + s + '</li>' }).join('')
+    sheet.hidden = false
+  }
+  var closeBtn = document.getElementById('pwa-sheet-close')
+  var sheet = document.getElementById('pwa-sheet')
+  if (closeBtn) closeBtn.addEventListener('click', function () { sheet.hidden = true })
+  if (sheet) sheet.addEventListener('click', function (e) { if (e.target === sheet) sheet.hidden = true })
+
+  var androidBtn = document.getElementById('pwa-install-android')
+  if (androidBtn) androidBtn.addEventListener('click', async function () {
+    if (deferredPrompt) {
+      deferredPrompt.prompt()
+      try { await deferredPrompt.userChoice } catch (_) {}
+      deferredPrompt = null
+      return
+    }
+    showSheet([
+      'Open this site in <strong>Chrome</strong> on your Android phone',
+      'Tap the <strong>⋮ menu</strong> in the top-right corner',
+      'Tap <strong>Add to Home screen</strong> → <strong>Install</strong>',
+    ])
+  })
+
+  var iosBtn = document.getElementById('pwa-install-ios')
+  if (iosBtn) iosBtn.addEventListener('click', function () {
+    showSheet([
+      'Open this site in <strong>Safari</strong> on your iPhone or iPad',
+      'Tap the <strong>Share</strong> button <span style="opacity:.7">(square with an arrow)</span>',
+      'Scroll down and tap <strong>Add to Home Screen</strong>',
+    ])
+  })
+})()
+</script>
+
 <style is:global>
 .site-footer {
+  position: relative;
   background: var(--navy-dark); color: #b0c4d4;
-  margin-top: 4rem; padding: 3rem 1.5rem 1.5rem;
+  margin-top: 4rem; overflow: hidden;
 }
-.footer-inner {
-  max-width: 1280px; margin: 0 auto;
-  display: flex; gap: 3rem; flex-wrap: wrap; margin-bottom: 2.5rem;
+.ft-band { max-width: 1280px; margin: 0 auto; padding: 0 1.5rem; }
+
+/* Newsletter band */
+.ft-newsletter {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 2rem; flex-wrap: wrap;
+  padding-top: 3rem; padding-bottom: 2.25rem;
+  border-bottom: 1px solid rgba(255,255,255,.08);
 }
-.footer-brand { flex: 1; min-width: 200px; }
-.footer-logo { font-size: 1.1rem; color: #fff; text-decoration: none; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
-.footer-mark {
+.ft-nl-copy h3 { color: #fff; font-size: 1.25rem; margin: 0 0 0.3rem; }
+.ft-nl-copy p { margin: 0; font-size: 0.875rem; color: #8ba3b5; }
+.ft-nl-form { min-width: min(420px, 100%); }
+.ft-nl-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.ft-nl-row {
+  display: flex; gap: 0.5rem;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 999px; padding: 0.3rem;
+}
+.ft-nl-row:focus-within { border-color: var(--sb-primary); }
+.ft-nl-input {
+  flex: 1; min-width: 0; background: transparent; border: 0; outline: 0;
+  color: #fff; font-size: 0.9rem; padding: 0.5rem 0.9rem;
+}
+.ft-nl-input::placeholder { color: #6d8598; }
+.ft-nl-btn {
+  border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--sb-primary); color: #fff;
+  font-weight: 700; font-size: 0.875rem; padding: 0.55rem 1.3rem;
+  transition: background .15s;
+}
+.ft-nl-btn:hover { background: var(--sb-primary-dark); }
+.ft-nl-btn:disabled { opacity: .6; cursor: default; }
+.ft-nl-msg { margin: 0.5rem 0.9rem 0; font-size: 0.8rem; min-height: 1em; }
+.ft-nl-msg.ok { color: #7fe3d2; }
+.ft-nl-msg.err { color: #ffb4a8; }
+
+/* Main band */
+.ft-main {
+  display: grid; gap: 2.5rem;
+  grid-template-columns: 1.2fr 1.8fr 1fr;
+  padding-top: 2.5rem; padding-bottom: 2.5rem;
+}
+@media (max-width: 900px) { .ft-main { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 620px) { .ft-main { grid-template-columns: 1fr; gap: 2rem; } }
+
+.ft-logo {
+  font-size: 1.15rem; color: #fff; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;
+}
+.ft-mark {
   width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
   background: var(--sb-primary); display: inline-flex; align-items: center; justify-content: center;
 }
-.footer-mark svg { width: 18px; height: 18px; display: block; }
-.footer-logo strong { color: var(--sb-primary); }
-.footer-brand p { font-size: 0.875rem; line-height: 1.6; margin: 0; }
-.footer-cols { display: flex; gap: 2.5rem; flex-wrap: wrap; }
-.footer-cols div { display: flex; flex-direction: column; gap: 0.4rem; }
-.footer-cols h4 { color: #fff; font-size: 0.8rem; text-transform: uppercase; letter-spacing: .08em; margin: 0 0 0.5rem; }
-.footer-cols a { color: #b0c4d4; text-decoration: none; font-size: 0.875rem; }
-.footer-cols a:hover { color: var(--sb-primary); }
-.footer-bottom {
+.ft-mark svg { width: 18px; height: 18px; display: block; }
+.ft-logo strong { color: var(--sb-primary); }
+.ft-tagline { font-size: 0.875rem; line-height: 1.65; margin: 0 0 1rem; max-width: 30ch; }
+.ft-contact { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; }
+.ft-contact a { color: var(--sb-primary); text-decoration: none; }
+.ft-contact a:hover { text-decoration: underline; }
+.ft-contact span { color: #8ba3b5; }
+
+.ft-links { display: flex; gap: 2.5rem; flex-wrap: wrap; }
+.ft-links > div { display: flex; flex-direction: column; gap: 0.45rem; min-width: 130px; }
+.ft-links h4, .ft-app h4 {
+  color: #fff; font-size: 0.75rem; text-transform: uppercase;
+  letter-spacing: .1em; margin: 0 0 0.6rem; font-weight: 700;
+}
+.ft-links a { color: #b0c4d4; text-decoration: none; font-size: 0.875rem; width: fit-content; }
+.ft-links a:hover { color: var(--sb-primary); }
+
+.ft-app p { font-size: 0.825rem; line-height: 1.6; color: #8ba3b5; margin: 0 0 1rem; }
+.ft-app-btns { display: flex; flex-direction: column; gap: 0.6rem; }
+.ft-app-btn {
+  display: flex; align-items: center; gap: 0.7rem;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.14);
+  border-radius: 12px; padding: 0.55rem 0.9rem; cursor: pointer;
+  color: #fff; text-align: left; width: 100%; max-width: 220px;
+  transition: border-color .15s, background .15s;
+}
+.ft-app-btn:hover { border-color: var(--sb-primary); background: rgba(34,171,179,.12); }
+.ft-app-btn svg { width: 22px; height: 22px; flex-shrink: 0; opacity: .9; }
+.ft-app-btn span { display: flex; flex-direction: column; line-height: 1.15; font-weight: 700; font-size: 0.9rem; }
+.ft-app-btn small { font-weight: 500; font-size: 0.68rem; color: #8ba3b5; text-transform: uppercase; letter-spacing: .05em; }
+
+/* Watermark + bottom */
+.ft-watermark {
+  text-align: center; user-select: none; pointer-events: none;
+  font-size: clamp(3.5rem, 13vw, 11rem); font-weight: 800; line-height: 0.72;
+  letter-spacing: 0.04em; color: rgba(255,255,255,.035);
+  margin-bottom: -0.12em;
+}
+.ft-bottom {
+  position: relative;
   max-width: 1280px; margin: 0 auto;
   border-top: 1px solid rgba(255,255,255,.08);
-  padding-top: 1.25rem;
-  display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
-  font-size: 0.8rem;
+  padding: 1.25rem 1.5rem 1.5rem;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 0.5rem; font-size: 0.8rem;
 }
-.footer-bottom a { color: #b0c4d4; text-decoration: none; }
-.footer-bottom a:hover { color: var(--sb-primary); }
+.ft-bottom a { color: #b0c4d4; text-decoration: none; }
+.ft-bottom a:hover { color: var(--sb-primary); }
+.ft-bottom-links { display: flex; gap: 1.25rem; align-items: center; }
+.ft-made { color: #6d8598; }
+
+/* Install sheet */
+.pwa-sheet {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(15,26,35,.6); backdrop-filter: blur(3px);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+@media (min-width: 620px) { .pwa-sheet { align-items: center; } }
+.pwa-sheet-card {
+  background: #fff; color: var(--sb-text);
+  border-radius: 18px 18px 0 0; padding: 1.5rem;
+  width: 100%; max-width: 420px;
+}
+@media (min-width: 620px) { .pwa-sheet-card { border-radius: 18px; } }
+.pwa-sheet-card h5 { font-size: 1.05rem; margin: 0 0 0.85rem; }
+.pwa-sheet-card ol { margin: 0 0 1.25rem; padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.9rem; color: var(--sb-secondary); }
+.pwa-sheet-close {
+  width: 100%; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--sb-primary); color: #fff; font-weight: 700; padding: 0.7rem;
+}
+.pwa-sheet-close:hover { background: var(--sb-primary-dark); }
 </style>

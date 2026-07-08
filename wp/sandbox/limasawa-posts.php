@@ -300,6 +300,9 @@ if (defined('ABSPATH')) {
                 'content'    => apply_filters('the_content', $post->post_content),
                 'categories' => $categories,
                 'related'    => $related,
+                // ISO 8601 dates for Article JSON-LD on the static frontend.
+                'dateIso'     => get_the_date('c', $post->ID),
+                'modifiedIso' => get_the_modified_date('c', $post->ID),
             ]);
             return new WP_REST_Response($out, 200);
         }

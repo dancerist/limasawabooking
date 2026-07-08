@@ -107,3 +107,16 @@ h1, h2, h3, h4, h5, h6 { font-family: 'DM Sans', system-ui, -apple-system, sans-
 .tier-local    { background:#F0FDF4; color:#15803D; }
 .tier-prime    { background:#FFF7ED; color:#C2410C; }
 .tier-featured { background:linear-gradient(135deg,#FFF7ED,#FEF3C7); color:#92400E; }
+
+/* ── Legal pages (terms / privacy) ─────────────────────────────── */
+.legal-wrap { max-width: 760px; margin: 0 auto; padding: 3rem 1.5rem 4rem; }
+.legal-head h1 { font-size: clamp(1.8rem, 5vw, 2.4rem); color: var(--sb-text); margin: 0 0 0.35rem; }
+.legal-updated { color: var(--sb-text-muted); font-size: 0.875rem; margin: 0 0 2rem; }
+.legal-body section { margin-bottom: 2rem; }
+.legal-body h2 { font-size: 1.15rem; color: var(--sb-text); margin: 0 0 0.6rem; }
+.legal-body p, .legal-body li { color: var(--sb-secondary); line-height: 1.7; font-size: 0.95rem; }
+.legal-body p { margin: 0 0 0.75rem; }
+.legal-body ul { margin: 0 0 0.75rem; padding-left: 1.25rem; }
+.legal-body li { margin-bottom: 0.35rem; }
+.legal-body a { color: var(--sb-primary-deeper); }
+.legal-body code { background: var(--sb-secondary-light); padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.85em; }

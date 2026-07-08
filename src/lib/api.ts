@@ -222,6 +222,9 @@ export function reshapeListing(l: any) {
     excerpt: l.excerpt || '',
     listingTier: l.tier || 'free',
     priceMode: l.priceMode || l.pricingMode || 'flat',
+    priceFrom: Number(l.priceFrom || 0),
+    ratingAvg: Number(l.ratingAvg || 0),
+    ratingCount: Number(l.ratingCount || 0),
     featuredImage: l.thumb ? { node: { sourceUrl: l.thumb, altText: '' } } : null,
     accommodationData: {
       accommodationBadges: Array.isArray(l.badges) ? l.badges : [],

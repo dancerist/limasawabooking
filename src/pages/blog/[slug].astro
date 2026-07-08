@@ -37,9 +37,42 @@ const { post } = Astro.props as { post: any }
 const title       = post?.title || 'Limasawa Booking'
 const description = post ? (post.excerpt || '').replace(/\s+/g, ' ').slice(0, 160) : 'Stories from Limasawa'
 const ogImage     = post?.thumb || undefined
+
+const postUrl = `https://limasawabooking.com/blog/${post?.slug || ''}`
+const jsonLd = post ? [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: title,
+    description,
+    url: postUrl,
+    mainEntityOfPage: postUrl,
+    ...(ogImage ? { image: ogImage } : {}),
+    // dateIso/modifiedIso come from the updated blog API; fall back to the label.
+    ...(post.dateIso ? { datePublished: post.dateIso } : post.dateLabel ? { datePublished: new Date(post.dateLabel).toISOString() } : {}),
+    ...(post.modifiedIso ? { dateModified: post.modifiedIso } : {}),
+    ...(post.author?.name ? { author: { '@type': 'Person', name: post.author.name } } : {}),
+    ...(post.category?.name ? { articleSection: post.category.name } : {}),
+    publisher: {
+      '@type': 'Organization',
+      name: 'Limasawa Booking',
+      url: 'https://limasawabooking.com',
+      logo: { '@type': 'ImageObject', url: 'https://limasawabooking.com/icon-512.png' },
+    },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://limasawabooking.com/' },
+      { '@type': 'ListItem', position: 2, name: 'Blog', item: 'https://limasawabooking.com/blog/' },
+      { '@type': 'ListItem', position: 3, name: title, item: postUrl },
+    ],
+  },
+] : undefined
 ---
 
-<Layout title={title} description={description} image={ogImage} type="article">
+<Layout title={title} description={description} image={ogImage} type="article" jsonLd={jsonLd}>
   <main class="bp-main">
     {post && (
       <article class="bp-article">
