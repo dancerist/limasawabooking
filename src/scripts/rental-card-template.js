@@ -36,7 +36,7 @@ export function rentalCardHTML(r) {
 
   return `<a class="rt-card" href="/rental/${rentalEsc(x.slug)}">
     <div class="rt-card-img">${thumb}${typeBadge}${tierBadge}${unavail}</div>
-    <h3 class="rt-card-title">${rentalEsc(x.title || '')}</h3>
+    <h2 class="rt-card-title">${rentalEsc(x.title || '')}</h2>
     ${area}
     <div class="rt-card-price"><strong>${peso(x.daily)}</strong><span>${unit}</span> ${hourly}</div>
   </a>`

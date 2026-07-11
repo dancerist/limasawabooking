@@ -35,7 +35,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       --bg:#F5F8FB;
       --border:#E2EBF3;
       --text:#1A2533;
-      --muted:#64748B;
+      --muted:#56657a;
       --white:#fff;
       --radius:12px;
       --radius-lg:16px;
@@ -245,7 +245,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     }
     .status-pending  { background:#FFF7ED; color:#C2410C; border:1px solid #FED7AA; }
     .status-publish  { background:#F0FDF4; color:#15803D; border:1px solid #BBF7D0; }
-    .status-draft    { background:#F8FAFC; color:#64748B; border:1px solid #CBD5E1; }
+    .status-draft    { background:#F8FAFC; color:#56657a; border:1px solid #CBD5E1; }
     .tier-badge {
       font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
       padding:.2rem .5rem; border-radius:999px;
@@ -382,7 +382,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       padding:.1rem .45rem; border-radius:999px;
     }
     .ps-publish { background:#F0FDF4; color:#15803D; border:1px solid #BBF7D0; }
-    .ps-draft   { background:#F8FAFC; color:#64748B; border:1px solid #CBD5E1; }
+    .ps-draft   { background:#F8FAFC; color:#56657a; border:1px solid #CBD5E1; }
     .ps-pending { background:#FFF7ED; color:#C2410C; border:1px solid #FED7AA; }
     .post-edit-link {
       font-size:.72rem; color:var(--primary); font-weight:600;
@@ -3847,7 +3847,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         meData = await meRes.json()
       } catch (e) {
         document.getElementById('loading-state').innerHTML =
-          `<div style="text-align:center; padding:3rem; color:#64748B;"><p>Failed to reach server. <button onclick="loadDashboard()" style="color:var(--primary);background:none;border:none;cursor:pointer;font-weight:600;">Retry</button></p></div>`
+          `<div style="text-align:center; padding:3rem; color:#56657a;"><p>Failed to reach server. <button onclick="loadDashboard()" style="color:var(--primary);background:none;border:none;cursor:pointer;font-weight:600;">Retry</button></p></div>`
         return
       }
       if (!meData?.user) { doLogout(); return }

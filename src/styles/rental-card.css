@@ -1,7 +1,7 @@
 /* Shared rental card styles. Pair with src/scripts/rental-card-template.js. */
 :root {
   --rt-text: #1A2533;
-  --rt-muted: #64748B;
+  --rt-muted: #56657a;
   --rt-border: #E2EBF3;
   --rt-bg: #F5F8FB;
   --rt-primary: #279DA3;

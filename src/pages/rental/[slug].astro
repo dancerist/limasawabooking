@@ -124,7 +124,7 @@ const jsonLd = r ? [
             <div class="rs-back"><a href="/rentals">← All rentals</a></div>
           </div>
 
-          <aside class="rs-book">
+          <section class="rs-book" aria-label="Rates and provider contact">
             <div class="rs-price">
               <div><strong>{peso(r.daily)}</strong><span> {unitLabel}</span></div>
               {r.hourly > 0 && r.rateUnit !== 'hour' && <p class="rs-hourly">{peso(r.hourly)} / hour</p>}
@@ -160,7 +160,7 @@ const jsonLd = r ? [
                 )}
               </div>
             )}
-          </aside>
+          </section>
         </div>
       </article>
     )}
@@ -168,13 +168,13 @@ const jsonLd = r ? [
 
   <style is:global>
     .rs-main { color: #1A2533; padding: 1.5rem 1.5rem 5rem; max-width: 1080px; margin: 0 auto; }
-    .rs-breadcrumb { display: flex; gap: .5rem; align-items: center; font-size: .82rem; color: #64748B; margin-bottom: 1.25rem; }
-    .rs-breadcrumb a { color: #64748B; text-decoration: none; }
+    .rs-breadcrumb { display: flex; gap: .5rem; align-items: center; font-size: .82rem; color: #56657a; margin-bottom: 1.25rem; }
+    .rs-breadcrumb a { color: #56657a; text-decoration: none; }
     .rs-breadcrumb a:hover { color: #279DA3; }
 
     .rs-grid { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 48px; align-items: start; }
     .rs-title { font-family: 'DM Sans', sans-serif; font-size: clamp(1.6rem, 4vw, 2.4rem); font-weight: 800; line-height: 1.15; margin: 0 0 .5rem; }
-    .rs-area { color: #64748B; margin: 0 0 1.5rem; }
+    .rs-area { color: #56657a; margin: 0 0 1.5rem; }
     .rs-content { font-family: 'Nunito Sans', sans-serif; font-size: 1.05rem; line-height: 1.7; color: #2D3748; }
     .rs-content > * + * { margin-top: 1.1em; }
     .rs-section { margin-top: 2.25rem; }
@@ -188,9 +188,9 @@ const jsonLd = r ? [
 
     .rs-book { position: sticky; top: 88px; border: 1px solid #D8E3ED; border-radius: 18px; padding: 22px; box-shadow: 0 14px 42px rgba(26,37,51,.10); background: #fff; }
     .rs-price strong { font-size: 28px; font-weight: 800; }
-    .rs-price span { color: #64748B; }
-    .rs-hourly { color: #64748B; margin: 4px 0 0; }
-    .rs-deposit { margin-top: 12px; padding-top: 12px; border-top: 1px solid #EEF2F6; color: #64748B; font-size: .9rem; }
+    .rs-price span { color: #56657a; }
+    .rs-hourly { color: #56657a; margin: 4px 0 0; }
+    .rs-deposit { margin-top: 12px; padding-top: 12px; border-top: 1px solid #EEF2F6; color: #56657a; font-size: .9rem; }
     .rs-unavail { margin-top: 12px; background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; border-radius: 8px; padding: .5rem .75rem; font-size: .85rem; font-weight: 700; text-align: center; }
     .rs-provider { margin-top: 16px; padding-top: 14px; border-top: 1px solid #EEF2F6; display: flex; flex-direction: column; gap: 2px; }
     .rs-provider span { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #94A3B8; font-weight: 700; }
@@ -199,7 +199,7 @@ const jsonLd = r ? [
     .rs-btn { display: flex; align-items: center; justify-content: center; min-height: 46px; border-radius: 10px; font-weight: 800; text-decoration: none; font-size: .9rem; }
     .rs-btn-call { background: #279DA3; color: #fff; }
     .rs-btn-wa { background: #25D366; color: #fff; }
-    .rs-note { margin-top: 14px; color: #64748B; font-size: .85rem; }
+    .rs-note { margin-top: 14px; color: #56657a; font-size: .85rem; }
     .rs-social { display: flex; gap: 8px; margin-top: 10px; }
     .rs-social-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; border-radius: 10px; border: 1.5px solid #E2EBF3; background: #fff; color: #1A2533; text-decoration: none; font-weight: 700; font-size: .85rem; transition: all .15s; }
     .rs-social-btn:hover { border-color: #22ABB3; color: #22ABB3; background: #F4FDFD; }

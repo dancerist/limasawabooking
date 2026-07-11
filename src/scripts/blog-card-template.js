@@ -48,7 +48,7 @@ export function blogCardHTML(post) {
 
   return `<a class="bl-card" href="/blog/${blogEsc(p.slug)}">
     <div class="bl-card-img">${thumb}${catBadge}</div>
-    <h3 class="bl-card-title">${blogEsc(p.title || '')}</h3>
+    <h2 class="bl-card-title">${blogEsc(p.title || '')}</h2>
     <p class="bl-card-excerpt">${blogEsc(decodeAmp(p.excerpt || ''))}</p>
     <div class="bl-card-meta">${author}${dateLabel}${readMin}</div>
   </a>`

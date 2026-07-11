@@ -34,7 +34,7 @@
   --sb-secondary-ultra-dark: #151A1E;
 
   --sb-text:        #1A2533;
-  --sb-text-muted:  #64748B;
+  --sb-text-muted:  #56657a;
   --sb-border:      #E2EBF3;
   --sb-white:       #FFFFFF;
   --sb-bg:          #F5F8FB;
@@ -46,6 +46,10 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
 body { font-family: 'Nunito Sans', system-ui, -apple-system, sans-serif; color: var(--sb-text); background: var(--sb-bg); }
 h1, h2, h3, h4, h5, h6 { font-family: 'DM Sans', system-ui, -apple-system, sans-serif; }
 
@@ -99,7 +103,7 @@ h1, h2, h3, h4, h5, h6 { font-family: 'DM Sans', system-ui, -apple-system, sans-
 
 .badge-pending  { background:#FFF7ED; color:#C2410C; border:1px solid #FED7AA; }
 .badge-publish  { background:#F0FDF4; color:#15803D; border:1px solid #BBF7D0; }
-.badge-draft    { background:#F8FAFC; color:#64748B; border:1px solid #CBD5E1; }
+.badge-draft    { background:#F8FAFC; color:#56657a; border:1px solid #CBD5E1; }
 .badge { display:inline-flex; align-items:center; gap:0.3rem; font-size:0.7rem; font-weight:700;
          text-transform:uppercase; letter-spacing:.06em; padding:0.2rem 0.6rem; border-radius:999px; }
 

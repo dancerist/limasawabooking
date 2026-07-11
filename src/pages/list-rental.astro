@@ -187,7 +187,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       <div class="lr-field" id="lr-payment" style="display:none">
         <label>Payment</label>
         <div class="lr-pay-box">
-          <p class="lr-pay-amount">Amount due: <strong id="lr-amount">₱99</strong> <span id="lr-bill-label" style="color:#64748B;font-weight:400">/ monthly</span></p>
+          <p class="lr-pay-amount">Amount due: <strong id="lr-amount">₱99</strong> <span id="lr-bill-label" style="color:#56657a;font-weight:400">/ monthly</span></p>
           <p class="lr-pay-instr">Pay via GCash, Maya, or BPI, then enter your reference and upload the receipt. We'll verify and activate your plan — your rental goes live once approved.</p>
           <select id="f-method" class="lr-input"><option value="">Payment method…</option><option value="gcash">GCash</option><option value="maya">Maya</option><option value="bpi">BPI transfer</option></select>
           <div id="lr-pay-details" class="lr-pay-details" style="display:none"></div>
@@ -213,14 +213,14 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     @media (max-width: 560px) { .lr-form { padding: 1.25rem; } }
     .lr-authwall, .lr-success { text-align: center; padding: 4rem 1rem; }
     .lr-authwall h1, .lr-success h1 { font-family: 'DM Sans', sans-serif; font-size: 1.8rem; font-weight: 800; margin-bottom: .75rem; }
-    .lr-authwall p, .lr-success p { color: #64748B; margin-bottom: 1.5rem; line-height: 1.6; }
+    .lr-authwall p, .lr-success p { color: #56657a; margin-bottom: 1.5rem; line-height: 1.6; }
     .lr-success-icon { width: 64px; height: 64px; border-radius: 50%; background: #E6F9FA; color: #22ABB3; font-size: 2rem; display: grid; place-items: center; margin: 0 auto 1.25rem; font-weight: 800; }
 
     .lr-head { margin-bottom: 2rem; }
-    .lr-back { color: #64748B; text-decoration: none; font-weight: 700; font-size: .85rem; }
+    .lr-back { color: #56657a; text-decoration: none; font-weight: 700; font-size: .85rem; }
     .lr-back:hover { color: #22ABB3; }
     .lr-head h1 { font-family: 'DM Sans', sans-serif; font-size: clamp(1.6rem, 4vw, 2.2rem); font-weight: 800; margin: .75rem 0 .35rem; }
-    .lr-head p { color: #64748B; line-height: 1.5; }
+    .lr-head p { color: #56657a; line-height: 1.5; }
 
     .lr-field { margin-bottom: 1.25rem; }
     .lr-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
@@ -237,7 +237,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     .lr-photo { position: relative; width: 84px; height: 84px; border-radius: 10px; overflow: hidden; background: #F5F8FB; }
     .lr-photo img { width: 100%; height: 100%; object-fit: cover; }
     .lr-photo button { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: rgba(0,0,0,.6); color: #fff; cursor: pointer; font-size: 13px; line-height: 1; }
-    .lr-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem; width: 100%; min-height: 104px; padding: 1.1rem; border: 1.5px dashed #CBD5E1; border-radius: 12px; color: #64748B; font-weight: 700; font-size: .9rem; cursor: pointer; background: #F8FAFC; text-align: center; transition: border-color .15s, background .15s, color .15s; box-sizing: border-box; }
+    .lr-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem; width: 100%; min-height: 104px; padding: 1.1rem; border: 1.5px dashed #CBD5E1; border-radius: 12px; color: #56657a; font-weight: 700; font-size: .9rem; cursor: pointer; background: #F8FAFC; text-align: center; transition: border-color .15s, background .15s, color .15s; box-sizing: border-box; }
     .lr-upload:hover { border-color: #22ABB3; background: #F4FDFD; color: #22ABB3; }
     .lr-upload-icon { width: 26px; height: 26px; color: #22ABB3; }
     .lr-upload small { font-weight: 500; color: #94A3B8; font-size: .74rem; }
@@ -256,7 +256,7 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     .lr-plan input { position: absolute; opacity: 0; pointer-events: none; }
     .lr-plan:hover { border-color: #9FE3E6; }
     .lr-plan.is-selected { border-color: #22ABB3; background: #F4FDFD; box-shadow: 0 0 0 3px rgba(34,171,179,.12); }
-    .lr-plan-name { font-weight: 800; font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: #64748B; }
+    .lr-plan-name { font-weight: 800; font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: #56657a; }
     .lr-plan.is-selected .lr-plan-name { color: #1A8089; }
     .lr-plan-price { font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 1.5rem; line-height: 1; color: #1A2533; }
     .lr-plan-price small { font-weight: 600; color: #94A3B8; font-size: .72rem; margin-left: 1px; }
@@ -269,15 +269,15 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     .lr-plan-badge { position: absolute; top: -9px; left: .85rem; background: #22ABB3; color: #fff; font-size: .58rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; padding: .2rem .45rem; border-radius: 6px; }
     .lr-billing { display: flex; gap: .5rem; margin-top: .7rem; }
     .lr-bill-opt { border: 1.5px solid #E2EBF3; background: #fff; border-radius: 9px; padding: .45rem .9rem; font-size: .82rem; font-weight: 700; cursor: pointer; color: #1A2533; }
-    .lr-bill-opt small { font-weight: 500; color: #64748B; }
+    .lr-bill-opt small { font-weight: 500; color: #56657a; }
     .lr-bill-opt.is-active { border-color: #22ABB3; background: #F8FEFE; color: #22ABB3; }
     .lr-pay-box { border: 1.5px solid #E2EBF3; border-radius: 12px; padding: 1rem; background: #F8FAFC; }
     .lr-pay-amount { font-size: 1rem; margin: 0 0 .35rem; }
-    .lr-pay-instr { font-size: .82rem; color: #64748B; line-height: 1.5; margin: 0 0 .75rem; }
+    .lr-pay-instr { font-size: .82rem; color: #56657a; line-height: 1.5; margin: 0 0 .75rem; }
     .lr-pay-details { margin: .6rem 0; border: 1px solid #E2EBF3; border-radius: 10px; padding: .8rem; background: #fff; text-align: center; }
     .lr-pay-details img { width: min(220px, 100%); border-radius: 10px; display: block; margin: .5rem auto 0; }
     .lr-pay-row { display: flex; justify-content: space-between; gap: 1rem; font-size: .85rem; padding: .15rem 0; }
-    .lr-pay-row span { color: #64748B; } .lr-pay-row strong { color: #1A2533; }
+    .lr-pay-row span { color: #56657a; } .lr-pay-row strong { color: #1A2533; }
     @media (max-width: 560px) { .lr-plans { grid-template-columns: 1fr; } }
   </style>
 

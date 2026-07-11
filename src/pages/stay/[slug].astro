@@ -224,7 +224,7 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
         <section id="sl-photos" class="photo-grid" aria-label="Listing photos"></section>
         <div class="content-grid">
           <div class="main-col" id="sl-main"></div>
-          <aside class="booking-card" id="sl-book" aria-label="Booking options"></aside>
+          <aside class="booking-card" id="sl-book" aria-label="Booking options" tabindex="0"></aside>
         </div>
       </div>
     </div>
@@ -263,7 +263,7 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     .back-link:hover { color: #1A2533; }
     .title-row { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 18px; }
     .title-row h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 42px); line-height: 1.04; letter-spacing: 0; color: #1A2533; }
-    .meta-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: #64748B; font-size: 15px; }
+    .meta-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: #56657a; font-size: 15px; }
     .meta-line span:not(:last-child)::after { content: "·"; margin-left: 12px; color: #CBD5E1; }
     .verified-dot { color: #0f8b65; font-weight: 800; }
     .title-rating { color: #1A2533; text-decoration: none; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
@@ -278,8 +278,8 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     .host-block-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .host-block-meta { flex: 1; min-width: 0; }
     .host-block-name { font-family: 'DM Sans', sans-serif; font-size: 1.05rem; font-weight: 700; color: #1A2533; }
-    .host-block-sub  { font-size: 0.85rem; color: #64748B; margin-top: 2px; }
-    .host-claim-link { display:inline-block; margin-top:12px; font-size:13px; font-weight:600; color:#64748B; text-decoration:none; transition:color .12s; }
+    .host-block-sub  { font-size: 0.85rem; color: #56657a; margin-top: 2px; }
+    .host-claim-link { display:inline-block; margin-top:12px; font-size:13px; font-weight:600; color:#56657a; text-decoration:none; transition:color .12s; }
     .host-claim-link:hover { color:#1A2533; text-decoration:underline; text-underline-offset:3px; }
     .host-claim-pending {
       display:inline-flex; align-items:center; gap:6px; margin-top:12px;
@@ -319,12 +319,12 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     .badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
     .stay-badge { display: inline-flex; align-items: center; min-height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--sb-primary-mid); background: var(--sb-primary-light); color: var(--sb-primary-deeper); font-family: 'DM Sans', system-ui, sans-serif; font-size: 11px; font-weight: 900; line-height: 1; text-transform: uppercase; letter-spacing: .06em; }
     .stay-badge-featured { border-color: rgba(76,91,108,.22); background: var(--sb-secondary-light); color: var(--sb-secondary); }
-    .sub-meta { color: #64748B; margin: -8px 0 0; }
+    .sub-meta { color: #56657a; margin: -8px 0 0; }
     .host-mini { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
     .host-avatar { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; background: var(--sb-primary-light); color: var(--sb-primary-deeper); font-weight: 900; flex: 0 0 auto; }
     .host-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .host-avatar span { display: grid; place-items: center; width: 100%; height: 100%; }
-    .host-mini span { display: block; color: #64748B; font-size: 13px; }
+    .host-mini span { display: block; color: #56657a; font-size: 13px; }
     .host-mini strong { color: #1A2533; }
     .description-copy.collapsed { max-height: 190px; overflow: hidden; position: relative; }
     .description-copy.collapsed::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 62px; background: linear-gradient(to bottom, rgba(255,255,255,0), #fff); }
@@ -341,7 +341,7 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     .description-copy li::marker { color: #94A3B8; }
     .description-copy a { color: var(--sb-primary); text-decoration: underline; text-underline-offset: 2px; }
     .description-copy a:hover { color: var(--sb-primary-deeper); }
-    .description-copy blockquote { border-left: 3px solid #E2EBF3; padding-left: 14px; color: #64748B; margin: 0; }
+    .description-copy blockquote { border-left: 3px solid #E2EBF3; padding-left: 14px; color: #56657a; margin: 0; }
     .text-button { margin-top: 12px; border: 0; background: none; padding: 0; color: #1A2533; font-weight: 900; text-decoration: underline; cursor: pointer; }
     .amenity-highlight-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
     .amenity-highlight { display: flex; align-items: center; gap: 14px; min-height: 58px; border: 1px solid #D8E3ED; border-radius: 14px; padding: 14px 16px; font-weight: 600; color: #1A2533; }
@@ -361,37 +361,37 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     .service-item img, .service-icon-fallback { width: 38px; height: 38px; object-fit: contain; flex: 0 0 auto; }
     .service-icon-fallback { display: grid; place-items: center; border-radius: 10px; background: #F5F8FB; color: #4C5B6C; font-size: 24px; }
     .service-item strong { display: block; color: #1A2533; font-size: 18px; line-height: 1.25; }
-    .service-item p { margin: 5px 0 0; color: #64748B; line-height: 1.5; }
+    .service-item p { margin: 5px 0 0; color: #56657a; line-height: 1.5; }
     /* Room-types / per-pax breakdown inside the right-hand booking card */
     .bc-rates { margin: 14px 0 2px; border-top: 1px solid #EEF2F6; padding-top: 12px; }
     .bc-rate-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 6px 0; }
     .bc-rate-name { color: #1A2533; font-weight: 600; font-size: 14px; }
-    .bc-rate-name em { color: #64748B; font-weight: 400; font-style: normal; font-size: 12px; }
-    .bc-rate-sub { display: block; color: #64748B; font-weight: 400; font-size: 12px; margin-top: 2px; line-height: 1.4; }
+    .bc-rate-name em { color: #56657a; font-weight: 400; font-style: normal; font-size: 12px; }
+    .bc-rate-sub { display: block; color: #56657a; font-weight: 400; font-size: 12px; margin-top: 2px; line-height: 1.4; }
     .bc-rate-row strong { color: #1A2533; font-size: 15px; white-space: nowrap; }
-    .bc-rate-add, .bc-rate-note { color: #64748B; font-size: 13px; margin-top: 8px; }
-    .bc-rates-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #64748B; margin-bottom: 4px; }
-    .price-from, .intro-price-from { color: #64748B; font-weight: 400; }
+    .bc-rate-add, .bc-rate-note { color: #56657a; font-size: 13px; margin-top: 8px; }
+    .bc-rates-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #56657a; margin-bottom: 4px; }
+    .price-from, .intro-price-from { color: #56657a; font-weight: 400; }
     /* Mobile-only top pricing summary (desktop shows price in the sidebar only) */
     .sl-mobile-pricing { display: none; }
     .sl-mobile-pricing .mp-head strong { font-size: 24px; font-weight: 800; color: #1A2533; }
-    .sl-mobile-pricing .mp-head span { color: #64748B; }
+    .sl-mobile-pricing .mp-head span { color: #56657a; }
     .sl-mobile-pricing .mp-month { font-size: 14px; }
     .sl-mobile-pricing .bc-rates:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
     .chip-list { display: flex; flex-wrap: wrap; gap: 10px; }
     .chip-list span { border: 1px solid #FECACA; color: #B91C1C; background: #FEF2F2; border-radius: 999px; padding: 8px 12px; font-size: 14px; }
-    .map-location { color: #64748B; margin: -8px 0 16px; }
+    .map-location { color: #56657a; margin: -8px 0 16px; }
     .map-frame { height: 360px; border-radius: 18px; overflow: hidden; border: 1px solid #D8E3ED; background: #F5F8FB; }
     .map-frame iframe { width: 100%; height: 100%; border: 0; }
     .booking-card { position: sticky; top: 96px; border: 1px solid #D8E3ED; border-radius: 18px; padding: 24px; box-shadow: 0 14px 42px rgba(26,37,51,.12); background: #fff; max-height: calc(100vh - 120px); overflow-y: auto; }
     .price-block strong { font-size: 30px; color: #1A2533; }
-    .price-block span, .price-block p, .booking-note, .no-booking { color: #64748B; }
+    .price-block span, .price-block p, .booking-note, .no-booking { color: #56657a; }
     .booking-note { margin: 14px 0 18px; font-size: 14px; line-height: 1.5; }
     .booking-links { display: grid; gap: 10px; }
     .booking-links a { display: flex; align-items: center; justify-content: center; min-height: 52px; border-radius: 12px; background: var(--sb-primary); color: #fff; text-decoration: none; font-weight: 900; }
     .booking-links a:not(:first-child) { background: #F5F8FB; color: #1A2533; border: 1px solid #D8E3ED; }
     .host-contact { border-top: 1px solid #E2EBF3; margin-top: 20px; padding-top: 18px; }
-    .host-contact span { display: block; color: #64748B; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+    .host-contact span { display: block; color: #56657a; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
     .host-contact strong { display: block; font-size: 16px; font-weight: 700; color: #1A2533; margin-top: 4px; }
     .contact-actions { display: flex; gap: 8px; margin-top: 10px; }
     .contact-btn {
@@ -470,7 +470,7 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     .rv-aggregate { display: flex; align-items: center; gap: 10px; }
     .rv-agg-stars { color: #F59E0B; font-size: 19px; letter-spacing: 1px; }
     .rv-agg-avg { font-size: 24px; font-weight: 900; color: #1A2533; line-height: 1; }
-    .rv-agg-count { font-size: 14px; color: #64748B; }
+    .rv-agg-count { font-size: 14px; color: #56657a; }
     .rv-write-btn { margin-left: auto; border: 1.5px solid #1A2533; border-radius: 10px; background: #fff; color: #1A2533; min-height: 40px; padding: 0 16px; font-weight: 900; cursor: pointer; font-size: 14px; white-space: nowrap; }
     .rv-write-btn:hover { background: #F5F8FB; }
     .rv-item { padding: 22px 0; border-bottom: 1px solid #E2EBF3; }
@@ -492,22 +492,22 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     .rv-star-btn { border: 0; background: none; color: #CBD5E1; font-size: 0; cursor: pointer; padding: 0 2px; transition: color .1s, transform .1s; line-height: 1; display: inline-flex; align-items: center; }
     .rv-star-btn.is-active, .rv-star-btn.is-hover { color: #F59E0B; }
     .rv-star-btn:hover { transform: scale(1.15); }
-    .rv-star-label { margin: 0 0 14px; font-size: 13px; color: #64748B; min-height: 1.4em; }
-    .rv-loggedin-note { margin: 6px 0 12px; font-size: 12px; color: #64748B; display: flex; align-items: center; gap: 5px; }
+    .rv-star-label { margin: 0 0 14px; font-size: 13px; color: #56657a; min-height: 1.4em; }
+    .rv-loggedin-note { margin: 6px 0 12px; font-size: 12px; color: #56657a; display: flex; align-items: center; gap: 5px; }
     .rv-loggedin-note::before { content: "✓"; color: #059669; font-weight: 700; }
     .rv-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
     .rv-form-inner input, .rv-form-inner textarea { width: 100%; border: 1.5px solid #D8E3ED; border-radius: 10px; padding: 11px 13px; font: inherit; font-size: 15px; color: #1A2533; background: #fff; box-sizing: border-box; outline: none; transition: border-color .15s; resize: vertical; }
     .rv-form-inner input:focus, .rv-form-inner textarea:focus { border-color: var(--sb-primary); }
     .rv-error { color: #DC2626; font-size: 13px; padding: 8px 0 2px; }
     .rv-form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
-    .rv-cancel-btn { border: 1.5px solid #CBD5E1; border-radius: 10px; background: #fff; color: #64748B; padding: 0 16px; min-height: 42px; font-weight: 700; cursor: pointer; font-size: 14px; }
+    .rv-cancel-btn { border: 1.5px solid #CBD5E1; border-radius: 10px; background: #fff; color: #56657a; padding: 0 16px; min-height: 42px; font-weight: 700; cursor: pointer; font-size: 14px; }
     .rv-cancel-btn:hover { background: #F5F8FB; }
     .rv-submit-btn { border: 0; border-radius: 10px; background: var(--sb-primary); color: #fff; padding: 0 20px; min-height: 42px; font-weight: 900; cursor: pointer; font-size: 14px; }
     .rv-submit-btn:hover { background: var(--sb-primary-deeper); }
     .rv-submit-btn:disabled { opacity: .6; cursor: not-allowed; }
     .rv-success { padding: 16px 0; text-align: center; }
     .rv-success strong { display: block; color: #059669; font-size: 19px; margin-bottom: 8px; }
-    .rv-success p { color: #64748B; font-size: 15px; margin: 0; }
+    .rv-success p { color: #56657a; font-size: 15px; margin: 0; }
     .sb-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(16px); background: #1A2533; color: #fff; padding: 13px 20px; border-radius: 12px; font-size: 14px; font-weight: 600; z-index: 9999; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; max-width: calc(100vw - 40px); text-align: center; }
     .sb-toast.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
     @media (max-width: 560px) {
@@ -658,7 +658,7 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
           : (i === 3 && gallery.length > 4)
             ? `<span class="photo-more photo-more-mobile">Show all ${gallery.length} photos</span>`
             : ''
-        return `<button class="photo-tile photo-tile-${i+1}" type="button" data-open-gallery>
+        return `<button class="photo-tile photo-tile-${i+1}" type="button" data-open-gallery aria-label="Open photo ${i+1} of ${gallery.length} in gallery">
           <img src="${esc(img.src)}" alt="${esc(img.alt)}" loading="${i===0?'eager':'lazy'}" />
           ${extra}
         </button>`
@@ -1096,7 +1096,7 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
             if (emailEl && !emailEl.value && u.email) {
               emailEl.value    = u.email
               emailEl.readOnly = true
-              emailEl.style.cssText += ';background:#F5F8FB;color:#64748B;cursor:default'
+              emailEl.style.cssText += ';background:#F5F8FB;color:#56657a;cursor:default'
               emailEl.title = 'Using your account email'
               if (!document.querySelector('.rv-loggedin-note')) {
                 const note = document.createElement('p')
@@ -1237,7 +1237,7 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
         loadReviews()
       } catch (_) {
         document.getElementById('skel').innerHTML =
-          `<p style="color:#64748B;text-align:center;padding:64px 0">
+          `<p style="color:#56657a;text-align:center;padding:64px 0">
             Listing not found. <a href="/stays" style="color:var(--sb-primary);font-weight:700">Browse all stays</a>
           </p>`
       }
@@ -1340,7 +1340,7 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
           : ''
         return `<div style="position:relative;background:#F5F8FB;border-radius:10px;padding:.75rem .9rem;border:1px solid #E2EBF3;overflow:hidden;">
           ${valHtml}
-          <div style="font-size:.65rem;color:#64748B;font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem;">${s.label}</div>
+          <div style="font-size:.65rem;color:#56657a;font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-top:.2rem;">${s.label}</div>
           ${lockEl}
         </div>`
       }).join('')
