@@ -144,7 +144,7 @@ function sliderHTML(l, uid) {
       }</div></div></div>`
     : ''
 
-  return `<div class="sb-track" id="track-${uid}">${slides}</div>${arrows}${dots}`
+  return `<div class="sb-track" id="track-${uid}" tabindex="0" role="group" aria-label="Photo slider">${slides}</div>${arrows}${dots}`
 }
 
 // ─── Main template ───────────────────────────────────────────────────────────
