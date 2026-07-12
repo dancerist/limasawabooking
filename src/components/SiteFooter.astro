@@ -89,6 +89,28 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
     </span>
   </div>
 
+  <!-- Mobile install invite — shown once per session on touch devices only -->
+  <div class="pwa-invite" id="pwa-invite" hidden>
+    <div class="pwa-invite-card" role="dialog" aria-modal="true" aria-labelledby="pwa-invite-title">
+      <button type="button" class="pwa-invite-close" id="pwa-invite-close" aria-label="Close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <div class="pwa-invite-head">
+        <span class="pwa-invite-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 4.6c-2.6 0-4.7 2.1-4.7 4.7 0 3.3 4.7 7.1 4.7 7.1s4.7-3.8 4.7-7.1c0-2.6-2.1-4.7-4.7-4.7z" fill="#fff"/><circle cx="12" cy="9.3" r="1.9" fill="var(--sb-primary)"/></svg>
+        </span>
+        <div>
+          <h5 id="pwa-invite-title">Take Limasawa with you</h5>
+          <p>Install Limasawa Booking on your phone — full screen, works like an app, no app store needed.</p>
+        </div>
+      </div>
+      <div class="pwa-invite-btns">
+        <button type="button" class="pwa-invite-install" id="pwa-invite-install">Install the app</button>
+        <button type="button" class="pwa-invite-later" id="pwa-invite-later">Not now</button>
+      </div>
+    </div>
+  </div>
+
   <!-- iOS / fallback install instructions -->
   <div class="pwa-sheet" id="pwa-sheet" hidden>
     <div class="pwa-sheet-card" role="dialog" aria-modal="true" aria-labelledby="pwa-sheet-title">
@@ -169,21 +191,60 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
       deferredPrompt = null
       return
     }
-    showSheet([
-      'Open this site in <strong>Chrome</strong> on your Android phone',
-      'Tap the <strong>⋮ menu</strong> in the top-right corner',
-      'Tap <strong>Add to Home screen</strong> → <strong>Install</strong>',
-    ])
+    showSheet(ANDROID_STEPS)
   })
 
+  var IOS_STEPS = [
+    'Open this site in <strong>Safari</strong> on your iPhone or iPad',
+    'Tap the <strong>Share</strong> button <span style="opacity:.7">(square with an arrow)</span>',
+    'Scroll down and tap <strong>Add to Home Screen</strong>',
+  ]
+  var ANDROID_STEPS = [
+    'Open this site in <strong>Chrome</strong> on your Android phone',
+    'Tap the <strong>⋮ menu</strong> in the top-right corner',
+    'Tap <strong>Add to Home screen</strong> → <strong>Install</strong>',
+  ]
+
   var iosBtn = document.getElementById('pwa-install-ios')
-  if (iosBtn) iosBtn.addEventListener('click', function () {
-    showSheet([
-      'Open this site in <strong>Safari</strong> on your iPhone or iPad',
-      'Tap the <strong>Share</strong> button <span style="opacity:.7">(square with an arrow)</span>',
-      'Scroll down and tap <strong>Add to Home Screen</strong>',
-    ])
-  })
+  if (iosBtn) iosBtn.addEventListener('click', function () { showSheet(IOS_STEPS) })
+
+  /* ── Mobile install invite — once per session, touch + small screen only ── */
+  var invite = document.getElementById('pwa-invite')
+  if (invite && !standalone) {
+    var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    var isMobile = window.matchMedia('(max-width: 640px)').matches &&
+                   (navigator.maxTouchPoints > 0 || 'ontouchstart' in window)
+    var seen = false
+    try { seen = sessionStorage.getItem('sb_pwa_invite') === '1' } catch (_) {}
+
+    function hideInvite() {
+      invite.classList.remove('open')
+      setTimeout(function () { invite.hidden = true }, 250)
+    }
+
+    if (isMobile && !seen) {
+      setTimeout(function () {
+        try { sessionStorage.setItem('sb_pwa_invite', '1') } catch (_) {}
+        invite.hidden = false
+        requestAnimationFrame(function () { invite.classList.add('open') })
+      }, 4000)
+    }
+
+    document.getElementById('pwa-invite-close').addEventListener('click', hideInvite)
+    document.getElementById('pwa-invite-later').addEventListener('click', hideInvite)
+    invite.addEventListener('click', function (e) { if (e.target === invite) hideInvite() })
+    document.getElementById('pwa-invite-install').addEventListener('click', async function () {
+      hideInvite()
+      if (deferredPrompt) {
+        deferredPrompt.prompt()
+        try { await deferredPrompt.userChoice } catch (_) {}
+        deferredPrompt = null
+        return
+      }
+      showSheet(isIOS ? IOS_STEPS : ANDROID_STEPS)
+    })
+  }
 })()
 </script>
 
@@ -297,6 +358,55 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
 .ft-bottom a:hover { color: #3EC7CF; }
 .ft-bottom-links { display: flex; gap: 1.25rem; align-items: center; }
 .ft-made { color: #6d8598; }
+
+/* Mobile install invite (bottom sheet) */
+.pwa-invite {
+  position: fixed; inset: 0; z-index: 1100;
+  background: rgba(15,26,35,.55); backdrop-filter: blur(2px);
+  display: flex; align-items: flex-end; justify-content: center;
+  opacity: 0; transition: opacity .25s;
+}
+.pwa-invite.open { opacity: 1; }
+.pwa-invite[hidden] { display: none; }
+/* Mobile-only: never render on desktop-width screens */
+@media (min-width: 641px) { .pwa-invite { display: none !important; } }
+.pwa-invite-card {
+  position: relative;
+  background: #fff; color: var(--sb-text);
+  border-radius: 18px 18px 0 0;
+  padding: 1.5rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+  width: 100%; max-width: 480px;
+  box-shadow: 0 -8px 30px rgba(15,26,35,.25);
+  transform: translateY(100%); transition: transform .28s cubic-bezier(.32,.72,.28,1);
+}
+.pwa-invite.open .pwa-invite-card { transform: translateY(0); }
+.pwa-invite-close {
+  position: absolute; top: 0.7rem; right: 0.7rem;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 0; background: var(--sb-bg); color: var(--sb-text-muted);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.pwa-invite-head { display: flex; gap: 0.85rem; align-items: flex-start; margin-bottom: 1.1rem; padding-right: 1.5rem; }
+.pwa-invite-mark {
+  width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+  background: var(--sb-primary); display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px var(--sb-primary-trans-50);
+}
+.pwa-invite-mark svg { width: 27px; height: 27px; display: block; }
+.pwa-invite-head h5 { margin: 0 0 0.3rem; font-size: 1.05rem; }
+.pwa-invite-head p { margin: 0; font-size: 0.85rem; line-height: 1.55; color: var(--sb-text-muted); }
+.pwa-invite-btns { display: flex; flex-direction: column; gap: 0.5rem; }
+.pwa-invite-install {
+  border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--sb-primary); color: #fff;
+  font-weight: 700; font-size: 0.95rem; padding: 0.75rem;
+}
+.pwa-invite-install:active { background: var(--sb-primary-dark); }
+.pwa-invite-later {
+  border: 0; border-radius: 999px; cursor: pointer;
+  background: none; color: var(--sb-text-muted);
+  font-weight: 600; font-size: 0.875rem; padding: 0.55rem;
+}
 
 /* Install sheet */
 .pwa-sheet {
