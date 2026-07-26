@@ -1,0 +1,117 @@
+---
+/**
+ * SEO landing pages — /stays/type/{category}.
+ *
+ * These replace the `/stays?category={slug}` filter URLs the homepage used to
+ * link. Those query URLs canonicalised to /stays, so every one of them was a
+ * crawled page whose canonical pointed somewhere else — six wasted crawl slots
+ * that ranked for nothing. A real static page per accommodation type targets
+ * "limasawa homestays", "limasawa resorts" etc. instead.
+ *
+ * The `?category=` URLs still work as the interactive filter state on /stays;
+ * they're just no longer linked from crawlable markup.
+ */
+import Layout from '../../../layouts/Layout.astro'
+import AccommodationCard from '../../../components/AccommodationCard.astro'
+import { getListings, deriveFacets, reshapeListing } from '../../../lib/api'
+import { MUNICIPALITIES } from '../../../lib/locations'
+
+export async function getStaticPaths() {
+  const all = (await getListings({ perPage: 48 })).listings
+  const { categories } = deriveFacets(all)
+  return categories.map((c) => ({
+    params: { slug: c.slug },
+    props: {
+      name: c.name,
+      slug: c.slug,
+      count: c.count,
+      nodes: all.filter((l) => l.cats.includes(c.slug)).map(reshapeListing),
+    },
+  }))
+}
+
+const { name, slug, count, nodes } = Astro.props as any
+const barangays = MUNICIPALITIES[0]?.barangays ?? []
+
+// English plurals for the handful of category names in this taxonomy.
+const plural = /s$/i.test(name) ? name : `${name}s`
+
+const seoTitle = `Limasawa ${plural} — Compare ${count} Island Stays`
+const seoDesc =
+  `Browse ${count} ${plural.toLowerCase()} on Limasawa Island, Southern Leyte. ` +
+  `Compare nightly rates, amenities, and locations, then book direct with the local host.`
+const h1 = `${plural} in Limasawa Island`
+const intro =
+  `Every ${name.toLowerCase()} listed on Limasawa Booking, in one place. ` +
+  `These are real properties run by hosts who live on the island — you contact them directly, ` +
+  `with no booking fee and no middleman.`
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: h1,
+  description: seoDesc,
+  url: `https://limasawabooking.com/stays/type/${slug}/`,
+  mainEntity: {
+    '@type': 'ItemList',
+    numberOfItems: nodes.length,
+    itemListElement: nodes.slice(0, 20).map((n: any, i: number) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `https://limasawabooking.com/stay/${n.slug}/`,
+      name: n.title,
+    })),
+  },
+}
+---
+
+<Layout title={seoTitle} description={seoDesc} image="/og/stays.jpg" jsonLd={jsonLd}>
+  <main class="ld-main">
+    <nav class="ld-crumb"><a href="/stays">Stays</a> <span>/</span> <span>{plural}</span></nav>
+
+    <header class="ld-hero">
+      <h1>{h1}</h1>
+      <p>{intro}</p>
+    </header>
+
+    {nodes.length > 0 ? (
+      <div class="ld-grid">
+        {nodes.map((n: any) => <AccommodationCard listing={n} />)}
+      </div>
+    ) : (
+      <div class="ld-empty">
+        <p>No {plural.toLowerCase()} listed yet.</p>
+        <a href="/stays" class="ld-link">Browse all Limasawa accommodations →</a>
+      </div>
+    )}
+
+    <section class="ld-areas">
+      <h2>Browse Limasawa by area</h2>
+      <div class="ld-area-links">
+        {barangays.map((b) => <a href={`/stays/${b.slug}`}>{b.name}</a>)}
+        <a href="/stays/beachfront">Beachfront</a>
+        <a href="/stays">All stays</a>
+      </div>
+    </section>
+  </main>
+
+  <style>
+    .ld-main { max-width: 1200px; margin: 0 auto; padding: 1.5rem 1.5rem 5rem; }
+    .ld-crumb { font-size: .82rem; color: #56657a; margin-bottom: 1.25rem; }
+    .ld-crumb a { color: #56657a; text-decoration: none; }
+    .ld-crumb a:hover { color: #279DA3; }
+    .ld-crumb span { margin: 0 .15rem; }
+    .ld-hero { max-width: 760px; margin-bottom: 2rem; }
+    .ld-hero h1 { font-family: 'DM Sans', sans-serif; font-size: clamp(1.8rem, 4.5vw, 2.6rem); font-weight: 800; line-height: 1.1; color: #1A2533; margin-bottom: .75rem; }
+    .ld-hero p { color: #56657a; line-height: 1.6; font-size: 1.02rem; }
+    .ld-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.75rem 1.25rem; }
+    .ld-empty { padding: 3rem 1rem; text-align: center; color: #56657a; }
+    .ld-link { color: #279DA3; font-weight: 700; text-decoration: none; }
+    .ld-link:hover { color: #1E8087; }
+    .ld-areas { margin-top: 3.5rem; padding-top: 2rem; border-top: 1px solid #E2EBF3; }
+    .ld-areas h2 { font-family: 'DM Sans', sans-serif; font-size: 1.25rem; font-weight: 800; color: #1A2533; margin-bottom: 1rem; }
+    .ld-area-links { display: flex; flex-wrap: wrap; gap: .6rem; }
+    .ld-area-links a { border: 1.5px solid #E2EBF3; border-radius: 999px; padding: .45rem 1.1rem; font-size: .85rem; font-weight: 700; color: #1A2533; text-decoration: none; }
+    .ld-area-links a:hover { border-color: #279DA3; color: #279DA3; }
+  </style>
+</Layout>

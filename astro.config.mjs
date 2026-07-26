@@ -14,7 +14,8 @@ export default defineConfig({
         !page.includes('/dashboard') &&
         !page.includes('/auth') &&
         !page.includes('/list-your-property') &&
-        !page.includes('/list-rental'),
+        !page.includes('/list-rental') &&
+        !page.includes('/claim-listing'),
       changefreq: 'weekly',
       priority: 0.7,
       lastmod: new Date(),

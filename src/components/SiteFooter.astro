@@ -33,7 +33,13 @@ const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking
         Every stay, rental, and travel guide for Limasawa Island — book direct with local hosts.
       </p>
       <div class="ft-contact">
-        <a href="mailto:nico@podiumapps.com">nico@podiumapps.com</a>
+        {/*
+          Cloudflare's Email Address Obfuscation rewrites any mailto: it finds
+          into /cdn-cgi/l/email-protection#hash. That path 404s on this zone, so
+          every page carried a broken internal link. The email_off comment pair
+          below is Cloudflare's documented opt-out — it leaves the mailto alone.
+        */}
+        <!--email_off--><a href="mailto:nico@podiumapps.com">nico@podiumapps.com</a><!--/email_off-->
         <span>Limasawa Island, Southern Leyte, PH</span>
       </div>
     </div>

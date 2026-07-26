@@ -83,7 +83,7 @@ const jsonLd = [
               <select id="hero-q" aria-label="What are you looking for?">
                 <option value="/stays" selected>What are you looking for?</option>
                 <option value="/stays">🏠 All accommodation</option>
-                {categories.map((c) => <option value={`/stays?category=${c.slug}`}>{c.name} ({c.count})</option>)}
+                {categories.map((c) => <option value={`/stays/type/${c.slug}`}>{c.name} ({c.count})</option>)}
                 <option value="/rentals">🛵 Scooter & motorbike rentals</option>
               </select>
             </div>
@@ -128,7 +128,7 @@ const jsonLd = [
     <section class="section">
       <div class="section-inner">
         <div class="section-head">
-          <h2>Featured stays</h2>
+          <h2>Featured Limasawa accommodations</h2>
           <a href="/stays" class="see-all">See all {total} →</a>
         </div>
         {featured.length === 0 ? (
@@ -148,7 +148,7 @@ const jsonLd = [
           <div class="section-head"><h2>Browse by type</h2></div>
           <div class="tile-row">
             {categories.map((c) => (
-              <a href={`/stays?category=${c.slug}`} class="tile" style={c.image ? `background-image: linear-gradient(180deg, rgba(13,30,43,.15), rgba(13,30,43,.7)), url(${c.image})` : ''}>
+              <a href={`/stays/type/${c.slug}`} class="tile" style={c.image ? `background-image: linear-gradient(180deg, rgba(13,30,43,.15), rgba(13,30,43,.7)), url(${c.image})` : ''}>
                 <span class="tile-name">{c.name}</span>
                 <span class="tile-count">{c.count} {c.count === 1 ? 'place' : 'places'}</span>
               </a>

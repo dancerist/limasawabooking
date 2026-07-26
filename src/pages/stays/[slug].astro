@@ -6,35 +6,38 @@
  */
 import Layout from '../../layouts/Layout.astro'
 import AccommodationCard from '../../components/AccommodationCard.astro'
-import { getListings, reshapeListing } from '../../lib/api'
+import { getListings, deriveFacets, reshapeListing } from '../../lib/api'
 import { MUNICIPALITIES } from '../../lib/locations'
 
 export async function getStaticPaths() {
   const barangays = MUNICIPALITIES[0]?.barangays ?? []
   const all = (await getListings({ perPage: 48 })).listings
+  const { categories } = deriveFacets(all)
   const out: any[] = []
   for (const b of barangays) {
     const listings = all.filter((l) => l.muniSlug === b.slug)
     out.push({
       params: { slug: b.slug },
-      props: { kind: 'location', name: b.name, slug: b.slug, nodes: listings.map(reshapeListing), browseHref: `/stays?location=${b.slug}` },
+      props: { kind: 'location', name: b.name, slug: b.slug, nodes: listings.map(reshapeListing), categories },
     })
   }
   const beach = all.filter((l: any) => l.beachfront || (l.amen || []).some((a: string) => ['beach-access', 'beach-view'].includes(a)))
   out.push({
     params: { slug: 'beachfront' },
-    props: { kind: 'beachfront', name: 'Beachfront', slug: 'beachfront', nodes: beach.map(reshapeListing), browseHref: '/stays?amenity=beach-access' },
+    props: { kind: 'beachfront', name: 'Beachfront', slug: 'beachfront', nodes: beach.map(reshapeListing), categories },
   })
   return out
 }
 
-const { kind, name, slug, nodes, browseHref } = Astro.props as any
+const { kind, name, slug, nodes, categories } = Astro.props as any
 const barangays = MUNICIPALITIES[0]?.barangays ?? []
 const isBeach = kind === 'beachfront'
 
+// Titles kept short enough that " — Limasawa Booking" still fits inside 60
+// chars, so the SERP shows the brand instead of Layout dropping it.
 const seoTitle = isBeach
-  ? 'Beachfront Accommodations in Limasawa Island'
-  : `${name} Accommodations — Where to Stay in ${name}, Limasawa`
+  ? 'Beachfront Accommodations, Limasawa'
+  : `${name} Accommodations, Limasawa Island`
 const seoDesc = isBeach
   ? 'Beachfront resorts and beach houses in Limasawa Island, Southern Leyte — stays steps from the sand. Compare rates and book direct with local hosts.'
   : `Find accommodations in ${name}, Limasawa Island — homestays, resorts, and budget rooms. Compare prices and book direct with local hosts in ${name}.`
@@ -64,8 +67,14 @@ const intro = isBeach
       </div>
     )}
 
+    {/*
+      This used to link /stays?location={slug} (and ?amenity=beach-access for
+      the beachfront page). Those URLs canonicalise to /stays, so linking them
+      handed the crawler pages that disowned themselves. /stays plain is the
+      same map — the query filters still work for anyone holding a saved link.
+    */}
     {nodes.length > 0 && (
-      <div class="ld-more"><a href={browseHref} class="ld-link">View on the map &amp; filter →</a></div>
+      <div class="ld-more"><a href="/stays" class="ld-link">View every stay on the map →</a></div>
     )}
 
     <section class="ld-areas">
@@ -76,6 +85,15 @@ const intro = isBeach
         <a href="/stays">All stays</a>
       </div>
     </section>
+
+    {categories?.length > 0 && (
+      <section class="ld-areas">
+        <h2>Browse Limasawa by accommodation type</h2>
+        <div class="ld-area-links">
+          {categories.map((c: any) => <a href={`/stays/type/${c.slug}`}>{c.name}</a>)}
+        </div>
+      </section>
+    )}
   </main>
 
   <style>

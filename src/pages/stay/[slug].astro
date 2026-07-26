@@ -5,7 +5,14 @@ import { getAccommodations } from '../../lib/api'
 const WP_REST = import.meta.env.PUBLIC_WP_REST ?? 'https://admin.limasawabooking.com/wp-json/limasawa/v1'
 
 interface PathProps {
+  /** SEO <title> — property name first, so brand queries match. */
   title: string
+  /** The property's own name, rendered as the server-side <h1>. */
+  name: string
+  /** Marketing sub-heading, shown under the h1 when it adds something. */
+  tagline: string
+  /** "Category · Barangay" line, server-rendered then enriched by the client. */
+  metaLine: string
   description: string
   image?: string
   jsonLd?: Record<string, any> | Record<string, any>[]
@@ -66,11 +73,34 @@ export async function getStaticPaths() {
             ratingCount > 0 ? `Rated ${ratingAvg}/5 (${ratingCount} review${ratingCount === 1 ? '' : 's'})` : '',
             guestCount > 0 ? `Sleeps ${guestCount}` : '',
           ].filter(Boolean).join(' · ')
-          const title = data.accommodationSubHeading || l.title || 'Listing'
+
+          // The property's own name. Previously the <title>/<h1> used
+          // accommodationSubHeading, which for most listings is a marketing
+          // sentence ("Relaxing beachfront stay with lagoon views…") — so a
+          // listing's own name appeared nowhere on its page. That is why
+          // "island lagoon resort" ranked #6.6 with a 0.4% CTR on its own
+          // branded query. Name leads everywhere now; the sub-heading becomes
+          // a tagline under the h1.
+          const name = (l.title || '').trim() || 'Listing'
+          const subHeading = (data.accommodationSubHeading || '').trim()
+          const tagline = subHeading && subHeading.toLowerCase() !== name.toLowerCase() ? subHeading : ''
+
+          // "Sailors Cabin — Homestay in Triana, Limasawa". The category is
+          // dropped when the name already carries a lodging noun: this taxonomy
+          // is loosely applied (Island Lagoon *Resort* is filed as a homestay),
+          // and "Island Lagoon Resort — Homestay in …" reads as a contradiction
+          // in the SERP. Also dropped when the result would exceed 60 chars.
+          const place = muni ? `${muni}, Limasawa` : 'Limasawa Island'
+          const NAME_HAS_TYPE = /\b(resort|hotel|homestay|inn|villa|lodge|lodging|house|apartment|cabin|hut|cottage|guest\s*house|b&b)\b/i
+          const withCat = cat && !NAME_HAS_TYPE.test(name) ? `${name} — ${cat} in ${place}` : ''
+          const title = withCat && withCat.length <= 60 ? withCat : `${name} — ${place}`
+          const metaLine = [cat, muni].filter(Boolean).join(' · ')
 
           // ─── Build LodgingBusiness JSON-LD ──────────────────────────────────
           const schemaType = SCHEMA_TYPE_BY_CATEGORY[catSlug] || 'LodgingBusiness'
-          const url = `https://limasawabooking.com/stay/${l.slug}`
+          // Trailing slash to match the canonical Astro emits for this route —
+          // schema url and <link rel=canonical> disagreeing is a wasted signal.
+          const url = `https://limasawabooking.com/stay/${l.slug}/`
           const dailyRate = Number(data.accommodationDailyRent || 0)
           const monthlyRate = Number(data.accommodationMonthlyRent || 0)
           const lat = data.accommodationLocation?.latitude
@@ -91,7 +121,8 @@ export async function getStaticPaths() {
           const jsonLd: Record<string, any> = {
             '@context': 'https://schema.org',
             '@type': schemaType,
-            name: title,
+            name,
+            ...(tagline ? { alternateName: tagline } : {}),
             description: description.slice(0, 320),
             url,
             ...(galleryImages.length ? { image: galleryImages } : image ? { image } : {}),
@@ -151,7 +182,7 @@ export async function getStaticPaths() {
             itemListElement: [
               { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://limasawabooking.com/' },
               { '@type': 'ListItem', position: 2, name: 'Stays', item: 'https://limasawabooking.com/stays/' },
-              { '@type': 'ListItem', position: 3, name: title, item: url },
+              { '@type': 'ListItem', position: 3, name, item: url },
             ],
           }
 
@@ -159,6 +190,9 @@ export async function getStaticPaths() {
             params: { slug: l.slug },
             props: {
               title,
+              name,
+              tagline,
+              metaLine,
               description: description.slice(0, 250),
               image,
               jsonLd: [jsonLd, breadcrumbLd],
@@ -173,7 +207,7 @@ export async function getStaticPaths() {
 }
 
 const { slug } = Astro.params
-const { title, description, image, jsonLd } = Astro.props as PathProps
+const { title, name, tagline, metaLine, description, image, jsonLd } = Astro.props as PathProps
 ---
 
 <Layout title={title} description={description} image={image} type="product" showNav={false} jsonLd={jsonLd}>
@@ -200,12 +234,30 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     </header>
 
     <div class="stay-wrap">
+      <!--
+        Heading is server-rendered, not painted by the client script. The page
+        body comes from the REST API at runtime, so a JS-built h1 left every
+        /stay/* URL with no <h1> for crawlers. It also sits outside #stay-content
+        (which starts display:none) so the title is on screen before the fetch
+        resolves. renderTitleSection() enriches .meta-line in place afterwards —
+        it must not re-emit the h1.
+      -->
+      <div id="sl-title">
+        <div class="title-row">
+          <div>
+            <h1>{name}</h1>
+            {tagline && <p class="stay-tagline">{tagline}</p>}
+            {metaLine && (
+              <div class="meta-line">
+                {metaLine.split(' · ').map((part) => <span>{part}</span>)}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       <!-- Loading skeleton -->
       <div id="skel">
-        <div class="skel-title">
-          <div class="skel-bar" style="width:58%;height:40px;border-radius:8px;"></div>
-          <div class="skel-bar" style="width:32%;height:17px;border-radius:6px;margin-top:11px;"></div>
-        </div>
         <div class="skel-gallery">
           <div class="skel-main"></div>
           <div></div><div></div><div></div><div></div>
@@ -220,7 +272,6 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
 
       <!-- Content shell (hidden until JS fills it) -->
       <div id="stay-content" style="display:none">
-        <div id="sl-title"></div>
         <section id="sl-photos" class="photo-grid" aria-label="Listing photos"></section>
         <div class="content-grid">
           <div class="main-col" id="sl-main"></div>
@@ -263,6 +314,8 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     .back-link:hover { color: #1A2533; }
     .title-row { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 18px; }
     .title-row h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 42px); line-height: 1.04; letter-spacing: 0; color: #1A2533; }
+    /* Sub-heading demoted from h1 to a tagline once the h1 became the property name. */
+    .stay-tagline { margin: 0 0 10px; color: #4C5B6C; font-size: 17px; line-height: 1.5; max-width: 62ch; }
     .meta-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: #56657a; font-size: 15px; }
     .meta-line span:not(:last-child)::after { content: "·"; margin-left: 12px; color: #CBD5E1; }
     .verified-dot { color: #0f8b65; font-weight: 800; }
@@ -295,7 +348,6 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
 
     /* Skeleton */
     .skel-bar { background: linear-gradient(90deg, #E2EBF3 25%, #EEF3F7 50%, #E2EBF3 75%); background-size: 200% 100%; animation: skel-shine 1.5s infinite; }
-    .skel-title { margin-bottom: 22px; }
     .skel-gallery { display: grid; grid-template-columns: 2fr 1fr 1fr; grid-template-rows: 210px 210px; gap: 8px; border-radius: 18px; overflow: hidden; margin-bottom: 38px; }
     .skel-gallery > div { background: linear-gradient(90deg, #E2EBF3 25%, #EEF3F7 50%, #E2EBF3 75%); background-size: 200% 100%; animation: skel-shine 1.5s infinite; }
     .skel-gallery .skel-main { grid-row: span 2; }
@@ -605,17 +657,30 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
     }
 
     // ─── Render functions (return HTML strings) ────────────────────────────────
-    function renderTitleSection(d, loc) {
+    // The h1 + tagline are server-rendered (see #sl-title in the template) so
+    // crawlers get a heading without running this script. Here we only top up
+    // the meta line with the bits that need live data — verified status and the
+    // review aggregate. Never re-emit the h1: doing so is what left these pages
+    // headingless for the crawler in the first place.
+    function enrichTitleSection(d, loc) {
+      const wrap = document.getElementById('sl-title')
+      if (!wrap) return
+      let line = wrap.querySelector('.meta-line')
+      if (!line) {
+        line = document.createElement('div')
+        line.className = 'meta-line'
+        wrap.querySelector('.title-row > div')?.appendChild(line)
+      }
+      // Rebuild from live data — the server-rendered spans are the same
+      // category/location values, so replacing them is a no-op visually.
       const meta = [
         d.category && `<span>${esc(d.category)}</span>`,
         loc        && `<span>${esc(loc)}</span>`,
         d.verified && `<span class="verified-dot">Verified</span>`,
         d.ratingCount > 0 && `<a class="title-rating" href="#sl-reviews"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:inline-block;vertical-align:-2px"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg> <strong>${Number(d.ratingAvg).toFixed(2)}</strong> · <u>${d.ratingCount} review${d.ratingCount === 1 ? '' : 's'}</u></a>`,
       ].filter(Boolean).join('')
-      return `<div class="title-row"><div>
-        <h1>${esc(d.subHeading || d.title || 'Listing')}</h1>
-        ${meta ? `<div class="meta-line">${meta}</div>` : ''}
-      </div></div>`
+      if (meta) line.innerHTML = meta
+      else line.remove()
     }
 
     function renderHostBlock(d) {
@@ -972,7 +1037,7 @@ const { title, description, image, jsonLd } = Astro.props as PathProps
       const cleanNames = cleanAmenityNames(d.amenityNames)
       const groups     = groupAmenities(cleanNames)
 
-      document.getElementById('sl-title').innerHTML       = renderTitleSection(d, loc)
+      enrichTitleSection(d, loc)
       document.getElementById('sl-photos').innerHTML      = renderPhotoGrid(gallery)
       document.getElementById('sl-main').innerHTML        = [
         renderIntro(d, loc),
