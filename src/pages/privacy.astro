@@ -85,7 +85,8 @@ const UPDATED = 'July 8, 2026'
           Under the Data Privacy Act you may request access to, correction of, or deletion of your personal
           data, object to processing, and lodge a complaint with the National Privacy Commission
           (privacy.gov.ph). To exercise any of these rights, email us at
-          <a href="mailto:nico@podiumapps.com">nico@podiumapps.com</a> — we respond within a reasonable
+          {/* email_off: Cloudflare rewrites bare mailto: to a 404ing /cdn-cgi path — see SiteFooter.astro */}
+          <!--email_off--><a href="mailto:nico@podiumapps.com">nico@podiumapps.com</a><!--/email_off--> — we respond within a reasonable
           period and verify identity before acting on requests.
         </p>
       </section>
@@ -111,7 +112,7 @@ const UPDATED = 'July 8, 2026'
         <h2>10. Changes and contact</h2>
         <p>
           We may update this policy from time to time; the date above reflects the current version.
-          Questions or requests: <a href="mailto:nico@podiumapps.com">nico@podiumapps.com</a>.
+          Questions or requests: <!--email_off--><a href="mailto:nico@podiumapps.com">nico@podiumapps.com</a><!--/email_off-->.
           See also our <a href="/terms">Terms &amp; Conditions</a>.
         </p>
       </section>
