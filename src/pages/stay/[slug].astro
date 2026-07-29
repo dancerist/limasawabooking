@@ -19,6 +19,29 @@ interface PathProps {
 }
 
 export async function getStaticPaths() {
+  // WP excerpts and property names arrive HTML-encoded ("Pogi&#8217;s"), and
+  // Astro escapes the ampersand again on the way into the meta attribute, so
+  // the entity reaches Google verbatim. Decode before use; loop because one
+  // pass only peels a single layer of the double encoding.
+  // Inlined here because Astro hoists getStaticPaths into its own context.
+  const decodeEntities = (input: string) => {
+    const NAMED: Record<string, string> = {
+      nbsp: ' ', amp: '&', quot: '"', apos: "'", lt: '<', gt: '>',
+      rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”',
+      ndash: '–', mdash: '—', hellip: '…',
+    }
+    let out = input
+    for (let i = 0; i < 3; i++) {
+      const next = out
+        .replace(/&#(\d+);/g, (_m, d) => String.fromCodePoint(Number(d)))
+        .replace(/&#x([0-9a-f]+);/gi, (_m, d) => String.fromCodePoint(parseInt(d, 16)))
+        .replace(/&([a-z]+);/gi, (m, n) => NAMED[n.toLowerCase()] ?? m)
+      if (next === out) break
+      out = next
+    }
+    return out
+  }
+
   // Map our accommodation-category slugs → schema.org LodgingBusiness subtypes.
   // Anything not in the map falls back to plain LodgingBusiness.
   // Inlined inside getStaticPaths because Astro hoists it into its own context.
@@ -50,14 +73,22 @@ export async function getStaticPaths() {
             undefined
           // reshapeListing emits databaseId: 0 for every location node, so take
           // the first named term (locations are stored flat — one barangay term).
-          const muni = (l.locations?.nodes || []).map((t: any) => t?.name).find(Boolean) || ''
+          const muni = decodeEntities((l.locations?.nodes || []).map((t: any) => t?.name).find(Boolean) || '')
           const catNode = l.accommodationsCategory?.nodes?.[0]
-          const cat = catNode?.name || ''
+          const cat = decodeEntities(catNode?.name || '')
           const catSlug = catNode?.slug || ''
           const fallbackDesc = [cat, muni && `in ${muni}, Limasawa`].filter(Boolean).join(' ').trim()
+          // Hosts routinely type a bare category line into the short
+          // description ("Beach resort in Limasawa Island, Philippines"), which
+          // left Island Lagoon — 254 impressions/28d — with a 64-character
+          // snippet. The excerpt is usually real prose, so take whichever
+          // actually says something rather than always preferring the former.
+          const shortDesc = decodeEntities((data.customAccommodationShortDescription || '').trim())
+          const excerptText = decodeEntities((l.excerpt || '').replace(/<[^>]*>/g, ' '))
+            .replace(/\s+/g, ' ')
+            .trim()
           const baseDesc =
-            (data.customAccommodationShortDescription || '').trim() ||
-            (l.excerpt || '').replace(/<[^>]*>/g, '').trim().slice(0, 160) ||
+            (excerptText.length > shortDesc.length ? excerptText : shortDesc) ||
             fallbackDesc ||
             'Find this accommodation on Limasawa Booking.'
           // Enrich the meta description with booking signals — the base sentence
@@ -67,12 +98,20 @@ export async function getStaticPaths() {
           const ratingAvg = Number(l.ratingAvg || 0)
           const ratingCount = Number(l.ratingCount || 0)
           const guestCount = Number(data.accommodationNumberOfGuests || 0)
-          const description = [
-            baseDesc.replace(/[.\s]+$/, ''),
+          const signals = [
             priceFrom > 0 ? `From ₱${priceFrom.toLocaleString('en-PH')}/night` : '',
             ratingCount > 0 ? `Rated ${ratingAvg}/5 (${ratingCount} review${ratingCount === 1 ? '' : 's'})` : '',
             guestCount > 0 ? `Sleeps ${guestCount}` : '',
           ].filter(Boolean).join(' · ')
+          // Price and rating are the strongest click signals in the snippet, so
+          // they get their space reserved first — with real prose now in front,
+          // Layout's 160-character clamp would otherwise cut them off entirely.
+          const DESC_MAX = 160
+          const room = DESC_MAX - (signals ? signals.length + 3 : 0)
+          const lead = baseDesc.replace(/[.\s]+$/, '')
+          const leadClamped =
+            lead.length > room ? `${lead.slice(0, room - 1).replace(/\s+\S*$/, '')}…` : lead
+          const description = [leadClamped, signals].filter(Boolean).join(' · ')
 
           // The property's own name. Previously the <title>/<h1> used
           // accommodationSubHeading, which for most listings is a marketing
@@ -81,8 +120,8 @@ export async function getStaticPaths() {
           // "island lagoon resort" ranked #6.6 with a 0.4% CTR on its own
           // branded query. Name leads everywhere now; the sub-heading becomes
           // a tagline under the h1.
-          const name = (l.title || '').trim() || 'Listing'
-          const subHeading = (data.accommodationSubHeading || '').trim()
+          const name = decodeEntities(l.title || '').replace(/\s+/g, ' ').trim() || 'Listing'
+          const subHeading = decodeEntities((data.accommodationSubHeading || '').trim())
           const tagline = subHeading && subHeading.toLowerCase() !== name.toLowerCase() ? subHeading : ''
 
           // "Sailors Cabin — Homestay in Triana, Limasawa". The category is

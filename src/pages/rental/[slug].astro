@@ -33,8 +33,39 @@ const { rental: r } = Astro.props as { rental: any }
 const peso = (n: number) => '₱' + Number(n || 0).toLocaleString('en-PH')
 const RT_UNIT: Record<string, string> = { day: '/ day', hour: '/ hour', trip: '/ trip', person: '/ person' }
 const unitLabel = RT_UNIT[r?.rateUnit] || '/ day'
-const title = r?.title || 'Rental — Limasawa Booking'
-const description = r ? (r.excerpt || `${r.type} rental in Limasawa from ${peso(r.daily)} ${unitLabel}.`).slice(0, 160) : 'Rentals in Limasawa'
+// Same WP double-encoding as /stay/*: excerpts and titles arrive as
+// "Aman&#8217;s Scooter Rental", Astro escapes the ampersand again on the way
+// into the meta attribute, and the entity reaches Google verbatim. Loop
+// because one pass only peels a single layer.
+const decodeEntities = (input: string) => {
+  const NAMED: Record<string, string> = {
+    nbsp: ' ', amp: '&', quot: '"', apos: "'", lt: '<', gt: '>',
+    rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”',
+    ndash: '–', mdash: '—', hellip: '…',
+  }
+  let out = input
+  for (let i = 0; i < 3; i++) {
+    const next = out
+      .replace(/&#(\d+);/g, (_m, d) => String.fromCodePoint(Number(d)))
+      .replace(/&#x([0-9a-f]+);/gi, (_m, d) => String.fromCodePoint(parseInt(d, 16)))
+      .replace(/&([a-z]+);/gi, (m, n) => NAMED[n.toLowerCase()] ?? m)
+    if (next === out) break
+    out = next
+  }
+  return out
+}
+// Collapse whitespace: "B&G\n\n   Motor Rental" in WP otherwise spends the
+// 60-character title budget on blanks and clamps to "B&G      Motor…".
+const title =
+  decodeEntities(r?.title || '').replace(/\s+/g, ' ').trim() || 'Rental — Limasawa Booking'
+// The excerpt can carry markup as well as entities, so strip tags and collapse
+// whitespace before measuring — otherwise a tag eats the 160-char budget.
+const rentalExcerpt = decodeEntities((r?.excerpt || '').replace(/<[^>]*>/g, ' '))
+  .replace(/\s+/g, ' ')
+  .trim()
+const description = r
+  ? (rentalExcerpt || `${r.type} rental in Limasawa from ${peso(r.daily)} ${unitLabel}.`).slice(0, 160)
+  : 'Rentals in Limasawa'
 const ogImage = r?.thumb || undefined
 
 // WhatsApp/phone normalisation (PH: 09XX → 639XX)
